@@ -69,6 +69,23 @@ print(attempt(lambda: socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)))
         out = run_guarded("import socket\na, b = socket.socketpair()\na.send(b'ok')\nprint(b.recv(2).decode())")
         self.assertEqual(out.strip(), "ok")
 
+    def test_sub_interpreters_are_blocked(self):
+        # A sub-interpreter would start without the audit hook.
+        out = run_guarded('''
+import importlib
+for name in ("_interpreters", "_xxsubinterpreters"):
+    for how in ("importlib", "statement"):
+        try:
+            importlib.import_module(name) if how == "importlib" else exec(f"import {name}")
+            print("OPEN", name, how)
+        except (ImportError, netguard.NetworkBlockedError):
+            print("blocked")
+''', before_guard="import importlib.util\nprint(sum(bool(importlib.util.find_spec(n)) for n in ('_interpreters', '_xxsubinterpreters')))")
+        lines = out.split("\n")
+        if lines[0].strip() == "0":
+            self.skipTest("this Python has no sub-interpreter module")
+        self.assertNotIn("OPEN", out)
+
     @unittest.skipUnless(LINUX, "the kernel filter is Linux-only")
     def test_kernel_blocks_native_sockets(self):
         # Look up libc's socket() before the block exists, then call it after:
@@ -160,6 +177,54 @@ class ModelTests(unittest.TestCase):
             engine.load_model(Path(tempfile.gettempdir()))
 
 
+class RecorderTests(unittest.TestCase):
+    def test_audio_survives_driver_errors_on_stop(self):
+        import wave
+        from unittest import mock
+
+        import numpy as np
+
+        class Status:
+            input_overflow = False
+
+        class FailingStream:  # an audio driver whose stop and close both fail
+            def __init__(self, callback, **kwargs):
+                self.callback = callback
+
+            def start(self):
+                self.callback(np.full((1600, 1), 1000, dtype=np.int16), 1600, None, Status())
+
+            def stop(self):
+                raise RuntimeError("driver error")
+
+            close = stop
+
+            def abort(self):
+                pass
+
+        class FakeSoundDevice:
+            InputStream = FailingStream
+
+            @staticmethod
+            def query_devices(device=None, kind=None):
+                return {"name": "Fake mic", "max_input_channels": 1, "default_samplerate": 16000}
+
+            @staticmethod
+            def check_input_settings(**kwargs):
+                pass
+
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch.object(engine, "import_sounddevice", lambda: FakeSoundDevice), \
+                mock.patch.object(engine, "_require_guard", lambda: None):
+            rec = engine.Recorder(None, Path(d, "r.wav"))
+            rec.start()
+            samples = rec.stop()
+            self.assertEqual(len(samples), 1600)
+            self.assertFalse(rec._writer.is_alive())
+            with wave.open(str(Path(d, "r.wav"))) as w:
+                self.assertEqual(w.getnframes(), 1600)
+
+
 class HelperTests(unittest.TestCase):
     def test_parse_language(self):
         self.assertIsNone(engine.parse_language("auto"))
@@ -209,13 +274,19 @@ class HelperTests(unittest.TestCase):
 @unittest.skipUnless(engine.installed_models(), "no speech model installed")
 class EndToEndTests(unittest.TestCase):
     def test_transcribe_file_offline(self):
-        with tempfile.TemporaryDirectory() as out:
+        with tempfile.TemporaryDirectory() as home:
+            out = Path(home, "out")
+            # A fresh home folder shows any file a library writes behind our back,
+            # such as onnxruntime's telemetry queue and device ID.
+            env = dict(os.environ, HOME=home, USERPROFILE=home)
             r = subprocess.run([sys.executable, "-I", str(ROOT / "transcriber.py"), "transcribe",
-                                str(SAMPLE), "-o", out, "-l", "en"],
-                               capture_output=True, text=True, timeout=900)
+                                str(SAMPLE), "-o", str(out), "-l", "en"],
+                               capture_output=True, text=True, timeout=900, env=env)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             text = Path(out, "jfk.txt").read_text(encoding="utf-8").lower()
+            stray = [str(p) for p in Path(home).rglob("*") if not p.is_relative_to(out)]
         self.assertIn("ask not what your country can do for you", text)
+        self.assertEqual(stray, [], "files written outside the output folder")
 
 
 if __name__ == "__main__":

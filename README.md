@@ -18,7 +18,7 @@ automatic language detection, punctuation included.
 | **Kernel filter** | The Linux kernel refuses to give the app, and anything it starts, any internet socket. Covers native code too. | Linux |
 | **Python block** | Before anything else loads, Python is set to refuse every network socket, connection and DNS lookup. Once on, it can't be switched off. | all |
 | **Local-only file reader** | FFmpeg, which reads audio files, may only open local files, even if a playlist inside a file points to a web address. | all |
-| **No downloads at runtime** | Models load from the `models` folder only. A model that lacks a file the speech library would otherwise fetch online is refused. Hugging Face offline mode on, telemetry off. | all |
+| **No downloads, no telemetry** | Models load from the `models` folder only. A model that lacks a file the speech library would otherwise fetch online is refused. Library telemetry is switched off, including Microsoft's in onnxruntime (used for voice detection), which is on by default. A test checks that nothing is written anywhere except your output folder. | all |
 | **Private files** | Saved to `~/OfflineTranscriber` (not Documents or Desktop, which iCloud and OneDrive often sync), readable only by your user account. Warns if you pick a folder that looks cloud-synced. | all |
 
 Check it yourself with `./run.sh check` (Windows: `run.bat check`). It tries
@@ -27,11 +27,12 @@ and shows that each attempt is blocked. You can also watch with a firewall
 that reports connection attempts, such as [LuLu](https://objective-see.org/products/lulu.html) on macOS.
 
 What the app can't control: other programs and the operating system. For
-example, iCloud or OneDrive syncing a folder you save to, backup software, or
+example, iCloud or OneDrive syncing a folder you save to, backup software,
 clipboard sync (Apple's Universal Clipboard, Windows clipboard sync) when you
-press "Copy". On macOS and Windows there is no kernel filter, so if you want
-protection even against a compromised library, keep the computer offline while
-using the app.
+press "Copy", or Windows' own diagnostic data (Settings > Privacy & security >
+Diagnostics & feedback: turn off optional diagnostic data). On macOS and
+Windows there is no kernel filter, so if you want protection even against a
+compromised library, keep the computer offline while using the app.
 
 ## Setup (one time, needs internet)
 

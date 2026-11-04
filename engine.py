@@ -143,9 +143,22 @@ def default_threads() -> int:
     return max(1, min(8, cores or os.cpu_count() or 4))
 
 
+def silence_onnxruntime() -> None:
+    """onnxruntime, which runs voice detection, has Microsoft telemetry on by
+    default. On macOS and Linux it is stopped by ORT_DISABLE_TELEMETRY (set by
+    netguard). Windows builds report through Windows' event tracing instead,
+    which only this call switches off. Must run before any onnxruntime session."""
+    try:
+        import onnxruntime
+        onnxruntime.disable_telemetry_events()
+    except Exception:
+        pass
+
+
 def load_model(model_dir: Path, compute: str = "cpu", compute_type: str | None = None, threads: int = 0):
     _require_guard()
     check_model_dir(model_dir)
+    silence_onnxruntime()
     from faster_whisper import WhisperModel
 
     compute_type = compute_type or ("int8" if compute == "cpu" else "float16")
@@ -399,12 +412,18 @@ class Recorder:
         """Stop recording and return all samples (int16 mono at self.samplerate)."""
         import numpy as np
 
-        if self._stream is not None:
-            try:
-                self._stream.stop()
-                self._stream.close()
-            finally:
-                self._stream = None
+        stream, self._stream = self._stream, None
+        if stream is not None:
+            # Whatever the audio driver does here, the audio already captured
+            # must still be saved and returned.
+            for close in (stream.stop, stream.close):
+                try:
+                    close()
+                except Exception:
+                    try:
+                        stream.abort()
+                    except Exception:
+                        pass
         self._finish()
         return np.concatenate(self._chunks) if self._chunks else np.zeros(0, dtype=np.int16)
 

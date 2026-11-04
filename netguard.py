@@ -47,6 +47,10 @@ class NetworkBlockedError(PermissionError):
 _OFFLINE_ENV = {
     "HF_HUB_OFFLINE": "1",
     "HF_HUB_DISABLE_TELEMETRY": "1",
+    # onnxruntime (used for voice detection) ships Microsoft telemetry that is on
+    # by default and sent from native code. This switches it off entirely: no
+    # uploader, no events, no device ID file. Must be set before it loads.
+    "ORT_DISABLE_TELEMETRY": "1",
     "DO_NOT_TRACK": "1",
 }
 
@@ -82,6 +86,13 @@ _NATIVE_NET_SYMBOLS = frozenset({
     "WinHttpOpen", "WinHttpConnect", "URLDownloadToFileA", "URLDownloadToFileW",
 })
 
+# Audit hooks belong to one interpreter. A sub-interpreter would start without
+# this one, so the modules that create them are made unimportable (a None entry
+# in sys.modules stops every import route; the audit hook catches the rest).
+_BLOCKED_MODULES = frozenset({
+    "_interpreters", "_xxsubinterpreters", "_testcapi", "_testinternalcapi",
+})
+
 _state = {"python_hook": False, "kernel_filter": False, "kernel_detail": "not attempted"}
 
 
@@ -108,6 +119,8 @@ def _audit_hook(event: str, args: tuple) -> None:
             name = name.decode("ascii", "replace")
         if name in _NATIVE_NET_SYMBOLS:
             raise _blocked(f"native function {name}")
+    elif event == "import" and args[0] in _BLOCKED_MODULES:
+        raise _blocked(f"module {args[0]} would run code without this block")
 
 
 # --- Linux kernel filter (seccomp) -------------------------------------------
@@ -224,6 +237,8 @@ def install() -> dict:
     else:
         _state["kernel_detail"] = "not available on this OS (keep the computer offline)"
 
+    for name in _BLOCKED_MODULES:
+        sys.modules[name] = None
     sys.addaudithook(_audit_hook)
     _state["python_hook"] = True
     return status()
@@ -362,8 +377,20 @@ def self_test() -> list[tuple[str, bool | None, str]]:
 
     def http_request():
         import urllib.request
-        urllib.request.urlopen("http://127.0.0.1:9/", timeout=2)
+        no_proxy = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        no_proxy.open("http://127.0.0.1:9/", timeout=2)
     expect_blocked("Python: HTTP request", http_request)
+
+    def sub_interpreter():
+        import importlib
+        for name in ("_interpreters", "_xxsubinterpreters"):
+            try:
+                importlib.import_module(name)
+            except (ImportError, NetworkBlockedError):
+                continue  # blocked, or not part of this Python
+            return  # imported: NOT blocked
+        raise NetworkBlockedError("no sub-interpreter module can be loaded")
+    expect_blocked("Python: sub-interpreters (would start without the block)", sub_interpreter)
 
     if os.name == "posix":
         def ctypes_socket():

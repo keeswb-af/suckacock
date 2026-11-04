@@ -258,6 +258,9 @@ def cmd_check(args) -> int:
     ok, detail = ffmpeg_lock_check()
     row(ok, "FFmpeg (audio file reader) limited to local files", detail)
     failures += ok is False
+    ok = all(os.environ.get(k) == "1" for k in ("ORT_DISABLE_TELEMETRY", "HF_HUB_DISABLE_TELEMETRY", "HF_HUB_OFFLINE"))
+    row(ok, "Library telemetry and downloads switched off", "onnxruntime, Hugging Face" if ok else "NOT set")
+    failures += not ok
 
     print("\nThis computer")
     for level, msg in privacy_report(engine.prepare_out_dir(args.out))[1:]:
