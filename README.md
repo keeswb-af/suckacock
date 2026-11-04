@@ -36,9 +36,21 @@ compromised library, keep the computer offline while using the app.
 
 ## Setup (one time, needs internet)
 
-You need **Python 3.12, 3.13 or 3.14**. On macOS and Windows, get 3.13 from
-[python.org](https://www.python.org/downloads/). (Python 3.15 isn't supported
-yet: one dependency has no build for it.)
+**Mac (easiest):** open Terminal (press Cmd+Space, type `Terminal`, press
+Enter), paste this line and press Enter:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/keeswb-af/suckacock/refs/heads/claude/compassionate-feynman-f9o7ga/install-mac.sh | bash
+```
+
+It installs the app into `~/Applications/OfflineTranscriber`, installs the
+official Python 3.13 from python.org if needed (only after Apple confirms the
+installer is genuine; this step asks for your Mac password), downloads the
+model, and puts an "Offline Transcriber" icon on your Desktop. Needs macOS 14
+or newer (Intel Macs: macOS 13). Run the same line again later to update.
+
+**Other ways:** you need **Python 3.12, 3.13 or 3.14** (3.15 isn't supported
+yet: one dependency has no build for it).
 
 macOS / Linux, in a terminal in this folder:
 

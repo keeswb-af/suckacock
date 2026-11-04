@@ -490,5 +490,10 @@ def run(args, privacy_report) -> int:
         raise
     if app.mic_error:
         app._write("\n" + app.mic_error + "\n", "error")
+    # Started from a terminal, the window can open behind it: bring it forward.
+    root.lift()
+    root.attributes("-topmost", True)
+    root.after(300, lambda: root.attributes("-topmost", False))
+    root.focus_force()
     root.mainloop()
     return 0
