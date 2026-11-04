@@ -1,0 +1,9 @@
+# Local install and downloaded models
+.venv/
+models/
+__pycache__/
+*.pyc
+
+# Never commit recordings or transcripts by accident
+*.wav
+*.srt
