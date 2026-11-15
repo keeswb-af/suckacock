@@ -1,1 +1,27 @@
-{"stickers": ["x"], "when": ["y"], "digital": [], "sources": []}
+{
+ "stickers": [
+  "Laatste Kans Koopjes (sinds september 2025) zijn tijdelijk afgeprijsde producten die bijna op hun datum zitten of uit het assortiment gaan. Alleen in de winkel, op is op.",
+  "Je herkent ze aan de blauw-oranje kortingssticker. Scan bij de kassa of met de handscanner alleen die sticker, anders betaal je de volle prijs.",
+  "In winkels met elektronische prijskaartjes prijst AH dynamisch af: 25%, dan 40%, oplopend tot 70% naarmate de dag vordert of de datum nadert. Waar dat niet kan, geldt de vaste 35%-sticker.",
+  "Brood van Gisteren: brood uit de eigen bakerij van de dag ervoor ligt 's ochtends tot 11:00 met flinke korting.",
+  "AH to go op het station (Stationsplein 3) biedt soms Too Good To Go-pakketten aan. Kijk daarvoor in de Too Good To Go-app."
+ ],
+ "when": [
+  "Kijk vooraf in de AH-app: zet de app in winkelmodus (winkelicoon linksboven), open Laatste Kans Koopjes en kies je winkel. Maak een screenshot en laad die hier: dan zie je thuis al wat bij je dieet past.",
+  "Er komen de hele dag nieuwe koopjes bij en de lijst in de app kan achterlopen. Wat in de app staat, kan al weg zijn.",
+  "De korting loopt op door de dag. Klanten melden de hoogste kortingen ('s avonds tot 70%) tegen sluitingstijd, maar AH noemt geen vaste tijden en dan is er minder keus.",
+  "Voor brood: ga 's ochtends vóór 11:00.",
+  "Neem een koeltas mee en ga na het afrekenen direct naar huis. Pak gekoelde producten als laatste."
+ ],
+ "digital": [
+  "De AH-app is de enige officiële bron die per winkel laat zien wat er ligt. AH heeft daar geen openbare koppeling voor. Daarom leest deze app screenshots en foto's in plaats van zelf bij AH te kijken."
+ ],
+ "sources": [
+  "https://www.ah.nl/klantenservice/producten/laatste-kans-koopjes",
+  "https://nieuws.ah.nl/albert-heijn-zet-slimme-technologie-in-om-nog-meer-voedselverspilling-tegen-te-gaan/",
+  "https://nieuws.ah.nl/dynamisch-afprijzen-zorgt-voor-minder-voedselverspilling/",
+  "https://www.voedingscentrum.nl/nl/service/vraag-en-antwoord/koken-en-bewaren/kun-je-vlees-na-de-tgt-datum-nog-eten-.aspx",
+  "https://www.voedingscentrum.nl/nl/thema/kopen-koken-bewaren/eten-bewaren/hoe-lang-kan-ik-bewaren/kipfilet-onbereid.aspx",
+  "https://www.toogoodtogo.com/nl/find/groningen/ahtogo-groningenverrassingspakket/groceries/verrassingspakket-443344"
+ ]
+}

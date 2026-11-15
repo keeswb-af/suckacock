@@ -1,1 +1,89 @@
-{"rules": ["r"], "freeze": [{"cat": "Vlees", "months": "3", "after": "1 dag"}]}
+{
+ "rules": [
+  "Te gebruiken tot (TGT) is een veiligheidsdatum: vers vlees, gehakt, kip, verse vis, voorgesneden groente, koelverse maaltijden. Op de datum zelf mag je het nog eten.",
+  "Op de TGT-datum kun je: vandaag opeten, vandaag invriezen (liefst meteen na thuiskomst), of vandaag bereiden en afgedekt in de koelkast nog 2 dagen bewaren.",
+  "Na de TGT-datum weggooien, ook als het er goed uitziet en ruikt.",
+  "Ten minste houdbaar tot (THT) is een kwaliteitsdatum: daarna vaak nog goed. Kijk, ruik en proef.",
+  "Invriezen stopt bacteriën maar doodt ze niet. Ontdooi in de koelkast, eet het binnen 24 uur op en verhit vlees, kip en vis goed.",
+  "Ontdooid rauw vlees of vis niet opnieuw invriezen. Wel mag je het eerst verwerken in een gerecht en dat gerecht invriezen.",
+  "Check het etiket: staat er 'niet opnieuw invriezen' (vaak bij vis), dan kan het niet de vriezer in.",
+  "Koelproducten nooit langer dan 2 uur buiten de koelkast. Koelkast op 4 °C, vriezer op -18 °C of kouder."
+ ],
+ "freeze": [
+  {
+   "cat": "Kip en kalkoen",
+   "months": "3 maanden",
+   "after": "binnen 24 uur bereiden"
+  },
+  {
+   "cat": "Gehakt",
+   "months": "3 maanden",
+   "after": "binnen 24 uur, helemaal gaar"
+  },
+  {
+   "cat": "Hamburgers, worst",
+   "months": "1 maand",
+   "after": "binnen 24 uur, helemaal gaar"
+  },
+  {
+   "cat": "Rundvlees uit één stuk",
+   "months": "9 maanden",
+   "after": "binnen 24 uur bereiden"
+  },
+  {
+   "cat": "Varkensvlees",
+   "months": "2 tot 3 maanden",
+   "after": "binnen 24 uur bereiden"
+  },
+  {
+   "cat": "Vette vis (zalm)",
+   "months": "3 maanden",
+   "after": "binnen 24 uur bereiden"
+  },
+  {
+   "cat": "Magere vis (kabeljauw)",
+   "months": "6 maanden",
+   "after": "binnen 24 uur bereiden"
+  },
+  {
+   "cat": "Brood",
+   "months": "1 maand",
+   "after": "per dag pakken wat je nodig hebt"
+  },
+  {
+   "cat": "Kant-en-klaar (lasagne)",
+   "months": "3 maanden",
+   "after": "in koelkast ontdooien, 1x goed opwarmen"
+  },
+  {
+   "cat": "Verse pasta (tortellini)",
+   "months": "1 maand",
+   "after": "bevroren koken"
+  },
+  {
+   "cat": "Harde kaas",
+   "months": "2 tot 4 maanden",
+   "after": "brokkelig, gebruik warm"
+  },
+  {
+   "cat": "Yoghurt, kwark",
+   "months": "kort",
+   "after": "alleen voor smoothies of gerechten"
+  },
+  {
+   "cat": "Voorgesneden groente",
+   "months": "3 maanden",
+   "after": "bevroren in de pan"
+  },
+  {
+   "cat": "Fruit",
+   "months": "8 tot 12 maanden",
+   "after": "voor smoothies en toetjes"
+  },
+  {
+   "cat": "Sla, komkommer, tomaat",
+   "months": "niet invriezen",
+   "after": "-"
+  }
+ ]
+}

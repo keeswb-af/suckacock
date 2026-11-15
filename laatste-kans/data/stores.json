@@ -60,7 +60,7 @@
   "city": "Groningen",
   "area": "Binnenstad-Zuid",
   "format": "AH",
-  "hours": "",
+  "hours": "tijden wisselen, zie ah.nl",
   "url": "https://www.ah.nl/winkels/nederland/groningen/gedempte-zuiderdiep-14/1552",
   "note": ""
  },
@@ -231,7 +231,7 @@
   "format": "AH",
   "hours": "dagelijks tot 21",
   "url": "https://www.ah.nl/winkels/nederland/haren-groningen/kerkstraat-27/1026",
-  "note": ""
+  "note": "AH heroverweegt deze locatie (2026)."
  },
  {
   "id": "ah-5826",
@@ -245,19 +245,6 @@
   "hours": "dagelijks ca. 7-23",
   "url": "https://www.ah.nl/winkels/nederland/groningen/stationsplein-3/5826",
   "note": "Doet mee met Too Good To Go."
- },
- {
-  "id": "ah-5884",
-  "name": "AH to go Stationsplein 1 H",
-  "short": "Station (to go, Stationsplein 1 H)",
-  "street": "Stationsplein 1 H",
-  "postcode": "9726 AE",
-  "city": "Groningen",
-  "area": "Hoofdstation",
-  "format": "AH to go",
-  "hours": "ma-vr 7-22",
-  "url": "https://www.ah.nl/winkels/nederland/groningen/stationsplein-1h/5884",
-  "note": ""
  },
  {
   "id": "ah-5700",

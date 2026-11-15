@@ -79,7 +79,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .brand-mark { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--sticker); color: var(--sticker-ink); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 1rem; transform: rotate(-12deg); }
 .brand h1 { font-size: 1.12rem; font-weight: 800; line-height: 1.1; }
 .brand p { font-size: 0.76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.store-pick select { max-width: 46vw; min-height: 38px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; font-size: 0.86rem; font-weight: 600; }
+.store-pick select { max-width: 46vw; min-height: 38px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 10px; font-size: 16px; font-weight: 600; }
 
 main { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 .view { display: flex; flex-direction: column; gap: 18px; padding-block: 16px 8px; }
@@ -137,6 +137,7 @@ textarea { min-height: 84px; resize: vertical; }
 .suggest li button:hover, .suggest li button:focus-visible { background: var(--surface-2); }
 .suggest .cat { font-size: 0.76rem; color: var(--muted); white-space: nowrap; }
 .match-note { font-size: 0.82rem; color: var(--muted); }
+#addForm, #addCard { scroll-margin-top: calc(76px + env(safe-area-inset-top, 0px)); }
 .nutri-in { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .photo-status { font-size: 0.9rem; }
 
@@ -232,7 +233,7 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
       <div class="brand-mark" aria-hidden="true">%</div>
       <div style="min-width:0">
         <h1>Laatste Kans</h1>
-        <p id="subline">Afgeprijsd bij AH in Groningen, gekeurd op jouw dieet</p>
+        <p id="subline">Laatste Kans Koopjes bij AH Groningen, gekeurd op jouw dieet</p>
       </div>
     </div>
     <label class="store-pick"><span class="sr">Jouw winkel</span><select id="storeSel"></select></label>
@@ -253,9 +254,13 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
     <div class="card" id="addCard">
       <div class="section-head"><h2>Wat ligt er met korting?</h2></div>
       <div id="photoRow" class="section" hidden>
-        <label class="btn btn-sticker btn-block" for="photoIn">Maak foto van de stickers</label>
-        <input type="file" id="photoIn" class="sr" accept="image/*" capture="environment" multiple>
-        <p class="small muted">Claude leest naam, prijs, korting en datum van de foto en beoordeelt elk product.</p>
+        <div class="grid2">
+          <label class="btn btn-sticker" for="shotIn">Screenshot AH-app</label>
+          <label class="btn" for="photoIn">Foto in de winkel</label>
+        </div>
+        <input type="file" id="shotIn" class="sr" accept="image/*" multiple>
+        <input type="file" id="photoIn" class="sr" accept="image/*" capture="environment">
+        <p class="small muted">Open in de AH-app Laatste Kans Koopjes van je winkel en maak screenshots. Of fotografeer producten met een kortingssticker. Claude leest naam, prijs, korting en datum en de app beoordeelt elk product.</p>
         <div id="photoStatus" class="photo-status" aria-live="polite"></div>
       </div>
       <div class="search-box">
@@ -282,9 +287,11 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
         </div>
         <div class="field">Korting
           <div class="seg" id="fDisc" role="group" aria-label="Korting">
-            <button type="button" data-v="35">35%</button>
-            <button type="button" data-v="50">50%</button>
             <button type="button" data-v="25">25%</button>
+            <button type="button" data-v="35">35%</button>
+            <button type="button" data-v="40">40%</button>
+            <button type="button" data-v="50">50%</button>
+            <button type="button" data-v="70">70%</button>
             <button type="button" data-v="0">Geen</button>
           </div>
         </div>
@@ -398,7 +405,7 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
           <textarea id="dNotes" placeholder="bv. Ik lust geen champignons, ik heb een airfryer, ik train 4x per week."></textarea>
         </label>
       </div>
-      <div class="btn-row"><button class="btn btn-primary" type="submit">Opslaan</button><span class="small muted" id="dietSaved" aria-live="polite"></span></div>
+      <div class="btn-row"><button class="btn btn-primary" type="submit" id="dietSubmit">Opslaan</button><span class="small muted" id="dietSaved" aria-live="polite"></span></div>
     </form>
   </section>
 
@@ -424,10 +431,10 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>
-const FOOD = [{"id":"kipfilet","name":"Kipfilet","aliases":["kippenborst"],"cat":"gevogelte","kcal":110,"protein":24,"carbs":0,"sugar":0,"fat":1.5,"satfat":0.4,"fiber":0,"salt":0.15,"pack_g":500,"price_eur":6.49,"tags":["meat","poultry","halal_possible"],"freezable":true,"src":"tmp"},{"id":"croissant","name":"Croissant","aliases":[],"cat":"brood","kcal":410,"protein":8,"carbs":45,"sugar":8,"fat":21,"satfat":13,"fiber":2,"salt":1.1,"pack_g":240,"price_eur":2.49,"tags":["gluten","dairy","lactose","bakery","processed"],"freezable":true,"src":"tmp"},{"id":"magere_kwark","name":"Magere kwark","aliases":["kwark"],"cat":"zuivel","kcal":58,"protein":10,"carbs":3.7,"sugar":3.7,"fat":0.2,"satfat":0.1,"fiber":0,"salt":0.1,"pack_g":500,"price_eur":1.69,"tags":["dairy","lactose","vegetarian"],"freezable":false,"src":"tmp"},{"id":"spinazie","name":"Spinazie","aliases":["verse spinazie"],"cat":"groente","kcal":23,"protein":2.9,"carbs":1.1,"sugar":0.4,"fat":0.4,"satfat":0.1,"fiber":2.2,"salt":0.2,"pack_g":300,"price_eur":1.99,"tags":["fresh_produce","vegan","vegetarian"],"freezable":false,"src":"tmp"},{"id":"zalmfilet","name":"Zalmfilet","aliases":["zalm"],"cat":"vis","kcal":200,"protein":20,"carbs":0,"sugar":0,"fat":13,"satfat":2.5,"fiber":0,"salt":0.1,"pack_g":250,"price_eur":6.29,"tags":["fish"],"freezable":true,"src":"tmp"},{"id":"bananen","name":"Bananen","aliases":["banaan"],"cat":"fruit","kcal":95,"protein":1.2,"carbs":21,"sugar":17,"fat":0.3,"satfat":0.1,"fiber":1.9,"salt":0,"pack_g":1000,"price_eur":1.99,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true,"src":"tmp"},{"id":"eieren","name":"Eieren","aliases":["ei"],"cat":"ei","kcal":130,"protein":12.5,"carbs":0.4,"sugar":0.4,"fat":9,"satfat":2.6,"fiber":0,"salt":0.35,"pack_g":600,"price_eur":3.49,"tags":["egg","vegetarian"],"freezable":false,"src":"tmp"}];
-const STORES = [{"id":"ah-1330","name":"AH Oude Ebbingestraat","short":"Oude Ebbingestraat","street":"Oude Ebbingestraat 19","postcode":"9712 HA","city":"Groningen","area":"Binnenstad","format":"AH","hours":"ma-za 8-22, zo 12-22","url":"https://www.ah.nl/winkels/nederland/groningen/oude-ebbingestraat-19/1330","note":""},{"id":"ah-1631","name":"AH Nieuwe Ebbingestraat","short":"Nieuwe Ebbingestraat","street":"Nieuwe Ebbingestraat 73","postcode":"9712 NG","city":"Groningen","area":"Hortusbuurt","format":"AH","hours":"dagelijks 8-22","url":"https://www.ah.nl/winkels/nederland/groningen/nieuwe-ebbingestraat-73/1631","note":""},{"id":"ah-4193","name":"AH Akerkhof","short":"Akerkhof","street":"Akerkhof 1","postcode":"9712 BA","city":"Groningen","area":"Binnenstad","format":"AH","hours":"ma-za 8-22, zo 12-22","url":"https://www.ah.nl/winkels/nederland/groningen/akerkhof-1/4193","note":""},{"id":"ah-1243","name":"AH Brugstraat","short":"Brugstraat","street":"Brugstraat 14","postcode":"9711 HX","city":"Groningen","area":"Binnenstad-Zuid","format":"AH","hours":"ma-za 8-22, zo 12-22","url":"https://www.ah.nl/winkels/nederland/groningen/brugstraat-14/1243","note":""},{"id":"ah-1552","name":"AH Gedempte Zuiderdiep","short":"Gedempte Zuiderdiep","street":"Gedempte Zuiderdiep 14","postcode":"9711 HG","city":"Groningen","area":"Binnenstad-Zuid","format":"AH","hours":"","url":"https://www.ah.nl/winkels/nederland/groningen/gedempte-zuiderdiep-14/1552","note":""},{"id":"ah-2219","name":"AH Westerkade","short":"Westerkade","street":"Westerkade 11","postcode":"9718 AR","city":"Groningen","area":"Westerhaven","format":"AH","hours":"ma-za 8-22, zo 12-22","url":"https://www.ah.nl/winkels/nederland/groningen/westerkade-11/2219","note":""},{"id":"ah-1206","name":"AH Floresplein","short":"Floresplein","street":"Floresplein 13","postcode":"9715 HH","city":"Groningen","area":"Indische Buurt","format":"AH","hours":"ma-za 8-22, zo 12-22","url":"https://www.ah.nl/winkels/nederland/groningen/floresplein-13/1206","note":""},{"id":"ah-1308","name":"AH Helperplein","short":"Helperplein","street":"Helperplein 4","postcode":"9721 CX","city":"Groningen","area":"Helpman","format":"AH","hours":"ma-za 8-22","url":"https://www.ah.nl/winkels/nederland/groningen/helperplein-4/1308","note":""},{"id":"ah-2315","name":"AH Van Lenneplaan","short":"De Wijert (Van Lenneplaan)","street":"Van Lenneplaan 99","postcode":"9721 PE","city":"Groningen","area":"De Wijert","format":"AH","hours":"ma-za 8-21, zo 12-21","url":"https://www.ah.nl/winkels/nederland/groningen/van-lenneplaan-99/2315","note":""},{"id":"ah-1060","name":"AH Von Suttnerstraat","short":"Hoornse Meer (Von Suttnerstraat)","street":"B.S.F. von Suttnerstraat 1","postcode":"9728 WZ","city":"Groningen","area":"Hoornse Meer","format":"AH","hours":"ma-za 8-21","url":"https://www.ah.nl/winkels/nederland/groningen/b-s-f-von-suttnerstraat-1/1060","note":""},{"id":"ah-1184","name":"AH Siersteenlaan","short":"Vinkhuizen (Siersteenlaan)","street":"Siersteenlaan 464","postcode":"9743 ES","city":"Groningen","area":"Vinkhuizen","format":"AH","hours":"ma-za 8-22, zo 12-22","url":"https://www.ah.nl/winkels/nederland/groningen/siersteenlaan-464/1184","note":""},{"id":"ah-1093","name":"AH Eikenlaan","short":"Selwerd (Eikenlaan)","street":"Eikenlaan 39","postcode":"9741 EH","city":"Groningen","area":"Selwerd","format":"AH","hours":"ma-za 8-22, zo 12-22","url":"https://www.ah.nl/winkels/nederland/groningen/eikenlaan-39/1093","note":""},{"id":"ah-1829","name":"AH Dierenriemstraat","short":"Paddepoel (Dierenriemstraat)","street":"Dierenriemstraat 122","postcode":"9742 AK","city":"Groningen","area":"Paddepoel","format":"AH","hours":"ma-vr 8-22","url":"https://www.ah.nl/winkels/nederland/groningen/dierenriemstraat-122/1829","note":""},{"id":"ah-8720","name":"AH Stoepemaheerd","short":"Beijum (Stoepemaheerd)","street":"Stoepemaheerd 21","postcode":"9737 TL","city":"Groningen","area":"Beijum","format":"AH","hours":"ma-za 8-21, zo 12-18","url":"https://www.ah.nl/winkels/nederland/groningen/stoepemaheerd-21/8720","note":""},{"id":"ah-8714","name":"AH Rijksweg 16","short":"Oosterhoogebrug (Rijksweg 16)","street":"Rijksweg 16","postcode":"9731 AB","city":"Groningen","area":"Oosterhoogebrug","format":"AH","hours":"ma-za 8-21","url":"https://www.ah.nl/winkels/nederland/groningen/rijksweg-16/8714","note":""},{"id":"ah-8595","name":"AH Rijksweg 129 A","short":"Ulgersmaborg (Rijksweg 129 A)","street":"Rijksweg 129 A","postcode":"9731 AH","city":"Groningen","area":"Ulgersmaborg","format":"AH","hours":"ma-za 8-21","url":"https://www.ah.nl/winkels/nederland/groningen/rijksweg-129a/8595","note":""},{"id":"ah-8539","name":"AH Zuiderweg","short":"Hoogkerk (Zuiderweg)","street":"Zuiderweg 27","postcode":"9745 AA","city":"Groningen","area":"Hoogkerk","format":"AH","hours":"ma-za 8-21","url":"https://www.ah.nl/winkels/nederland/groningen/zuiderweg-27/8539","note":""},{"id":"ah-1026","name":"AH Kerkstraat Haren","short":"Haren (Kerkstraat)","street":"Kerkstraat 27","postcode":"9751 BB","city":"Haren","area":"Haren","format":"AH","hours":"dagelijks tot 21","url":"https://www.ah.nl/winkels/nederland/haren-groningen/kerkstraat-27/1026","note":""},{"id":"ah-5826","name":"AH to go Stationsplein 3","short":"Station (to go, Stationsplein 3)","street":"Stationsplein 3","postcode":"9726 AE","city":"Groningen","area":"Hoofdstation","format":"AH to go","hours":"dagelijks ca. 7-23","url":"https://www.ah.nl/winkels/nederland/groningen/stationsplein-3/5826","note":"Doet mee met Too Good To Go."},{"id":"ah-5884","name":"AH to go Stationsplein 1 H","short":"Station (to go, Stationsplein 1 H)","street":"Stationsplein 1 H","postcode":"9726 AE","city":"Groningen","area":"Hoofdstation","format":"AH to go","hours":"ma-vr 7-22","url":"https://www.ah.nl/winkels/nederland/groningen/stationsplein-1h/5884","note":""},{"id":"ah-5700","name":"AH to go Hanzeplein","short":"UMCG (to go, Hanzeplein)","street":"Hanzeplein 1","postcode":"9713 GZ","city":"Groningen","area":"UMCG","format":"AH to go","hours":"ma-vr 7-20","url":"https://www.ah.nl/winkels/nederland/groningen/hanzeplein-1/5700","note":""},{"id":"ah-5564","name":"AH to go Pleiadenlaan","short":"Paddepoel (to go, Pleiadenlaan)","street":"Pleiadenlaan 4","postcode":"9742 NG","city":"Groningen","area":"Paddepoel-Zuid","format":"AH to go","hours":"dagelijks 7-24","url":"https://www.ah.nl/winkels/nederland/groningen/pleiadenlaan-4/5564","note":""},{"id":"ah-5704","name":"AH to go Nijenborgh","short":"Zernike (to go, Nijenborgh)","street":"Nijenborgh 9","postcode":"9747 AG","city":"Groningen","area":"Zernike Campus","format":"AH to go","hours":"ma-vr 8.30-17, vaak dicht","url":"https://www.ah.nl/winkels/nederland/groningen/nijenborgh-9/5704","note":"Campuswinkel met beperkte tijden."},{"id":"ah-2328","name":"AH Hereweg","short":"Hereweg (nieuw)","street":"Hereweg 53","postcode":"9725 AB","city":"Groningen","area":"Herewegbuurt","format":"AH","hours":"nog niet open (nov 2026)","url":"https://www.ah.nl/winkels/nederland/groningen/hereweg-53/2328","note":"Nieuwe winkel, opent binnenkort."}];
-const TIPS = {"stickers":["x"],"when":["y"],"digital":[],"sources":[]};
-const SAFETY = {"rules":["r"],"freeze":[{"cat":"Vlees","months":"3","after":"1 dag"}]};
+const FOOD = [{"id":"kipfilet","name":"Kipfilet","aliases":["kippenborst","kipborst","kipborstfilet","scharrel kipfilet","kipfiletblokjes","kipfiletreepjes","kip","Kipfilet (naturel, vers)"],"cat":"gevogelte","kcal":114,"protein":25,"carbs":0,"sugar":0,"fat":1.2,"satfat":0.3,"fiber":0,"salt":0.15,"pack_g":500,"price_eur":6.49,"tags":["halal_possible","meat","poultry"],"freezable":true},{"id":"kipdijfilet","name":"Kipdijfilet","aliases":["kippendijfilet","kippendij","kippendijen","dijfilet","kipdij","kipdijfiletreepjes","Kipdijfilet (naturel, vers)"],"cat":"gevogelte","kcal":147,"protein":19,"carbs":0,"sugar":0,"fat":7.9,"satfat":2.3,"fiber":0,"salt":0.18,"pack_g":400,"price_eur":4.99,"tags":["halal_possible","meat","poultry"],"freezable":true},{"id":"kippenpoten","name":"Kippenpoten / drumsticks","aliases":["drumsticks","kippenbouten","kippenbout","kippenpootjes","kippendijen met bot","Kippenpoten / drumsticks (met vel en bot)"],"cat":"gevogelte","kcal":185,"protein":18.5,"carbs":0,"sugar":0,"fat":12.5,"satfat":3.5,"fiber":0,"salt":0.2,"pack_g":600,"price_eur":4.49,"tags":["halal_possible","meat","poultry"],"freezable":true},{"id":"kipshoarma","name":"Kipshoarma","aliases":["shoarma","shoarmareepjes","shoarmavlees","kipshoarmareepjes","kipdij shoarma","Kipshoarma (gekruide reepjes, rauw)"],"cat":"gevogelte","kcal":151,"protein":18,"carbs":0.9,"sugar":0.5,"fat":8,"satfat":2.3,"fiber":0.3,"salt":1.3,"pack_g":400,"price_eur":4.99,"tags":["halal_possible","meat","poultry","processed"],"freezable":true},{"id":"kalkoenfilet","name":"Kalkoenfilet","aliases":["kalkoen","kalkoenborst","kalkoenfilet blokjes","kalkoenschnitzel","kalkoenreepjes","Kalkoenfilet (vers)"],"cat":"gevogelte","kcal":111,"protein":25,"carbs":0,"sugar":0,"fat":1.2,"satfat":0.3,"fiber":0,"salt":0.13,"pack_g":250,"price_eur":4.49,"tags":["halal_possible","meat","poultry"],"freezable":true},{"id":"kipgehakt","name":"Kipgehakt","aliases":["kippengehakt","gehakt kip"],"cat":"gevogelte","kcal":140,"protein":19,"carbs":0.5,"sugar":0.2,"fat":7,"satfat":2,"fiber":0,"salt":0.2,"pack_g":300,"price_eur":3.49,"tags":["halal_possible","meat","poultry"],"freezable":true},{"id":"gehakt_half_om_half","name":"Half-om-half gehakt","aliases":["half-om-half","half om half gehakt","gemengd gehakt","h-o-h gehakt","rund-varkensgehakt","gehakt","Half-om-half gehakt (rund/varken)"],"cat":"vlees","kcal":213,"protein":18,"carbs":0.5,"sugar":0.3,"fat":16,"satfat":6.7,"fiber":0,"salt":0.15,"pack_g":500,"price_eur":4.99,"tags":["beef","meat","pork"],"freezable":true},{"id":"rundergehakt","name":"Rundergehakt","aliases":["runder gehakt","rundgehakt","gehakt rund"],"cat":"vlees","kcal":216,"protein":19,"carbs":0,"sugar":0,"fat":16,"satfat":7,"fiber":0,"salt":0.15,"pack_g":300,"price_eur":4.99,"tags":["beef","halal_possible","meat"],"freezable":true},{"id":"rundergehakt_mager","name":"Mager rundergehakt","aliases":["mager gehakt","rundergehakt mager","magere rundergehakt","Mager rundergehakt (ca. 12% vet)"],"cat":"vlees","kcal":185,"protein":20.5,"carbs":0,"sugar":0,"fat":12,"satfat":5.3,"fiber":0,"salt":0.15,"pack_g":300,"price_eur":5.29,"tags":["beef","halal_possible","meat"],"freezable":true},{"id":"biefstuk","name":"Biefstuk","aliases":["kogelbiefstuk","rundersteak","steak","biefstukje","biefstukreepjes"],"cat":"vlees","kcal":108,"protein":21,"carbs":0,"sugar":0,"fat":2.7,"satfat":1.1,"fiber":0,"salt":0.13,"pack_g":200,"price_eur":4.99,"tags":["beef","halal_possible","meat"],"freezable":true},{"id":"runderstooflappen","name":"Runderstooflappen / riblappen","aliases":["runderlappen","sukadelappen","stoofvlees","riblappen","draadjesvlees"],"cat":"vlees","kcal":160,"protein":21,"carbs":0,"sugar":0,"fat":8.5,"satfat":3.6,"fiber":0,"salt":0.15,"pack_g":500,"price_eur":7.49,"tags":["beef","halal_possible","meat"],"freezable":true},{"id":"varkenshaas","name":"Varkenshaas","aliases":["varkenshaasje","haas","varkenshaasmedaillons"],"cat":"vlees","kcal":103,"protein":22,"carbs":0,"sugar":0,"fat":1.7,"satfat":0.6,"fiber":0,"salt":0.23,"pack_g":300,"price_eur":5.29,"tags":["meat","pork"],"freezable":true},{"id":"varkensfilet","name":"Varkensfilet / varkensschnitzel","aliases":["varkensschnitzel","schnitzel","varkenslapjes","filetlapjes","hamlappen"],"cat":"vlees","kcal":115,"protein":22,"carbs":0,"sugar":0,"fat":3,"satfat":1.1,"fiber":0,"salt":0.15,"pack_g":400,"price_eur":4.99,"tags":["meat","pork"],"freezable":true},{"id":"karbonade","name":"Varkenskarbonade","aliases":["karbonades","schouderkarbonade","haaskarbonade","kotelet","varkenskotelet"],"cat":"vlees","kcal":175,"protein":20,"carbs":0,"sugar":0,"fat":10.5,"satfat":3.8,"fiber":0,"salt":0.15,"pack_g":500,"price_eur":4.99,"tags":["meat","pork"],"freezable":true},{"id":"speklapjes","name":"Speklapjes","aliases":["speklap","speklapje","buikspek","speklapjes a la minute","Speklapjes (naturel)"],"cat":"vlees","kcal":320,"protein":17,"carbs":0,"sugar":0,"fat":28,"satfat":10.5,"fiber":0,"salt":0.15,"pack_g":500,"price_eur":5.99,"tags":["meat","pork"],"freezable":true},{"id":"gyros","name":"Gyros","aliases":["gyrosreepjes","varkensgyros","gyrosvlees","Gyros (gekruide varkensreepjes)"],"cat":"vlees","kcal":180,"protein":19,"carbs":2,"sugar":1,"fat":11,"satfat":4,"fiber":0.3,"salt":1.4,"pack_g":400,"price_eur":4.49,"tags":["meat","pork","processed"],"freezable":true},{"id":"runderhamburger","name":"Runderhamburger","aliases":["hamburger","hamburgers","burger","rundburger","rundhamburger","Runderhamburger (4 stuks)"],"cat":"vlees","kcal":221,"protein":14,"carbs":2.3,"sugar":0.5,"fat":17,"satfat":7.5,"fiber":0.5,"salt":1,"pack_g":400,"price_eur":5.49,"tags":["beef","gluten","halal_possible","meat","processed"],"freezable":true},{"id":"runderhamburger_minder_vet","name":"Runderhamburger minder vet","aliases":["magere hamburger","hamburger minder vet","light burger","Runderhamburger minder vet (4 stuks)"],"cat":"vlees","kcal":176,"protein":14,"carbs":2.4,"sugar":0.5,"fat":12,"satfat":5,"fiber":0.5,"salt":1.08,"pack_g":400,"price_eur":4.99,"tags":["beef","gluten","halal_possible","meat","processed"],"freezable":true},{"id":"rookworst","name":"Gelderse rookworst","aliases":["worst","rookworstje","gelderse worst"],"cat":"vlees","kcal":280,"protein":14,"carbs":2,"sugar":1,"fat":23,"satfat":9.1,"fiber":0,"salt":2,"pack_g":275,"price_eur":1.49,"tags":["meat","pork","processed","ultraprocessed"],"freezable":true},{"id":"braadworst","name":"Braadworst / verse worst","aliases":["verse worst","saucijs","saucijzen","bbq worst","braadworstjes"],"cat":"vlees","kcal":270,"protein":14,"carbs":2,"sugar":0.5,"fat":23,"satfat":9,"fiber":0.2,"salt":1.7,"pack_g":400,"price_eur":3.99,"tags":["gluten","meat","pork","processed"],"freezable":true},{"id":"slavinken","name":"Slavinken","aliases":["slavink","gehaktrol met spek"],"cat":"vlees","kcal":255,"protein":14,"carbs":3,"sugar":1,"fat":21,"satfat":8.5,"fiber":0.2,"salt":1.6,"pack_g":400,"price_eur":4.49,"tags":["beef","egg","gluten","meat","pork","processed"],"freezable":true},{"id":"gehaktballen","name":"Gehaktballen","aliases":["gehaktbal","gehaktballetjes","balletjes","Gehaktballen (rauw, half-om-half)"],"cat":"vlees","kcal":230,"protein":16,"carbs":4,"sugar":1,"fat":17,"satfat":7,"fiber":0.3,"salt":1.4,"pack_g":400,"price_eur":4.49,"tags":["beef","egg","gluten","meat","pork","processed"],"freezable":true},{"id":"kipschnitzel","name":"Kipschnitzel","aliases":["kipschnitzels","gepaneerde kipschnitzel","schnitzel kip","Kipschnitzel (gepaneerd, vers)"],"cat":"gevogelte","kcal":210,"protein":17,"carbs":12,"sugar":1,"fat":10,"satfat":1.5,"fiber":0.8,"salt":1.1,"pack_g":300,"price_eur":3.99,"tags":["egg","gluten","halal_possible","meat","poultry","processed"],"freezable":true},{"id":"kipfilet_beleg","name":"Gerookte kipfilet","aliases":["gerookte kipfilet","kipfilet beleg","kipfiletplakjes","kip beleg","broodbeleg kip","Gerookte kipfilet (broodbeleg, plakjes)"],"cat":"beleg","kcal":115,"protein":24,"carbs":0.8,"sugar":0.5,"fat":1.8,"satfat":0.5,"fiber":0,"salt":2,"pack_g":100,"price_eur":3.49,"tags":["halal_possible","meat","poultry","processed"],"freezable":true},{"id":"achterham","name":"Achterham","aliases":["ham","hamplakjes","ham beleg","achterham flinterdun","Achterham (plakjes)"],"cat":"beleg","kcal":106,"protein":18,"carbs":3.1,"sugar":1,"fat":2.4,"satfat":0.9,"fiber":0,"salt":2,"pack_g":150,"price_eur":2.99,"tags":["meat","pork","processed"],"freezable":true},{"id":"beenham","name":"Beenham","aliases":["gegrilde beenham","gebraden beenham","ham","Beenham (gegrild/gebraden, plakjes)"],"cat":"beleg","kcal":130,"protein":18,"carbs":1.5,"sugar":1,"fat":5.5,"satfat":2,"fiber":0,"salt":2,"pack_g":100,"price_eur":3.09,"tags":["meat","pork","processed"],"freezable":true},{"id":"rookvlees","name":"Runderrookvlees","aliases":["runderrookvlees","rookvlees plakken","rundvlees beleg","Runderrookvlees (plakjes)"],"cat":"beleg","kcal":117,"protein":22,"carbs":0.5,"sugar":0.5,"fat":3,"satfat":1.2,"fiber":0,"salt":3.4,"pack_g":100,"price_eur":3.19,"tags":["beef","halal_possible","meat","processed"],"freezable":true},{"id":"zalmfilet","name":"Zalmfilet","aliases":["zalm","verse zalm","zalmmoot","zalmfilets","atlantische zalm","Zalmfilet (vers, kweek)"],"cat":"vis","kcal":210,"protein":21,"carbs":0,"sugar":0,"fat":14,"satfat":2.6,"fiber":0,"salt":0.12,"pack_g":250,"price_eur":5.99,"tags":["fish","halal_possible"],"freezable":true},{"id":"kabeljauwfilet","name":"Kabeljauwfilet","aliases":["kabeljauw","kabeljauwhaas","witvis","kabeljauwfilets","Kabeljauwfilet (vers)"],"cat":"vis","kcal":73,"protein":17,"carbs":0,"sugar":0,"fat":0.6,"satfat":0.1,"fiber":0,"salt":0.25,"pack_g":250,"price_eur":5.99,"tags":["fish","halal_possible"],"freezable":true},{"id":"pangasiusfilet","name":"Pangasiusfilet","aliases":["pangasius","pangasiusfilets","witvis","Pangasiusfilet (gekoeld)"],"cat":"vis","kcal":78,"protein":16,"carbs":0,"sugar":0,"fat":1.5,"satfat":0.5,"fiber":0,"salt":0.4,"pack_g":350,"price_eur":4.99,"tags":["fish","halal_possible"],"freezable":false},{"id":"gerookte_zalm","name":"Gerookte zalm","aliases":["zalm gerookt","gerookte zalmfilet","zalmplakken","koudgerookte zalm","Gerookte zalm (plakken)"],"cat":"vis","kcal":207,"protein":20,"carbs":0,"sugar":0,"fat":14,"satfat":2.5,"fiber":0,"salt":2.73,"pack_g":100,"price_eur":4.49,"tags":["fish","halal_possible","processed"],"freezable":true},{"id":"hollandse_garnalen","name":"Hollandse garnalen","aliases":["garnalen","grijze garnalen","noordzeegarnalen","gepelde garnalen","Hollandse garnalen (gepeld, gekookt)"],"cat":"vis","kcal":88,"protein":20,"carbs":0,"sugar":0,"fat":0.9,"satfat":0.2,"fiber":0,"salt":2.5,"pack_g":100,"price_eur":7.49,"tags":["fish","halal_possible","shellfish"],"freezable":false},{"id":"tonijnsteak","name":"Tonijnsteak","aliases":["tonijn","verse tonijn","tonijnfilet","tuna","Tonijnsteak (vers)"],"cat":"vis","kcal":101,"protein":23,"carbs":0,"sugar":0,"fat":1,"satfat":0.3,"fiber":0,"salt":0.1,"pack_g":250,"price_eur":7.99,"tags":["fish","halal_possible"],"freezable":false},{"id":"sushi","name":"Sushi","aliases":["sushibox","sushi box","maki","nigiri","california rolls","Sushi (box, gemengd)"],"cat":"maaltijd","kcal":139,"protein":3.6,"carbs":22,"sugar":5,"fat":3.9,"satfat":0.7,"fiber":0.8,"salt":1,"pack_g":250,"price_eur":6.99,"tags":["fish","gluten","processed","ready_meal","soy"],"freezable":false},{"id":"gerookte_makreel","name":"Gerookte makreel","aliases":["makreel","makreelfilet","gerookte makreelfilet","Gerookte makreel(filet)"],"cat":"vis","kcal":285,"protein":19,"carbs":0,"sugar":0,"fat":23,"satfat":5,"fiber":0,"salt":1.6,"pack_g":200,"price_eur":3.99,"tags":["fish","halal_possible","processed"],"freezable":true},{"id":"tofu_naturel","name":"Tofu naturel","aliases":["tofu","tahoe","tofu blok","bonenkwark"],"cat":"vega","kcal":126,"protein":13,"carbs":1,"sugar":0.5,"fat":7.6,"satfat":1.2,"fiber":0.9,"salt":0.03,"pack_g":375,"price_eur":1.79,"tags":["halal_possible","soy","vegan","vegetarian"],"freezable":true},{"id":"tempeh","name":"Tempeh naturel","aliases":["tempe","tempé","tempeh blok"],"cat":"vega","kcal":149,"protein":12,"carbs":5.6,"sugar":0.5,"fat":7.5,"satfat":1.5,"fiber":5,"salt":0.02,"pack_g":250,"price_eur":1.89,"tags":["halal_possible","soy","vegan","vegetarian"],"freezable":true},{"id":"vega_burger","name":"Plantaardige burger","aliases":["vegaburger","vegetarische burger","plantaardige burger","veggie burger","terra burger","Plantaardige burger (AH Terra)"],"cat":"vega","kcal":189,"protein":12,"carbs":7,"sugar":1,"fat":11,"satfat":3,"fiber":6.9,"salt":1.08,"pack_g":227,"price_eur":3.49,"tags":["gluten","halal_possible","processed","soy","ultraprocessed","vegan","vegetarian"],"freezable":true},{"id":"groenteburger","name":"Plantaardige groenteburger","aliases":["groenteburgers","groente burger","vegetarische groenteburger","Plantaardige groenteburger (AH Terra)"],"cat":"vega","kcal":112,"protein":10,"carbs":8,"sugar":2,"fat":3.6,"satfat":0.4,"fiber":4.6,"salt":1.08,"pack_g":200,"price_eur":1.69,"tags":["gluten","halal_possible","processed","ultraprocessed","vegan","vegetarian"],"freezable":true},{"id":"falafel","name":"Falafel","aliases":["falafelballetjes","falafel balletjes"],"cat":"vega","kcal":192,"protein":8.4,"carbs":16,"sugar":2,"fat":8.8,"satfat":1,"fiber":7,"salt":1.18,"pack_g":200,"price_eur":2.69,"tags":["gluten","halal_possible","processed","vegan","vegetarian"],"freezable":true},{"id":"vega_kipstuckjes","name":"Vegan kipstuckjes","aliases":["vegetarische kipstukjes","kipstuckjes","vegan kip","vega kip","plantaardige kip","Vegan kipstuckjes (Vegetarische Slager)"],"cat":"vega","kcal":130,"protein":20,"carbs":1.8,"sugar":0.6,"fat":3.4,"satfat":0.4,"fiber":4,"salt":1.2,"pack_g":160,"price_eur":4.29,"tags":["gluten","halal_possible","processed","soy","ultraprocessed","vegan","vegetarian"],"freezable":true},{"id":"magere_kwark","name":"Magere kwark","aliases":["kwark","magere franse kwark","platte kwark","kwark mager"],"cat":"zuivel","kcal":52,"protein":9,"carbs":4,"sugar":4,"fat":0,"satfat":0,"fiber":0,"salt":0.1,"pack_g":500,"price_eur":1.49,"tags":["dairy","halal_possible","lactose","vegetarian"],"freezable":false},{"id":"griekse_yoghurt_10","name":"Yoghurt Griekse stijl 10% vet","aliases":["griekse yoghurt","yoghurt griekse stijl","turkse yoghurt","volle griekse yoghurt"],"cat":"zuivel","kcal":128,"protein":4.5,"carbs":5,"sugar":5,"fat":10,"satfat":6.5,"fiber":0,"salt":0.1,"pack_g":1000,"price_eur":2.15,"tags":["dairy","halal_possible","lactose","vegetarian"],"freezable":false},{"id":"volle_yoghurt","name":"Volle yoghurt","aliases":["yoghurt vol","volle yoghurt naturel"],"cat":"zuivel","kcal":63,"protein":3.9,"carbs":3.7,"sugar":3.7,"fat":3.1,"satfat":2,"fiber":0,"salt":0.11,"pack_g":1000,"price_eur":1.79,"tags":["dairy","halal_possible","lactose","vegetarian"],"freezable":false},{"id":"halfvolle_yoghurt","name":"Halfvolle yoghurt","aliases":["yoghurt","halfvolle yoghurt naturel"],"cat":"zuivel","kcal":46,"protein":4,"carbs":4.3,"sugar":4.3,"fat":1.5,"satfat":1,"fiber":0,"salt":0.12,"pack_g":1000,"price_eur":1.49,"tags":["dairy","halal_possible","lactose","vegetarian"],"freezable":false},{"id":"magere_yoghurt","name":"Magere yoghurt","aliases":["magere yoghurt naturel","yoghurt mager","0% yoghurt"],"cat":"zuivel","kcal":36,"protein":4.3,"carbs":4.3,"sugar":4.3,"fat":0.1,"satfat":0.1,"fiber":0,"salt":0.13,"pack_g":1000,"price_eur":1.39,"tags":["dairy","halal_possible","lactose","vegetarian"],"freezable":false},{"id":"skyr_naturel","name":"Skyr naturel","aliases":["skyr","ijslandse yoghurt","arla skyr","high protein yoghurt"],"cat":"zuivel","kcal":60,"protein":10,"carbs":3.9,"sugar":3.9,"fat":0.2,"satfat":0.1,"fiber":0,"salt":0.1,"pack_g":450,"price_eur":2.49,"tags":["dairy","halal_possible","lactose","vegetarian"],"freezable":false},{"id":"halfvolle_melk","name":"Halfvolle melk","aliases":["melk","halfvolle","verse melk","Halfvolle melk (vers)"],"cat":"zuivel","kcal":46,"protein":3.5,"carbs":4.7,"sugar":4.7,"fat":1.5,"satfat":1,"fiber":0,"salt":0.1,"pack_g":1000,"price_eur":1.19,"tags":["dairy","halal_possible","lactose","vegetarian"],"freezable":true},{"id":"volle_melk","name":"Volle melk","aliases":["melk vol","volle melk vers","Volle melk (vers)"],"cat":"zuivel","kcal":63,"protein":3.4,"carbs":4.6,"sugar":4.6,"fat":3.5,"satfat":2.3,"fiber":0,"salt":0.1,"pack_g":1000,"price_eur":1.39,"tags":["dairy","halal_possible","lactose","vegetarian"],"freezable":true},{"id":"karnemelk","name":"Karnemelk","aliases":["karne","karnemelk vers"],"cat":"zuivel","kcal":35,"protein":3.3,"carbs":4,"sugar":4,"fat":0.5,"satfat":0.3,"fiber":0,"salt":0.1,"pack_g":1000,"price_eur":1.09,"tags":["dairy","halal_possible","lactose","vegetarian"],"freezable":false},{"id":"cottage_cheese","name":"Cottage cheese / hüttenkäse","aliases":["hüttenkäse","huttenkase","cottage kaas","korrelige kaas"],"cat":"zuivel","kcal":91,"protein":12,"carbs":2.8,"sugar":2.8,"fat":3.5,"satfat":2.2,"fiber":0,"salt":0.6,"pack_g":200,"price_eur":0.99,"tags":["dairy","halal_possible","lactose","vegetarian"],"freezable":false},{"id":"mozzarella","name":"Mozzarella 45+","aliases":["verse mozzarella","mozzarella bol","mozarella"],"cat":"kaas","kcal":247,"protein":18,"carbs":1,"sugar":1,"fat":19,"satfat":12,"fiber":0,"salt":0.5,"pack_g":125,"price_eur":1.59,"tags":["dairy","lactose"],"freezable":true},{"id":"feta","name":"Griekse feta","aliases":["fetakaas","feta kaas","witte kaas","schapenkaas"],"cat":"kaas","kcal":278,"protein":17,"carbs":0.7,"sugar":0.5,"fat":23,"satfat":17,"fiber":0,"salt":2.25,"pack_g":200,"price_eur":2.39,"tags":["dairy","lactose"],"freezable":true},{"id":"jong_belegen_plakken","name":"Goudse jong belegen 48+","aliases":["kaas","kaasplakken","jong belegen","goudse kaas","plakjes kaas","48+ kaas","Goudse jong belegen 48+ (plakken)"],"cat":"kaas","kcal":375,"protein":24,"carbs":0,"sugar":0,"fat":31,"satfat":21,"fiber":0,"salt":2,"pack_g":190,"price_eur":3.09,"tags":["dairy","halal_possible","vegetarian"],"freezable":true},{"id":"roomkaas_naturel","name":"Verse roomkaas naturel","aliases":["roomkaas","verse roomkaas","smeerkaas","cream cheese"],"cat":"kaas","kcal":291,"protein":5.5,"carbs":3.2,"sugar":3.2,"fat":28,"satfat":19,"fiber":0,"salt":0.9,"pack_g":200,"price_eur":2.59,"tags":["dairy","halal_possible","lactose","vegetarian"],"freezable":false},{"id":"slagroom","name":"Verse slagroom","aliases":["room","verse room","kookroom","slagroom vers","Verse slagroom (35%)"],"cat":"zuivel","kcal":337,"protein":2.1,"carbs":3,"sugar":3,"fat":35,"satfat":23.5,"fiber":0,"salt":0.05,"pack_g":250,"price_eur":1.29,"tags":["dairy","halal_possible","lactose","vegetarian"],"freezable":true},{"id":"vanillevla","name":"Vanillevla","aliases":["vla","pudding","vanille vla","vanillepudding"],"cat":"zuivel","kcal":91,"protein":2.2,"carbs":14,"sugar":9.2,"fat":2.9,"satfat":1.9,"fiber":0,"salt":0.1,"pack_g":1000,"price_eur":1.59,"tags":["dairy","halal_possible","high_sugar","lactose","processed","vegetarian"],"freezable":false},{"id":"chocoladevla","name":"Chocoladevla / chocoladepudding","aliases":["chocovla","chocolade vla","chocoladepudding","pudding"],"cat":"zuivel","kcal":100,"protein":3.3,"carbs":15,"sugar":12,"fat":2.7,"satfat":1.7,"fiber":0.8,"salt":0.15,"pack_g":1000,"price_eur":1.79,"tags":["dairy","halal_possible","high_sugar","lactose","processed","vegetarian"],"freezable":false},{"id":"eieren","name":"Eieren","aliases":["ei","eitjes","scharreleieren","vrije uitloop eieren","kippeneieren","Eieren (vrije uitloop, M, 10 stuks)"],"cat":"ei","kcal":130,"protein":12.6,"carbs":0.4,"sugar":0.3,"fat":9,"satfat":2.6,"fiber":0,"salt":0.35,"pack_g":500,"price_eur":4.19,"tags":["egg","halal_possible","vegetarian"],"freezable":false},{"id":"hummus","name":"Hummus naturel","aliases":["houmous","humus","hoemoes","kikkererwtendip"],"cat":"beleg","kcal":302,"protein":6,"carbs":8.8,"sugar":0.1,"fat":26,"satfat":3.4,"fiber":4.6,"salt":1.2,"pack_g":200,"price_eur":1.49,"tags":["halal_possible","processed","vegan","vegetarian"],"freezable":true},{"id":"kipsalade_kerrie","name":"Kip-kerrie salade","aliases":["kipsalade","kip kerrie salade","kipkerrie","kip-kerriesalade","Kip-kerrie salade (35% minder vet)"],"cat":"beleg","kcal":216,"protein":8,"carbs":9,"sugar":6,"fat":17,"satfat":1.6,"fiber":0.5,"salt":1.3,"pack_g":175,"price_eur":2.99,"tags":["egg","halal_possible","meat","poultry","processed"],"freezable":false},{"id":"kip_karamba_salade","name":"Kip karamba salade","aliases":["kipsalade","kip karamba","pittige kipsalade"],"cat":"beleg","kcal":362,"protein":7.2,"carbs":11,"sugar":6,"fat":32,"satfat":2.6,"fiber":0.5,"salt":1.18,"pack_g":175,"price_eur":2.59,"tags":["egg","halal_possible","meat","poultry","processed"],"freezable":false},{"id":"kip_sate_salade","name":"Kip saté salade","aliases":["kip sate salade","satesalade","kipsatesalade"],"cat":"beleg","kcal":272,"protein":9,"carbs":15,"sugar":9,"fat":18,"satfat":3,"fiber":1,"salt":1.3,"pack_g":175,"price_eur":2.99,"tags":["egg","gluten","halal_possible","meat","nuts","poultry","processed","soy"],"freezable":false},{"id":"tonijnsalade","name":"Tonijnsalade","aliases":["tonijn salade","tonijnspread","salade tonijn"],"cat":"beleg","kcal":264,"protein":11,"carbs":7.2,"sugar":4.9,"fat":21,"satfat":1.9,"fiber":1.2,"salt":1.21,"pack_g":175,"price_eur":2.49,"tags":["egg","fish","halal_possible","processed"],"freezable":false},{"id":"eiersalade","name":"Eiersalade","aliases":["eisalade","salade ei","ei salade"],"cat":"beleg","kcal":230,"protein":7,"carbs":5,"sugar":3,"fat":20,"satfat":2.2,"fiber":0.3,"salt":1.1,"pack_g":175,"price_eur":2.29,"tags":["egg","halal_possible","processed","vegetarian"],"freezable":false},{"id":"volkoren_brood","name":"Volkoren brood","aliases":["volkorenbrood","volkoren heel","bruin brood volkoren","boterhammen volkoren","Volkoren brood (heel)"],"cat":"brood","kcal":232,"protein":12,"carbs":39,"sugar":3.5,"fat":1.6,"satfat":0.3,"fiber":6.9,"salt":0.9,"pack_g":800,"price_eur":2.29,"tags":["bakery","gluten","processed","vegetarian","wholegrain"],"freezable":true},{"id":"tijgerbrood_wit","name":"Tijgerbrood wit","aliases":["tijgerbrood","tijger wit","witbrood","wit brood","Tijgerbrood wit (heel)"],"cat":"brood","kcal":249,"protein":8.5,"carbs":50,"sugar":1.2,"fat":1.3,"satfat":0.1,"fiber":1.6,"salt":0.9,"pack_g":800,"price_eur":2.29,"tags":["bakery","gluten","processed","vegetarian"],"freezable":true},{"id":"speltbrood","name":"Spelt volkoren brood","aliases":["spelt","speltbrood volkoren","spelt volkoren"],"cat":"brood","kcal":283,"protein":11,"carbs":37,"sugar":0.6,"fat":8.5,"satfat":1,"fiber":7.2,"salt":1.05,"pack_g":600,"price_eur":2.89,"tags":["bakery","gluten","processed","vegetarian","wholegrain"],"freezable":true},{"id":"stokbrood","name":"Stokbrood wit","aliases":["baguette","stokbrood wit","afbakstokbrood"],"cat":"brood","kcal":245,"protein":8.1,"carbs":50,"sugar":1,"fat":0.9,"satfat":0.2,"fiber":2.3,"salt":1.1,"pack_g":400,"price_eur":1.39,"tags":["bakery","gluten","processed","vegetarian"],"freezable":true},{"id":"croissant","name":"Roomboter croissants","aliases":["croissants","roomboter croissant","croissantje"],"cat":"brood","kcal":403,"protein":7.3,"carbs":45,"sugar":5.9,"fat":21,"satfat":14,"fiber":2.2,"salt":0.95,"pack_g":180,"price_eur":1.49,"tags":["bakery","dairy","gluten","lactose","ultraprocessed","vegetarian"],"freezable":true},{"id":"krentenbollen","name":"Krentenbollen","aliases":["krentenbol","rozijnenbollen","krentenbolletjes"],"cat":"brood","kcal":273,"protein":7.9,"carbs":53,"sugar":24,"fat":2.5,"satfat":0.8,"fiber":3.3,"salt":0.6,"pack_g":500,"price_eur":2.39,"tags":["bakery","gluten","high_sugar","processed","vegetarian"],"freezable":true},{"id":"wraps","name":"Tortilla wraps naturel","aliases":["tortilla","tortilla wraps","wrap","wraps naturel"],"cat":"brood","kcal":311,"protein":9.9,"carbs":52,"sugar":1.9,"fat":6.5,"satfat":1.3,"fiber":2.3,"salt":0.95,"pack_g":320,"price_eur":0.99,"tags":["bakery","gluten","ultraprocessed","vegetarian"],"freezable":true},{"id":"pita","name":"Witte pitabroodjes","aliases":["pitabroodjes","pitabroodje","pita's","pitas"],"cat":"brood","kcal":244,"protein":8.4,"carbs":49,"sugar":1.9,"fat":1,"satfat":0.2,"fiber":2.9,"salt":1,"pack_g":400,"price_eur":1.19,"tags":["bakery","gluten","processed","vegetarian"],"freezable":true},{"id":"bagels","name":"Bagels","aliases":["bagel","sesambagels","sesam bagel","Bagels (sesam)"],"cat":"brood","kcal":299,"protein":11,"carbs":52,"sugar":2.4,"fat":4.5,"satfat":0.7,"fiber":3,"salt":1.2,"pack_g":340,"price_eur":1.99,"tags":["bakery","gluten","processed","vegetarian"],"freezable":true},{"id":"roggebrood","name":"Roggebrood","aliases":["fries roggebrood","rogge","roggebrood gesneden"],"cat":"brood","kcal":189,"protein":4.5,"carbs":34,"sugar":5.1,"fat":1.4,"satfat":0.2,"fiber":11,"salt":0.75,"pack_g":500,"price_eur":0.89,"tags":["bakery","gluten","processed","vegetarian","wholegrain"],"freezable":true},{"id":"witte_bollen","name":"Witte bollen","aliases":["bolletjes","witte broodjes","bakkersbollen wit","zachte bollen"],"cat":"brood","kcal":270,"protein":9,"carbs":50,"sugar":3,"fat":3.5,"satfat":0.8,"fiber":2.5,"salt":1.1,"pack_g":300,"price_eur":1.49,"tags":["bakery","gluten","processed","vegetarian"],"freezable":true},{"id":"spinazie","name":"Spinazie","aliases":["verse spinazie","spinazieblad","babyspinazie","Spinazie (zak)"],"cat":"groente","kcal":26,"protein":3.2,"carbs":0.9,"sugar":0.4,"fat":0.6,"satfat":0.1,"fiber":2,"salt":0.03,"pack_g":400,"price_eur":1.99,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"rucola","name":"Rucola slamelange","aliases":["rucolasla","rucola"],"cat":"groente","kcal":22,"protein":2.7,"carbs":1.1,"sugar":1.1,"fat":0.3,"satfat":0,"fiber":1.9,"salt":0.2,"pack_g":75,"price_eur":1.69,"tags":["fresh_produce","vegan","vegetarian"],"freezable":false},{"id":"sla_mix","name":"Slamelange","aliases":["slamelange","melange","ijsbergsla","gemengde sla","salademix","sla","Slamelange (ijsbergsla melange)"],"cat":"groente","kcal":17,"protein":1.1,"carbs":2,"sugar":1.5,"fat":0.2,"satfat":0,"fiber":1.5,"salt":0.02,"pack_g":100,"price_eur":1.19,"tags":["fresh_produce","vegan","vegetarian"],"freezable":false},{"id":"broccoli","name":"Broccoli","aliases":["broccoliroosjes"],"cat":"groente","kcal":27,"protein":2.9,"carbs":0.7,"sugar":0.5,"fat":0.7,"satfat":0.1,"fiber":3.1,"salt":0.03,"pack_g":400,"price_eur":2.49,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"bloemkool","name":"Bloemkoolroosjes","aliases":["bloemkool","bloemkoolroosjes"],"cat":"groente","kcal":26,"protein":1.9,"carbs":3,"sugar":2,"fat":0.2,"satfat":0,"fiber":2.2,"salt":0.03,"pack_g":400,"price_eur":2.49,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"champignons","name":"Champignons","aliases":["kastanjechampignons","witte champignons","paddenstoelen"],"cat":"groente","kcal":21,"protein":3,"carbs":1,"sugar":0.5,"fat":0.3,"satfat":0.1,"fiber":1.5,"salt":0.02,"pack_g":250,"price_eur":1.49,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"paprika","name":"Paprika","aliases":["paprika's","rode paprika","paprika mix","puntpaprika","Paprika (mix, rood/geel/groen)"],"cat":"groente","kcal":30,"protein":1,"carbs":5,"sugar":4.5,"fat":0.3,"satfat":0.1,"fiber":1.9,"salt":0.01,"pack_g":500,"price_eur":2.29,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"courgette","name":"Courgette","aliases":["courgettes","zucchini"],"cat":"groente","kcal":17,"protein":1.2,"carbs":2.1,"sugar":2,"fat":0.3,"satfat":0.1,"fiber":1.1,"salt":0.02,"pack_g":300,"price_eur":0.99,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"wortels","name":"Wortels","aliases":["wortelen","winterpeen","peen","bospeen","worteltjes","Wortels (winterpeen)"],"cat":"groente","kcal":36,"protein":0.8,"carbs":6.5,"sugar":5,"fat":0.2,"satfat":0,"fiber":2.6,"salt":0.1,"pack_g":1000,"price_eur":1.29,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"tomaten","name":"Trostomaten","aliases":["tomaat","tomaten","trostomaat"],"cat":"groente","kcal":19,"protein":0.9,"carbs":2.8,"sugar":2.6,"fat":0.2,"satfat":0,"fiber":1.2,"salt":0.01,"pack_g":500,"price_eur":1.99,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"cherrytomaten","name":"Cherrytomaten","aliases":["snoeptomaten","cherry tomaatjes","kerstomaten","tomaatjes","Cherrytomaten (snoeptomaten)"],"cat":"groente","kcal":24,"protein":1,"carbs":3.9,"sugar":3.5,"fat":0.3,"satfat":0.1,"fiber":1.3,"salt":0.01,"pack_g":250,"price_eur":1.69,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"avocado","name":"Avocado","aliases":["avocado's","eetrijpe avocado","Avocado (eetrijp)"],"cat":"fruit","kcal":161,"protein":2,"carbs":1.8,"sugar":0.7,"fat":14.7,"satfat":2.1,"fiber":6.7,"salt":0.02,"pack_g":360,"price_eur":2.49,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"soepgroente","name":"Verse soepgroente","aliases":["soepgroenten","soeppakket","soepgroente vers"],"cat":"groente","kcal":25,"protein":1.2,"carbs":3.5,"sugar":2.8,"fat":0.3,"satfat":0,"fiber":2.2,"salt":0.05,"pack_g":300,"price_eur":1.49,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"roerbakgroente","name":"Roerbakgroente mix","aliases":["wokgroente","roerbakmix","wokmix","oosterse groentemix"],"cat":"groente","kcal":28,"protein":1.5,"carbs":4,"sugar":3,"fat":0.3,"satfat":0.1,"fiber":2,"salt":0.05,"pack_g":400,"price_eur":1.99,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"andijvie_gesneden","name":"Andijvie gesneden","aliases":["andijvie","gesneden andijvie"],"cat":"groente","kcal":14,"protein":1.3,"carbs":0.8,"sugar":0.5,"fat":0.2,"satfat":0,"fiber":2,"salt":0.05,"pack_g":400,"price_eur":1.49,"tags":["fresh_produce","vegan","vegetarian"],"freezable":false},{"id":"spitskool_gesneden","name":"Spitskool gesneden","aliases":["spitskool","gesneden spitskool","koolsla groente"],"cat":"groente","kcal":25,"protein":1.3,"carbs":3.5,"sugar":3.2,"fat":0.1,"satfat":0,"fiber":2.5,"salt":0.03,"pack_g":350,"price_eur":1.49,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"boerenkool_gesneden","name":"Boerenkool gesneden","aliases":["boerenkool","gesneden boerenkool"],"cat":"groente","kcal":42,"protein":3.5,"carbs":3,"sugar":2,"fat":0.9,"satfat":0.1,"fiber":4.1,"salt":0.1,"pack_g":500,"price_eur":1.79,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"sperziebonen","name":"Sperziebonen","aliases":["boontjes","haricots verts","sperzieboontjes"],"cat":"groente","kcal":31,"protein":1.8,"carbs":4.3,"sugar":3.3,"fat":0.2,"satfat":0,"fiber":2.7,"salt":0.01,"pack_g":400,"price_eur":2.29,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"komkommer","name":"Komkommer","aliases":["komkommers"],"cat":"groente","kcal":15,"protein":0.7,"carbs":2.5,"sugar":1.7,"fat":0.1,"satfat":0,"fiber":0.6,"salt":0.01,"pack_g":350,"price_eur":0.89,"tags":["fresh_produce","vegan","vegetarian"],"freezable":false},{"id":"tauge","name":"Taugé","aliases":["taugé","taugeh","sojascheuten","mungboonscheuten"],"cat":"groente","kcal":33,"protein":3,"carbs":4.1,"sugar":4.1,"fat":0.2,"satfat":0,"fiber":1.8,"salt":0.02,"pack_g":300,"price_eur":0.99,"tags":["fresh_produce","vegan","vegetarian"],"freezable":false},{"id":"peterselie","name":"Verse peterselie","aliases":["peterselie","platte peterselie","verse kruiden"],"cat":"groente","kcal":36,"protein":3,"carbs":3,"sugar":0.9,"fat":0.8,"satfat":0.1,"fiber":3.3,"salt":0.14,"pack_g":30,"price_eur":0.99,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"basilicum","name":"Verse basilicum","aliases":["basilicum","verse kruiden","basilicumplantje"],"cat":"groente","kcal":23,"protein":3.2,"carbs":1,"sugar":0.3,"fat":0.6,"satfat":0,"fiber":1.6,"salt":0.01,"pack_g":15,"price_eur":1.09,"tags":["fresh_produce","vegan","vegetarian"],"freezable":false},{"id":"bananen","name":"Bananen","aliases":["banaan"],"cat":"fruit","kcal":93,"protein":1.1,"carbs":20,"sugar":12,"fat":0.3,"satfat":0.1,"fiber":2.6,"salt":0,"pack_g":1000,"price_eur":1.99,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"aardbeien","name":"Aardbeien","aliases":["aardbei"],"cat":"fruit","kcal":33,"protein":0.7,"carbs":5.7,"sugar":4.9,"fat":0.3,"satfat":0,"fiber":2,"salt":0,"pack_g":400,"price_eur":3.49,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"blauwe_bessen","name":"Blauwe bessen","aliases":["blauwebessen","blueberries","bessen"],"cat":"fruit","kcal":58,"protein":0.7,"carbs":12,"sugar":10,"fat":0.3,"satfat":0,"fiber":2.4,"salt":0,"pack_g":300,"price_eur":3.99,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"frambozen","name":"Frambozen","aliases":["framboos"],"cat":"fruit","kcal":45,"protein":1.2,"carbs":5.4,"sugar":4.4,"fat":0.7,"satfat":0,"fiber":6.5,"salt":0,"pack_g":125,"price_eur":2.49,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"mango","name":"Mango","aliases":["mango's","eetrijpe mango","Mango (eetrijp)"],"cat":"fruit","kcal":60,"protein":0.8,"carbs":13.4,"sugar":13,"fat":0.4,"satfat":0.1,"fiber":1.6,"salt":0,"pack_g":400,"price_eur":1.99,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"ananas_stukjes","name":"Ananas stukjes","aliases":["ananas","gesneden ananas","ananasstukjes","Ananas stukjes (gesneden)"],"cat":"fruit","kcal":50,"protein":0.5,"carbs":11.7,"sugar":9.9,"fat":0.1,"satfat":0,"fiber":1.4,"salt":0,"pack_g":400,"price_eur":2.79,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"fruitmix_gesneden","name":"Gesneden fruit","aliases":["fruitsalade","gesneden fruit","fruitbakje","fruitmix","Gesneden fruit (fruitsalade/fruitbakje)"],"cat":"fruit","kcal":50,"protein":0.6,"carbs":11,"sugar":10.5,"fat":0.2,"satfat":0,"fiber":1.2,"salt":0,"pack_g":300,"price_eur":2.99,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"druiven","name":"Druiven","aliases":["witte druiven","rode druiven","pitloze druiven","Druiven (pitloos)"],"cat":"fruit","kcal":70,"protein":0.7,"carbs":17,"sugar":15.5,"fat":0.2,"satfat":0.1,"fiber":0.9,"salt":0,"pack_g":500,"price_eur":2.49,"tags":["fresh_produce","vegan","vegetarian"],"freezable":true},{"id":"lasagne","name":"Lasagne bolognese","aliases":["lasagne bolognese","lasagna","ah lasagne","AH maaltijd lasagne bolognese"],"cat":"maaltijd","kcal":138,"protein":7.5,"carbs":13,"sugar":3.5,"fat":6,"satfat":3,"fiber":1.2,"salt":0.75,"pack_g":400,"price_eur":3.99,"tags":["beef","dairy","egg","gluten","lactose","meat","pork","processed","ready_meal"],"freezable":true},{"id":"nasi_goreng","name":"Nasi goreng met kip","aliases":["nasi","nasi met kip","nasi goreng","AH maaltijd nasi goreng met kip"],"cat":"maaltijd","kcal":149,"protein":7,"carbs":18,"sugar":4,"fat":5,"satfat":1.3,"fiber":1.8,"salt":0.9,"pack_g":450,"price_eur":3.99,"tags":["egg","gluten","meat","poultry","processed","ready_meal","soy"],"freezable":true},{"id":"macaroni_ham_kaas","name":"Macaroni ham-kaas","aliases":["macaroni","macaroni ham kaas","macaroni met ham en kaas","AH maaltijd macaroni ham-kaas"],"cat":"maaltijd","kcal":144,"protein":7,"carbs":17,"sugar":2.5,"fat":5,"satfat":2.5,"fiber":1.3,"salt":0.8,"pack_g":400,"price_eur":3.79,"tags":["dairy","gluten","lactose","meat","pork","ready_meal","ultraprocessed"],"freezable":true},{"id":"spaghetti_bolognese","name":"Spaghetti bolognese","aliases":["spaghetti","pasta bolognese","spaghetti bolognaise","AH maaltijd spaghetti bolognese"],"cat":"maaltijd","kcal":130,"protein":6.5,"carbs":16,"sugar":3.5,"fat":4,"satfat":1.6,"fiber":1.8,"salt":0.7,"pack_g":450,"price_eur":3.99,"tags":["beef","dairy","gluten","lactose","meat","pork","processed","ready_meal"],"freezable":true},{"id":"bami_goreng","name":"Bami goreng met kip","aliases":["bami","bami goreng","AH maaltijd bami goreng met kip"],"cat":"maaltijd","kcal":141,"protein":7,"carbs":16,"sugar":4,"fat":5,"satfat":1.2,"fiber":1.8,"salt":1,"pack_g":450,"price_eur":3.99,"tags":["egg","gluten","meat","poultry","processed","ready_meal","soy"],"freezable":true},{"id":"stamppot_boerenkool","name":"Boerenkoolstamppot met rookworst","aliases":["boerenkoolstamppot","stamppot boerenkool","stamppot met rookworst","stamppot","AH maaltijd boerenkoolstamppot met rookworst"],"cat":"maaltijd","kcal":117,"protein":4.5,"carbs":9,"sugar":1.5,"fat":6.5,"satfat":2.5,"fiber":2,"salt":0.9,"pack_g":450,"price_eur":4.29,"tags":["dairy","lactose","meat","pork","ready_meal","ultraprocessed"],"freezable":true},{"id":"hutspot","name":"Hutspot met draadjesvlees","aliases":["hutspot met draadjesvlees","hutspot vlees","AH maaltijd hutspot met draadjesvlees"],"cat":"maaltijd","kcal":94,"protein":5,"carbs":9,"sugar":3,"fat":3.8,"satfat":1.6,"fiber":2,"salt":0.7,"pack_g":450,"price_eur":4.49,"tags":["beef","dairy","gluten","lactose","meat","processed","ready_meal"],"freezable":true},{"id":"kip_tikka_masala","name":"Kip tikka masala met rijst","aliases":["tikka masala","kip curry","kipcurry","AH maaltijd kip tikka masala met rijst"],"cat":"maaltijd","kcal":131,"protein":7,"carbs":15,"sugar":3,"fat":4.5,"satfat":1.8,"fiber":1.2,"salt":0.7,"pack_g":450,"price_eur":4.49,"tags":["dairy","lactose","meat","poultry","processed","ready_meal"],"freezable":true},{"id":"chili_con_carne","name":"Chili con carne met rijst","aliases":["chili","chili con carne","AH maaltijd chili con carne met rijst"],"cat":"maaltijd","kcal":121,"protein":6.5,"carbs":15,"sugar":2.5,"fat":3.3,"satfat":1.2,"fiber":2.5,"salt":0.7,"pack_g":450,"price_eur":4.29,"tags":["beef","meat","pork","processed","ready_meal"],"freezable":true},{"id":"verse_pizza","name":"Verse pizza margherita","aliases":["pizza","pizza margherita","verse pizza","Verse pizza margherita (koeling)"],"cat":"maaltijd","kcal":240,"protein":10,"carbs":31,"sugar":3.5,"fat":8,"satfat":3.8,"fiber":2,"salt":1.2,"pack_g":400,"price_eur":3.99,"tags":["dairy","gluten","lactose","ready_meal","ultraprocessed","vegetarian"],"freezable":true},{"id":"verse_tomatensoep","name":"Verse tomatensoep","aliases":["tomatensoep","verse soep","soep","Verse tomatensoep (zonder balletjes)"],"cat":"maaltijd","kcal":45,"protein":1.2,"carbs":5.5,"sugar":4,"fat":1.8,"satfat":0.8,"fiber":1,"salt":0.7,"pack_g":500,"price_eur":2.99,"tags":["dairy","lactose","processed","ready_meal","vegetarian"],"freezable":true},{"id":"verse_erwtensoep","name":"Verse erwtensoep","aliases":["erwtensoep","snert","verse soep"],"cat":"maaltijd","kcal":85,"protein":5,"carbs":8,"sugar":1.5,"fat":3,"satfat":1.1,"fiber":3,"salt":0.8,"pack_g":500,"price_eur":3.29,"tags":["meat","pork","processed","ready_meal"],"freezable":true},{"id":"maaltijdsalade","name":"Maaltijdsalade pasta-kip-pesto","aliases":["pastasalade","salade kip pesto","maaltijd salade"],"cat":"salade","kcal":158,"protein":7,"carbs":15,"sugar":2,"fat":7.5,"satfat":1.5,"fiber":1.5,"salt":0.8,"pack_g":330,"price_eur":4.49,"tags":["dairy","egg","gluten","lactose","meat","nuts","poultry","processed","ready_meal"],"freezable":false},{"id":"salade_bowl","name":"Salade bowl vegetarisch","aliases":["salad bowl","salade bowl","buddha bowl","vega bowl","Salade bowl vegetarisch (bijv. falafel/quinoa)"],"cat":"salade","kcal":130,"protein":4.5,"carbs":13,"sugar":3,"fat":6,"satfat":0.8,"fiber":3,"salt":0.7,"pack_g":330,"price_eur":4.79,"tags":["gluten","processed","ready_meal","vegetarian"],"freezable":false},{"id":"poke_bowl","name":"Poké bowl zalm","aliases":["poké bowl","pokebowl","poke bowl zalm","poke"],"cat":"maaltijd","kcal":149,"protein":6.5,"carbs":19,"sugar":3.5,"fat":5,"satfat":0.9,"fiber":1.2,"salt":0.8,"pack_g":350,"price_eur":5.99,"tags":["fish","gluten","processed","ready_meal","soy"],"freezable":false},{"id":"wrap_to_go","name":"Wrap kip","aliases":["wrap kip","kipwrap","wrap to go","Wrap kip (to go)"],"cat":"maaltijd","kcal":200,"protein":9,"carbs":22,"sugar":2.5,"fat":8,"satfat":1.5,"fiber":1.8,"salt":1,"pack_g":190,"price_eur":3.29,"tags":["dairy","egg","gluten","lactose","meat","poultry","ready_meal","ultraprocessed"],"freezable":false},{"id":"sandwich_ei","name":"Sandwich ei","aliases":["eiersandwich","sandwich ei","broodje ei","Sandwich ei (to go)"],"cat":"maaltijd","kcal":231,"protein":9,"carbs":23,"sugar":2.5,"fat":11,"satfat":1.5,"fiber":2,"salt":1,"pack_g":160,"price_eur":2.79,"tags":["egg","gluten","ready_meal","ultraprocessed","vegetarian"],"freezable":false},{"id":"sandwich_kip","name":"Sandwich kip-kerrie","aliases":["sandwich kip kerrie","kipsandwich","broodje kip","Sandwich kip-kerrie (to go)"],"cat":"maaltijd","kcal":222,"protein":10,"carbs":22,"sugar":3.5,"fat":10,"satfat":1.2,"fiber":2,"salt":1,"pack_g":170,"price_eur":2.99,"tags":["egg","gluten","meat","poultry","ready_meal","ultraprocessed"],"freezable":false},{"id":"tortellini","name":"Verse tortellini ricotta-spinazie","aliases":["verse tortellini","tortellini","verse pasta","ravioli"],"cat":"zetmeel","kcal":260,"protein":10,"carbs":38,"sugar":2.5,"fat":7,"satfat":3.5,"fiber":2.5,"salt":0.9,"pack_g":250,"price_eur":2.79,"tags":["dairy","egg","gluten","lactose","processed","vegetarian"],"freezable":true},{"id":"tagliatelle_vers","name":"Verse tagliatelle","aliases":["verse tagliatelle","verse pasta","eierpasta","fettuccine","Verse tagliatelle (eierpasta)"],"cat":"zetmeel","kcal":275,"protein":11,"carbs":50,"sugar":1,"fat":3,"satfat":0.8,"fiber":2,"salt":0.05,"pack_g":250,"price_eur":2.29,"tags":["egg","gluten","processed","vegetarian"],"freezable":true},{"id":"gnocchi","name":"Gnocchi","aliases":["aardappelgnocchi","gnocchi di patate","Gnocchi (aardappel)"],"cat":"zetmeel","kcal":154,"protein":3.5,"carbs":33,"sugar":0.5,"fat":0.4,"satfat":0.1,"fiber":2,"salt":1.1,"pack_g":500,"price_eur":1.99,"tags":["gluten","processed","vegetarian"],"freezable":true},{"id":"woknoedels","name":"Verse woknoedels","aliases":["verse noedels","mie","noedels","wokmie","udon","Verse woknoedels (mie, met ei)"],"cat":"zetmeel","kcal":159,"protein":5,"carbs":31,"sugar":0.8,"fat":1.3,"satfat":0.3,"fiber":1.5,"salt":0.4,"pack_g":400,"price_eur":1.99,"tags":["egg","gluten","processed","vegetarian"],"freezable":true},{"id":"jus_dorange","name":"Vers geperste jus d'orange","aliases":["sinaasappelsap","verse jus","jus d'orange","vers sap"],"cat":"overig","kcal":43,"protein":0.7,"carbs":9.5,"sugar":9,"fat":0.2,"satfat":0,"fiber":0.3,"salt":0,"pack_g":1000,"price_eur":3.49,"tags":["high_sugar","vegan","vegetarian"],"freezable":true},{"id":"smoothie","name":"Fruitsmoothie","aliases":["smoothie","fruitsmoothie","verse smoothie","Fruitsmoothie (zonder zuivel)"],"cat":"overig","kcal":55,"protein":0.6,"carbs":12,"sugar":11,"fat":0.2,"satfat":0,"fiber":1.2,"salt":0,"pack_g":750,"price_eur":2.79,"tags":["high_sugar","processed","vegan","vegetarian"],"freezable":true}];
+const STORES = [{"id":"ah-1330","name":"AH Oude Ebbingestraat","short":"Oude Ebbingestraat","street":"Oude Ebbingestraat 19","postcode":"9712 HA","city":"Groningen","area":"Binnenstad","format":"AH","hours":"ma-za 8-22, zo 12-22","url":"https://www.ah.nl/winkels/nederland/groningen/oude-ebbingestraat-19/1330","note":""},{"id":"ah-1631","name":"AH Nieuwe Ebbingestraat","short":"Nieuwe Ebbingestraat","street":"Nieuwe Ebbingestraat 73","postcode":"9712 NG","city":"Groningen","area":"Hortusbuurt","format":"AH","hours":"dagelijks 8-22","url":"https://www.ah.nl/winkels/nederland/groningen/nieuwe-ebbingestraat-73/1631","note":""},{"id":"ah-4193","name":"AH Akerkhof","short":"Akerkhof","street":"Akerkhof 1","postcode":"9712 BA","city":"Groningen","area":"Binnenstad","format":"AH","hours":"ma-za 8-22, zo 12-22","url":"https://www.ah.nl/winkels/nederland/groningen/akerkhof-1/4193","note":""},{"id":"ah-1243","name":"AH Brugstraat","short":"Brugstraat","street":"Brugstraat 14","postcode":"9711 HX","city":"Groningen","area":"Binnenstad-Zuid","format":"AH","hours":"ma-za 8-22, zo 12-22","url":"https://www.ah.nl/winkels/nederland/groningen/brugstraat-14/1243","note":""},{"id":"ah-1552","name":"AH Gedempte Zuiderdiep","short":"Gedempte Zuiderdiep","street":"Gedempte Zuiderdiep 14","postcode":"9711 HG","city":"Groningen","area":"Binnenstad-Zuid","format":"AH","hours":"tijden wisselen, zie ah.nl","url":"https://www.ah.nl/winkels/nederland/groningen/gedempte-zuiderdiep-14/1552","note":""},{"id":"ah-2219","name":"AH Westerkade","short":"Westerkade","street":"Westerkade 11","postcode":"9718 AR","city":"Groningen","area":"Westerhaven","format":"AH","hours":"ma-za 8-22, zo 12-22","url":"https://www.ah.nl/winkels/nederland/groningen/westerkade-11/2219","note":""},{"id":"ah-1206","name":"AH Floresplein","short":"Floresplein","street":"Floresplein 13","postcode":"9715 HH","city":"Groningen","area":"Indische Buurt","format":"AH","hours":"ma-za 8-22, zo 12-22","url":"https://www.ah.nl/winkels/nederland/groningen/floresplein-13/1206","note":""},{"id":"ah-1308","name":"AH Helperplein","short":"Helperplein","street":"Helperplein 4","postcode":"9721 CX","city":"Groningen","area":"Helpman","format":"AH","hours":"ma-za 8-22","url":"https://www.ah.nl/winkels/nederland/groningen/helperplein-4/1308","note":""},{"id":"ah-2315","name":"AH Van Lenneplaan","short":"De Wijert (Van Lenneplaan)","street":"Van Lenneplaan 99","postcode":"9721 PE","city":"Groningen","area":"De Wijert","format":"AH","hours":"ma-za 8-21, zo 12-21","url":"https://www.ah.nl/winkels/nederland/groningen/van-lenneplaan-99/2315","note":""},{"id":"ah-1060","name":"AH Von Suttnerstraat","short":"Hoornse Meer (Von Suttnerstraat)","street":"B.S.F. von Suttnerstraat 1","postcode":"9728 WZ","city":"Groningen","area":"Hoornse Meer","format":"AH","hours":"ma-za 8-21","url":"https://www.ah.nl/winkels/nederland/groningen/b-s-f-von-suttnerstraat-1/1060","note":""},{"id":"ah-1184","name":"AH Siersteenlaan","short":"Vinkhuizen (Siersteenlaan)","street":"Siersteenlaan 464","postcode":"9743 ES","city":"Groningen","area":"Vinkhuizen","format":"AH","hours":"ma-za 8-22, zo 12-22","url":"https://www.ah.nl/winkels/nederland/groningen/siersteenlaan-464/1184","note":""},{"id":"ah-1093","name":"AH Eikenlaan","short":"Selwerd (Eikenlaan)","street":"Eikenlaan 39","postcode":"9741 EH","city":"Groningen","area":"Selwerd","format":"AH","hours":"ma-za 8-22, zo 12-22","url":"https://www.ah.nl/winkels/nederland/groningen/eikenlaan-39/1093","note":""},{"id":"ah-1829","name":"AH Dierenriemstraat","short":"Paddepoel (Dierenriemstraat)","street":"Dierenriemstraat 122","postcode":"9742 AK","city":"Groningen","area":"Paddepoel","format":"AH","hours":"ma-vr 8-22","url":"https://www.ah.nl/winkels/nederland/groningen/dierenriemstraat-122/1829","note":""},{"id":"ah-8720","name":"AH Stoepemaheerd","short":"Beijum (Stoepemaheerd)","street":"Stoepemaheerd 21","postcode":"9737 TL","city":"Groningen","area":"Beijum","format":"AH","hours":"ma-za 8-21, zo 12-18","url":"https://www.ah.nl/winkels/nederland/groningen/stoepemaheerd-21/8720","note":""},{"id":"ah-8714","name":"AH Rijksweg 16","short":"Oosterhoogebrug (Rijksweg 16)","street":"Rijksweg 16","postcode":"9731 AB","city":"Groningen","area":"Oosterhoogebrug","format":"AH","hours":"ma-za 8-21","url":"https://www.ah.nl/winkels/nederland/groningen/rijksweg-16/8714","note":""},{"id":"ah-8595","name":"AH Rijksweg 129 A","short":"Ulgersmaborg (Rijksweg 129 A)","street":"Rijksweg 129 A","postcode":"9731 AH","city":"Groningen","area":"Ulgersmaborg","format":"AH","hours":"ma-za 8-21","url":"https://www.ah.nl/winkels/nederland/groningen/rijksweg-129a/8595","note":""},{"id":"ah-8539","name":"AH Zuiderweg","short":"Hoogkerk (Zuiderweg)","street":"Zuiderweg 27","postcode":"9745 AA","city":"Groningen","area":"Hoogkerk","format":"AH","hours":"ma-za 8-21","url":"https://www.ah.nl/winkels/nederland/groningen/zuiderweg-27/8539","note":""},{"id":"ah-1026","name":"AH Kerkstraat Haren","short":"Haren (Kerkstraat)","street":"Kerkstraat 27","postcode":"9751 BB","city":"Haren","area":"Haren","format":"AH","hours":"dagelijks tot 21","url":"https://www.ah.nl/winkels/nederland/haren-groningen/kerkstraat-27/1026","note":"AH heroverweegt deze locatie (2026)."},{"id":"ah-5826","name":"AH to go Stationsplein 3","short":"Station (to go, Stationsplein 3)","street":"Stationsplein 3","postcode":"9726 AE","city":"Groningen","area":"Hoofdstation","format":"AH to go","hours":"dagelijks ca. 7-23","url":"https://www.ah.nl/winkels/nederland/groningen/stationsplein-3/5826","note":"Doet mee met Too Good To Go."},{"id":"ah-5700","name":"AH to go Hanzeplein","short":"UMCG (to go, Hanzeplein)","street":"Hanzeplein 1","postcode":"9713 GZ","city":"Groningen","area":"UMCG","format":"AH to go","hours":"ma-vr 7-20","url":"https://www.ah.nl/winkels/nederland/groningen/hanzeplein-1/5700","note":""},{"id":"ah-5564","name":"AH to go Pleiadenlaan","short":"Paddepoel (to go, Pleiadenlaan)","street":"Pleiadenlaan 4","postcode":"9742 NG","city":"Groningen","area":"Paddepoel-Zuid","format":"AH to go","hours":"dagelijks 7-24","url":"https://www.ah.nl/winkels/nederland/groningen/pleiadenlaan-4/5564","note":""},{"id":"ah-5704","name":"AH to go Nijenborgh","short":"Zernike (to go, Nijenborgh)","street":"Nijenborgh 9","postcode":"9747 AG","city":"Groningen","area":"Zernike Campus","format":"AH to go","hours":"ma-vr 8.30-17, vaak dicht","url":"https://www.ah.nl/winkels/nederland/groningen/nijenborgh-9/5704","note":"Campuswinkel met beperkte tijden."},{"id":"ah-2328","name":"AH Hereweg","short":"Hereweg (nieuw)","street":"Hereweg 53","postcode":"9725 AB","city":"Groningen","area":"Herewegbuurt","format":"AH","hours":"nog niet open (nov 2026)","url":"https://www.ah.nl/winkels/nederland/groningen/hereweg-53/2328","note":"Nieuwe winkel, opent binnenkort."}];
+const TIPS = {"stickers":["Laatste Kans Koopjes (sinds september 2025) zijn tijdelijk afgeprijsde producten die bijna op hun datum zitten of uit het assortiment gaan. Alleen in de winkel, op is op.","Je herkent ze aan de blauw-oranje kortingssticker. Scan bij de kassa of met de handscanner alleen die sticker, anders betaal je de volle prijs.","In winkels met elektronische prijskaartjes prijst AH dynamisch af: 25%, dan 40%, oplopend tot 70% naarmate de dag vordert of de datum nadert. Waar dat niet kan, geldt de vaste 35%-sticker.","Brood van Gisteren: brood uit de eigen bakerij van de dag ervoor ligt 's ochtends tot 11:00 met flinke korting.","AH to go op het station (Stationsplein 3) biedt soms Too Good To Go-pakketten aan. Kijk daarvoor in de Too Good To Go-app."],"when":["Kijk vooraf in de AH-app: zet de app in winkelmodus (winkelicoon linksboven), open Laatste Kans Koopjes en kies je winkel. Maak een screenshot en laad die hier: dan zie je thuis al wat bij je dieet past.","Er komen de hele dag nieuwe koopjes bij en de lijst in de app kan achterlopen. Wat in de app staat, kan al weg zijn.","De korting loopt op door de dag. Klanten melden de hoogste kortingen ('s avonds tot 70%) tegen sluitingstijd, maar AH noemt geen vaste tijden en dan is er minder keus.","Voor brood: ga 's ochtends vóór 11:00.","Neem een koeltas mee en ga na het afrekenen direct naar huis. Pak gekoelde producten als laatste."],"digital":["De AH-app is de enige officiële bron die per winkel laat zien wat er ligt. AH heeft daar geen openbare koppeling voor. Daarom leest deze app screenshots en foto's in plaats van zelf bij AH te kijken."],"sources":["https://www.ah.nl/klantenservice/producten/laatste-kans-koopjes","https://nieuws.ah.nl/albert-heijn-zet-slimme-technologie-in-om-nog-meer-voedselverspilling-tegen-te-gaan/","https://nieuws.ah.nl/dynamisch-afprijzen-zorgt-voor-minder-voedselverspilling/","https://www.voedingscentrum.nl/nl/service/vraag-en-antwoord/koken-en-bewaren/kun-je-vlees-na-de-tgt-datum-nog-eten-.aspx","https://www.voedingscentrum.nl/nl/thema/kopen-koken-bewaren/eten-bewaren/hoe-lang-kan-ik-bewaren/kipfilet-onbereid.aspx","https://www.toogoodtogo.com/nl/find/groningen/ahtogo-groningenverrassingspakket/groceries/verrassingspakket-443344"]};
+const SAFETY = {"rules":["Te gebruiken tot (TGT) is een veiligheidsdatum: vers vlees, gehakt, kip, verse vis, voorgesneden groente, koelverse maaltijden. Op de datum zelf mag je het nog eten.","Op de TGT-datum kun je: vandaag opeten, vandaag invriezen (liefst meteen na thuiskomst), of vandaag bereiden en afgedekt in de koelkast nog 2 dagen bewaren.","Na de TGT-datum weggooien, ook als het er goed uitziet en ruikt.","Ten minste houdbaar tot (THT) is een kwaliteitsdatum: daarna vaak nog goed. Kijk, ruik en proef.","Invriezen stopt bacteriën maar doodt ze niet. Ontdooi in de koelkast, eet het binnen 24 uur op en verhit vlees, kip en vis goed.","Ontdooid rauw vlees of vis niet opnieuw invriezen. Wel mag je het eerst verwerken in een gerecht en dat gerecht invriezen.","Check het etiket: staat er 'niet opnieuw invriezen' (vaak bij vis), dan kan het niet de vriezer in.","Koelproducten nooit langer dan 2 uur buiten de koelkast. Koelkast op 4 °C, vriezer op -18 °C of kouder."],"freeze":[{"cat":"Kip en kalkoen","months":"3 maanden","after":"binnen 24 uur bereiden"},{"cat":"Gehakt","months":"3 maanden","after":"binnen 24 uur, helemaal gaar"},{"cat":"Hamburgers, worst","months":"1 maand","after":"binnen 24 uur, helemaal gaar"},{"cat":"Rundvlees uit één stuk","months":"9 maanden","after":"binnen 24 uur bereiden"},{"cat":"Varkensvlees","months":"2 tot 3 maanden","after":"binnen 24 uur bereiden"},{"cat":"Vette vis (zalm)","months":"3 maanden","after":"binnen 24 uur bereiden"},{"cat":"Magere vis (kabeljauw)","months":"6 maanden","after":"binnen 24 uur bereiden"},{"cat":"Brood","months":"1 maand","after":"per dag pakken wat je nodig hebt"},{"cat":"Kant-en-klaar (lasagne)","months":"3 maanden","after":"in koelkast ontdooien, 1x goed opwarmen"},{"cat":"Verse pasta (tortellini)","months":"1 maand","after":"bevroren koken"},{"cat":"Harde kaas","months":"2 tot 4 maanden","after":"brokkelig, gebruik warm"},{"cat":"Yoghurt, kwark","months":"kort","after":"alleen voor smoothies of gerechten"},{"cat":"Voorgesneden groente","months":"3 maanden","after":"bevroren in de pan"},{"cat":"Fruit","months":"8 tot 12 maanden","after":"voor smoothies en toetjes"},{"cat":"Sla, komkommer, tomaat","months":"niet invriezen","after":"-"}]};
 </script>
 <script>
 'use strict';
@@ -451,11 +458,14 @@ function h(tag, attrs, ...kids) {
   }
   return el;
 }
+function fill(el, ...kids) { el.replaceChildren(...kids.flat(Infinity).filter(k => k != null && k !== false)); }
 const EUR = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' });
 const fmtEur = v => (v == null || !isFinite(v)) ? '-' : EUR.format(v);
 const fmtNum = (v, d = 0) => (v == null || !isFinite(v)) ? '-' : new Intl.NumberFormat('nl-NL', { maximumFractionDigits: d, minimumFractionDigits: d }).format(v);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const round2 = v => Math.round(v * 100) / 100;
+const clone = o => JSON.parse(JSON.stringify(o));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 function parseNum(s) {
   if (s == null) return null;
   if (typeof s === 'number') return isFinite(s) ? s : null;
@@ -467,7 +477,9 @@ function parseNum(s) {
   return isFinite(v) ? v : null;
 }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
-function todayISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function isoOf(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function todayISO() { return isoOf(new Date()); }
+function addDays(iso, n) { const [y, m, d] = iso.split('-').map(Number); const dt = new Date(y, m - 1, d); dt.setDate(dt.getDate() + n); return isoOf(dt); }
 function lerp(x, pts) {
   if (x <= pts[0][0]) return pts[0][1];
   for (let i = 1; i < pts.length; i++) {
@@ -475,9 +487,9 @@ function lerp(x, pts) {
   }
   return pts[pts.length - 1][1];
 }
-function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9% ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
 let toastTimer;
-function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2200); }
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2400); }
 
 /* ============================================================
    Diet model
@@ -485,18 +497,12 @@ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = fal
 const GOALS = {
   balanced: { label: 'Gezond basis', desc: 'Schijf van Vijf: veel groente en fruit, volkoren, genoeg eiwit, weinig bewerkt vlees, suiker en zout.', kcal: 2000, protein: 90, pf: 0.4, carbsMax: null },
   cut: { label: 'Afvallen, eiwitrijk', desc: 'Veel eiwit per kcal zodat je vol zit en spiermassa houdt. Calorierijke producten met weinig eiwit vallen af.', kcal: 1800, protein: 140, pf: 0.9, carbsMax: null },
-  bulk: { label: 'Spieropbouw', desc: 'Veel eiwit en genoeg energie per euro. Rijst, brood en zuivel tellen mee als goedkope energie.', kcal: 2800, protein: 160, pf: 0.7, carbsMax: null },
+  bulk: { label: 'Spieropbouw', desc: 'Veel eiwit en genoeg energie per euro. Brood, rijst en zuivel tellen mee als goedkope energie.', kcal: 2800, protein: 160, pf: 0.7, carbsMax: null },
   lowcarb: { label: 'Koolhydraatarm', desc: 'Rond de 100 g koolhydraten per dag of minder: brood, pasta en zoet worden kritisch bekeken.', kcal: 2000, protein: 110, pf: 0.6, carbsMax: 100 },
-  keto: { label: 'Keto', desc: 'Onder de 30 g koolhydraten per dag. Vooral vlees, vis, eieren, kaas, groente boven de grond.', kcal: 2000, protein: 110, pf: 0.5, carbsMax: 30 },
+  keto: { label: 'Keto', desc: 'Onder de 30 g koolhydraten per dag. Vooral vlees, vis, eieren, kaas en groente boven de grond.', kcal: 2000, protein: 110, pf: 0.5, carbsMax: 30 },
   med: { label: 'Mediterraan', desc: 'Vis, groente, peulvruchten, volkoren en noten; weinig rood en bewerkt vlees.', kcal: 2000, protein: 90, pf: 0.4, carbsMax: null },
 };
-const EATS = {
-  alles: { label: 'Alles' },
-  flexi: { label: 'Weinig vlees' },
-  pesco: { label: 'Pescotarisch' },
-  vega: { label: 'Vegetarisch' },
-  vegan: { label: 'Veganistisch' },
-};
+const EATS = { alles: { label: 'Alles' }, flexi: { label: 'Weinig vlees' }, pesco: { label: 'Pescotarisch' }, vega: { label: 'Vegetarisch' }, vegan: { label: 'Veganistisch' } };
 const EXCL = [
   ['pork', 'Geen varkensvlees'], ['beef', 'Geen rundvlees'], ['fish', 'Geen vis'], ['shellfish', 'Geen schaaldieren'],
   ['lactose', 'Lactosevrij'], ['dairy', 'Geen zuivel'], ['gluten', 'Glutenvrij'], ['egg', 'Geen ei'],
@@ -507,7 +513,7 @@ const ALLOWED_TAGS = ['meat', 'poultry', 'pork', 'beef', 'fish', 'shellfish', 'd
 const CATS = { vlees: 'Vlees', gevogelte: 'Gevogelte', vis: 'Vis', vega: 'Vega', zuivel: 'Zuivel', kaas: 'Kaas', ei: 'Eieren', beleg: 'Beleg', brood: 'Brood', groente: 'Groente', fruit: 'Fruit', maaltijd: 'Maaltijd', salade: 'Salade', zetmeel: 'Pasta en co', overig: 'Overig' };
 
 function defaultProfile() {
-  return { goal: 'balanced', eat: 'alles', kcal: 2000, protein: 90, carbsMax: null, excl: {}, avoidUltra: false, freezer: true, persons: 1, budget: 40, notes: '', weight: null, store: null, setAt: null };
+  return { goal: 'balanced', eat: 'alles', kcal: 2000, protein: 90, carbsMax: null, excl: {}, avoidUltra: false, freezer: true, persons: 1, budget: 40, notes: '', weight: null, store: null, setAt: null, savedAt: 0 };
 }
 function exclusionsFor(P) {
   const ex = new Set();
@@ -525,6 +531,34 @@ function exclusionsFor(P) {
   return ex;
 }
 const ANIMAL = ['meat', 'poultry', 'pork', 'beef', 'fish', 'shellfish', 'dairy', 'egg', 'lactose'];
+
+/* Tags guessed from a product name, for products that are not in the table.
+   Deliberately broad: a wrong "contains" makes the app cautious, a missed one could make it wrong. */
+const NAME_TAG_RULES = [
+  [/varken|spek|\bham\b|beenham|achterham|ontbijtspek|bacon|salami|chorizo|karbonade|frikandel|knakworst|rookworst|braadworst|slavink|gyros|cervelaat|leverworst|pancetta|prosciutto|serrano|half om half|halfomhalf|\bworst/, ['meat', 'pork']],
+  [/rund|biefstuk|rosbief|entrecote|tartaar|hamburger|rookvlees|ossenworst|riblap|sukade|stooflap|gehakt|kalfs/, ['meat', 'beef']],
+  [/\bkip|kippen|kalkoen|\beend|chicken|drumstick|\bkuiken/, ['meat', 'poultry']],
+  [/vlees|\blam\b|lams|geit|\bwild\b|hert|konijn|shoarma|doner|kebab|vleeswaren|carpaccio/, ['meat']],
+  [/\bvis|zalm|tonijn|kabeljauw|pangasius|makreel|haring|tilapia|koolvis|sushi|forel|\bheek|\bschol|ansjovis|sardine|surimi|lekkerbek|kibbeling|visstick|poke/, ['fish']],
+  [/garnaal|garnalen|mossel|krab|kreeft|scampi|inktvis|calamar|oester/, ['fish', 'shellfish']],
+  [/melk|kaas|kwark|yoghurt|\broom|room\b|slagroom|boter|skyr|kefir|\bvla\b|pudding|mozzarella|feta|brie|camembert|ricotta|mascarpone|cottage|huttenkase|zuivel|\bijs\b|creme fraiche|zure room/, ['dairy', 'lactose']],
+  [/\bei\b|eieren|\beier|omelet|mayonaise|\bmayo|scharrelei/, ['egg']],
+  [/brood|tarwe|pasta|spaghetti|macaroni|lasagne|\bwrap|pita|tortilla|croissant|bagel|cracker|koek|cake|taart|muffin|pizza|noedel|\bmie\b|couscous|bulgur|spelt|rogge|gerst|paneer|schnitzel|\bbol\b|bollen|krentenbol|tosti|sandwich|broodje|gnocchi|tortellini|ravioli|seitan|quiche|bladerdeeg|pannenkoek|wafel/, ['gluten']],
+  [/\bnoot|noten|pinda|amandel|hazelno|walno|cashew|pistache|pecan|macadamia|pesto|sate\b|satay/, ['nuts']],
+  [/soja|tofu|tempeh|edamame|miso|ketjap/, ['soy']],
+];
+function inferTags(name) {
+  let n = norm(name);
+  const tags = new Set();
+  const plantMilk = /(soja|haver|amandel|kokos|rijst|erwten)\s?(melk|drink|yoghurt|room|kwark)/;
+  const vegMark = /\bvega\b|vegetarisch|plantaardig|vegan|veggie|\bterra\b/;
+  const veganMark = /vegan|plantaardig/;
+  n = n.replace(/pindakaas/g, 'pinda').replace(plantMilk, (_, base) => ` ${base} plantdrink `);
+  for (const [re, ts] of NAME_TAG_RULES) if (re.test(n)) ts.forEach(t => tags.add(t));
+  if (vegMark.test(n)) { ['meat', 'pork', 'beef', 'poultry', 'fish', 'shellfish'].forEach(t => tags.delete(t)); tags.add('vegetarian'); }
+  if (veganMark.test(n)) { ['dairy', 'lactose', 'egg'].forEach(t => tags.delete(t)); tags.add('vegan'); }
+  return [...tags];
+}
 
 /* ============================================================
    Food lookup and quick parsing
@@ -564,19 +598,21 @@ function matchFood(q, limit = 6) {
 function parseQuick(text) {
   let s = ' ' + String(text || '') + ' ';
   const r = { name: '', grams: null, price: null, now: null, pct: null };
-  const pct = s.match(/(-?\d{1,2})\s*%/);
-  if (pct) { r.pct = Math.abs(parseInt(pct[1], 10)); s = s.replace(pct[0], ' '); }
+  // Discount: prefer "NN% korting", else the last non-zero percentage. "0%" in a name (magere kwark 0%) is not a discount.
+  const pcts = [...s.matchAll(/-?(\d{1,2})\s*%(\s*korting)?/gi)].map(m => ({ m, v: parseInt(m[1], 10), k: !!m[2] })).filter(x => x.v > 0);
+  const pick = pcts.find(x => x.k) || pcts[pcts.length - 1];
+  if (pick) { r.pct = pick.v; s = s.replace(pick.m[0], ' '); }
   const w = s.match(/(\d+(?:[.,]\d+)?)\s*(kg|kilo|g|gr|gram|ml|l|liter|cl)\b/i);
   if (w) {
     let v = parseNum(w[1]); const u = w[2].toLowerCase();
     if (u === 'kg' || u === 'kilo' || u === 'l' || u === 'liter') v *= 1000; else if (u === 'cl') v *= 10;
     r.grams = Math.round(v); s = s.replace(w[0], ' ');
   }
-  const prices = [...s.matchAll(/€?\s?(\d{1,3}[.,]\d{2})(?!\d)/g)];
+  const prices = [...s.matchAll(/€\s?(\d{1,3}(?:[.,]\d{1,2})?)|(?<![\d.,])(\d{1,3}[.,]\d{1,2})(?![\d%])/g)];
   if (prices.length) {
-    const vals = prices.map(m => parseNum(m[1]));
+    const vals = prices.map(m => parseNum(m[1] || m[2])).filter(v => v != null);
     if (vals.length >= 2) { r.price = Math.max(vals[0], vals[1]); r.now = Math.min(vals[0], vals[1]); }
-    else r.price = vals[0];
+    else if (vals.length) r.price = vals[0];
     for (const m of prices) s = s.replace(m[0], ' ');
   }
   r.name = s.replace(/€/g, ' ').replace(/\s+/g, ' ').trim();
@@ -584,71 +620,99 @@ function parseQuick(text) {
 }
 
 /* ============================================================
-   Scoring engine (pure)
+   Item helpers (expiry is stored as a date, the label is derived)
    ============================================================ */
+function expState(it) {
+  const d = it.expDate;
+  if (!d) return 'later';
+  const t = todayISO();
+  if (d < t) return 'verlopen';
+  if (d === t) return 'vandaag';
+  if (d === addDays(t, 1)) return 'morgen';
+  return 'later';
+}
+function expDateFor(choice) { const t = todayISO(); return choice === 'vandaag' ? t : choice === 'morgen' ? addDays(t, 1) : null; }
+function migrateItem(it) {
+  if (!it || typeof it !== 'object') return null;
+  if (!('expDate' in it)) {
+    const base = it.addedAt ? isoOf(new Date(it.addedAt)) : todayISO();
+    it.expDate = it.expiry === 'vandaag' ? base : it.expiry === 'morgen' ? addDays(base, 1) : null;
+  }
+  delete it.expiry;
+  if (!Array.isArray(it.tags)) it.tags = [];
+  return it;
+}
 function itemPriceNow(it) {
   if (it.priceNow != null && isFinite(it.priceNow)) return it.priceNow;
   if (it.priceNormal != null && it.discountPct != null) return round2(it.priceNormal * (1 - it.discountPct / 100));
   return it.priceNormal ?? null;
 }
+
+/* ============================================================
+   Scoring engine (pure)
+   ============================================================ */
 function evaluate(it, P) {
   const G = GOALS[P.goal] || GOALS.balanced;
   const pf = G.pf;
+  const goal = P.goal;
   const n = it.n || null;
+  const num = k => (n && n[k] != null && n[k] !== '' && isFinite(+n[k])) ? +n[k] : null;
   const g = it.grams > 0 ? it.grams : 0;
   const price = itemPriceNow(it);
   const tags = new Set(it.tags || []);
   const ex = exclusionsFor(P);
   const hits = [...ex].filter(t => tags.has(t));
-  const R = [];
+  const R = [], pins = [];
   const add = (w, s) => R.push({ w, s });
+  let capTwijfel = false;
 
-  const kcal = n ? +n.kcal || 0 : 0, prot = n ? +n.protein || 0 : 0, carbs = n ? +n.carbs || 0 : 0;
-  const fiber = n ? +n.fiber || 0 : 0, sugar = n ? +n.sugar || 0 : 0, satfat = n ? +n.satfat || 0 : 0, salt = n ? +n.salt || 0 : 0;
-  const protPack = prot * g / 100, kcalPack = kcal * g / 100, carbPack = carbs * g / 100;
+  const kcal = num('kcal'), prot = num('protein'), carbs = num('carbs');
+  const fiber = num('fiber'), sugar = num('sugar'), satfat = num('satfat'), salt = num('salt');
+  const known = (kcal != null && kcal > 0) || (prot != null && prot > 0);
+  const protPack = (prot ?? 0) * g / 100, kcalPack = (kcal ?? 0) * g / 100;
+  const carbPack = carbs != null ? carbs * g / 100 : null;
+  const hasNormal = it.priceNormal > 0 && price != null;
   const m = {
-    protPack, kcalPack, carbPack,
-    eurPerProt: (price > 0 && prot >= 5 && protPack >= 5) ? price / protPack * 100 : null,
-    perKg: (price > 0 && g > 0) ? price / g * 1000 : null,
+    protPack, kcalPack, carbPack, price,
+    eurPerProt: (price > 0 && prot != null && prot >= 5 && protPack >= 5) ? price / protPack * 100 : null,
     kcalPerEur: (price > 0 && kcalPack > 0) ? kcalPack / price : null,
-    protPer100kcal: kcal > 0 ? prot / kcal * 100 : 0,
-    discount: (it.priceNormal > 0 && price != null) ? clamp(1 - price / it.priceNormal, 0, 1) : clamp((it.discountPct || 0) / 100, 0, 1),
-    price,
+    perKg: (price > 0 && g > 0) ? price / g * 1000 : null,
+    protPer100kcal: (kcal > 0 && prot != null) ? prot / kcal * 100 : null,
+    discount: hasNormal ? clamp(1 - price / it.priceNormal, 0, 1) : (price != null && it.discountPct > 0 ? clamp(it.discountPct / 100, 0, 1) : 0),
   };
+  const dens = m.protPer100kcal;
   const fresh = tags.has('fresh_produce');
 
   /* --- diet fit --- */
   let fit = 60;
-  if (!n || !(kcal > 0 || prot > 0)) {
+  if (!known) {
     fit = 50;
     add(-1, 'Voedingswaarde onbekend: vul die in of laat Claude schatten');
   } else {
-    if (prot >= 8) {
-      const d = m.protPer100kcal;
-      const b = d >= 15 ? 25 : d >= 10 ? 15 : d >= 6 ? 5 : 0;
+    if (prot != null && prot >= 8 && dens != null) {
+      const b = dens >= 15 ? 25 : dens >= 10 ? 15 : dens >= 6 ? 5 : 0;
       fit += pf * b;
       if (b >= 15 && pf >= 0.5) add(pf * b, `Veel eiwit per kcal (${fmtNum(prot, 0)} g per 100 g)`);
       else if (b >= 5 && pf >= 0.5) add(pf * b, `Redelijk eiwitrijk (${fmtNum(prot, 0)} g per 100 g)`);
-    } else if (kcal >= 250) {
-      fit -= 10 * pf;
-      if (pf >= 0.5) add(-10 * pf, 'Veel kcal, weinig eiwit');
     }
-    const goal = P.goal;
+    if (!fresh && kcal != null && kcal >= 200 && dens != null && dens < 6 && pf >= 0.5) { fit -= 10 * pf; add(-10 * pf, 'Veel kcal, weinig eiwit'); }
     if (goal === 'cut') {
-      if (kcal <= 150 && prot >= 10) { fit += 8; add(8, 'Weinig kcal, veel eiwit'); }
-      if (kcal >= 350 && m.protPer100kcal < 10) { fit -= 12; add(-12, `Calorierijk (${fmtNum(kcal)} kcal per 100 g)`); }
+      if (kcal != null && prot != null && kcal <= 150 && prot >= 10) { fit += 8; add(8, 'Weinig kcal, veel eiwit'); }
+      if (kcal != null && kcal >= 350 && (dens == null || dens < 10)) { fit -= 12; add(-12, `Calorierijk (${fmtNum(kcal)} kcal per 100 g)`); }
       if (fresh) fit += 6;
     } else if (goal === 'bulk') {
-      if (kcal >= 200 && prot >= 10) { fit += 10; add(10, 'Eiwit plus energie'); }
+      if (kcal != null && prot != null && kcal >= 200 && prot >= 10) { fit += 10; add(10, 'Eiwit plus energie'); }
       if (m.kcalPerEur != null && m.kcalPerEur >= 600) fit += 5;
     } else if (goal === 'lowcarb') {
-      if (carbs <= 10) { fit += 10; add(10, `Weinig koolhydraten (${fmtNum(carbs, 0)} g per 100 g)`); }
-      else if (carbs > 30) { fit -= 20; add(-20, `Veel koolhydraten (${fmtNum(carbs, 0)} g per 100 g)`); }
+      if (carbs == null) { add(-5, 'Koolhydraten onbekend: check het etiket'); capTwijfel = true; }
+      else if (carbs <= 10) { fit += 10; add(10, `Weinig koolhydraten (${fmtNum(carbs, 0)} g per 100 g)`); }
+      else if (carbs > 30) { fit -= 20; add(-20, `Veel koolhydraten (${fmtNum(carbs, 0)} g per 100 g)`); capTwijfel = true; }
       else if (carbs > 15) { fit -= 8; add(-8, `Vrij veel koolhydraten (${fmtNum(carbs, 0)} g per 100 g)`); }
     } else if (goal === 'keto') {
-      if (carbs <= 5) { fit += 18; add(18, `Past in keto (${fmtNum(carbs, 1)} g koolh. per 100 g)`); }
+      if (carbs == null) { add(-5, 'Koolhydraten onbekend: check het etiket'); capTwijfel = true; }
+      else if (carbs <= 5) { fit += 18; add(18, `Past in keto (${fmtNum(carbs, 1)} g koolh. per 100 g)`); }
       else if (carbs <= 10) { fit += 2; }
-      else if (carbs <= 20) { fit -= 15; add(-15, `Lastig voor keto (${fmtNum(carbs, 0)} g koolh. per 100 g)`); }
+      else if (carbs <= 15) { fit -= 12; add(-12, `Lastig voor keto (${fmtNum(carbs, 0)} g koolh. per 100 g)`); capTwijfel = true; }
       else { fit -= 35; add(-35, `Te veel koolhydraten voor keto (${fmtNum(carbs, 0)} g per 100 g)`); }
     } else if (goal === 'med') {
       if (tags.has('fish') || tags.has('shellfish')) { fit += 10; add(10, 'Vis past goed in mediterraan'); }
@@ -656,64 +720,91 @@ function evaluate(it, P) {
       if (tags.has('wholegrain')) { fit += 6; add(6, 'Volkoren'); }
       if (tags.has('beef') || tags.has('pork')) { fit -= 6; add(-6, 'Rood vlees: liever af en toe'); }
       if (tags.has('processed') && (tags.has('meat') || tags.has('pork') || tags.has('beef'))) { fit -= 8; add(-8, 'Bewerkt vlees'); }
-    } else if (goal === 'balanced') {
+    } else {
       if (fresh) { fit += 12; add(12, 'Verse groente of fruit'); }
       if (tags.has('fish')) { fit += 6; add(6, 'Vis: Schijf van Vijf raadt 1x per week aan'); }
       if (tags.has('wholegrain')) { fit += 6; add(6, 'Volkoren'); }
       if (tags.has('processed') && (tags.has('meat') || tags.has('pork') || tags.has('beef'))) { fit -= 6; add(-6, 'Bewerkt vlees: Schijf van Vijf raadt dit af'); }
     }
-    if (fiber >= 6) { fit += 6; add(6, `Vezelrijk (${fmtNum(fiber, 0)} g per 100 g)`); }
-    else if (fiber >= 3) fit += 3;
-    if (!fresh && sugar > 30) { fit -= 14; add(-14, `Veel suiker (${fmtNum(sugar, 0)} g per 100 g)`); }
-    else if (!fresh && sugar > 15) { fit -= 8; add(-8, `Vrij veel suiker (${fmtNum(sugar, 0)} g per 100 g)`); }
-    if (satfat > 8) { const p = P.goal === 'bulk' || P.goal === 'keto' ? 3 : 6; fit -= p; add(-p, `Veel verzadigd vet (${fmtNum(satfat, 0)} g per 100 g)`); }
-    if (salt > 2.5) { fit -= 9; add(-9, `Erg zout (${fmtNum(salt, 1)} g per 100 g)`); }
-    else if (salt > 1.5) { fit -= 5; add(-5, `Vrij zout (${fmtNum(salt, 1)} g per 100 g)`); }
+    // A daily carb limit (from the goal or set by the user) against the carbs in this pack.
+    const lim = P.carbsMax != null ? P.carbsMax : G.carbsMax;
+    if (lim != null && lim > 0 && carbPack != null) {
+      const share = carbPack / (lim * Math.max(1, P.persons || 1));
+      if (share > 1) { fit -= 15; add(-15, `${fmtNum(carbPack)} g koolh. in dit pak, meer dan je dagmax van ${fmtNum(lim)} g`); if (goal === 'keto' || goal === 'lowcarb') capTwijfel = true; }
+      else if (share > 0.5) { fit -= 6; add(-6, `${fmtNum(carbPack)} g koolh. in dit pak, ruim de helft van je dagmax`); }
+    }
+    if (fiber != null && fiber >= 6) { fit += 6; add(6, `Vezelrijk (${fmtNum(fiber, 0)} g per 100 g)`); }
+    else if (fiber != null && fiber >= 3) fit += 3;
+    if (tags.has('high_sugar') && !fresh) {
+      const p = goal === 'keto' || goal === 'lowcarb' ? 18 : goal === 'cut' ? 10 : 6;
+      fit -= p; add(-p, 'Veel (toegevoegde) suiker');
+    } else if (!fresh && sugar != null && sugar > 30) { fit -= 14; add(-14, `Veel suiker (${fmtNum(sugar, 0)} g per 100 g)`); }
+    else if (!fresh && sugar != null && sugar > 15) { fit -= 8; add(-8, `Vrij veel suiker (${fmtNum(sugar, 0)} g per 100 g)`); }
+    if (satfat != null && satfat > 8) { const p = goal === 'bulk' || goal === 'keto' ? 3 : 6; fit -= p; add(-p, `Veel verzadigd vet (${fmtNum(satfat, 0)} g per 100 g)`); }
+    if (salt != null && salt > 2.5) { fit -= 9; add(-9, `Erg zout (${fmtNum(salt, 1)} g per 100 g)`); }
+    else if (salt != null && salt > 1.5) { fit -= 5; add(-5, `Vrij zout (${fmtNum(salt, 1)} g per 100 g)`); }
   }
   if (tags.has('ultraprocessed')) { const p = P.avoidUltra ? 15 : 4; fit -= p; if (P.avoidUltra) add(-p, 'Ultrabewerkt'); }
   else if (tags.has('processed') && P.avoidUltra) fit -= 5;
-  if (P.eat === 'vegan' && !tags.has('vegan') && !ANIMAL.some(t => tags.has(t)) && !fresh) { fit -= 10; add(-10, 'Check het etiket op dierlijke ingrediënten'); }
-  if (P.excl && P.excl.halal && (tags.has('meat') || tags.has('poultry') || tags.has('beef')) && !hits.length) add(-2, 'Check of het vlees halal is');
-  if (P.eat === 'flexi' && (tags.has('meat') || tags.has('beef') || tags.has('pork'))) { fit -= 5; }
+  if (P.eat === 'vegan' && !tags.has('vegan') && !ANIMAL.some(t => tags.has(t)) && !fresh) { fit -= 10; pins.push('Check het etiket op dierlijke ingrediënten'); capTwijfel = true; }
+  if (P.eat === 'flexi' && (tags.has('meat') || tags.has('beef') || tags.has('pork'))) fit -= 5;
+  // Halal: regular AH meat is not halal certified, so meat can at most be "twijfel" and the warning always shows.
+  if (P.excl && P.excl.halal && !hits.length && (tags.has('meat') || tags.has('poultry') || tags.has('beef'))) { pins.push('Alleen kopen met halal-keurmerk'); capTwijfel = true; }
+  // Typed-in products: the app only knows what the name says, so never give "Kopen" to someone who avoids things.
+  if (!it.foodId && it.source === 'manual' && ex.size && !hits.length) { pins.push('Samenstelling onbekend: check het etiket op wat je niet eet'); capTwijfel = true; }
   fit = clamp(fit, 0, 100);
 
   /* --- value for money --- */
-  const protPts = m.eurPerProt != null ? lerp(m.eurPerProt, [[0.8, 60], [1.5, 52], [2.5, 38], [4, 22], [6, 8], [10, 0]]) : 0;
+  // Cheap protein only counts when the product is a real protein source (bread is cheap per gram of protein but mostly starch).
+  const protPts = m.eurPerProt != null ? lerp(m.eurPerProt, [[0.8, 60], [1.5, 54], [2.5, 44], [4, 30], [6, 15], [10, 0]]) * clamp((dens ?? 0) / 10, 0, 1) : 0;
   const kcalPts = m.kcalPerEur != null ? lerp(m.kcalPerEur, [[50, 0], [100, 6], [250, 20], [500, 36], [900, 50], [1500, 60]]) : 0;
-  const wp = P.goal === 'cut' ? 0.9 : P.goal === 'bulk' ? 0.6 : P.goal === 'keto' || P.goal === 'lowcarb' ? 0.6 : 0.45;
+  const wp = goal === 'cut' ? 0.9 : 0.6;
   let eff = wp * protPts + (1 - wp) * kcalPts;
+  if (known && !tags.has('processed') && !tags.has('ultraprocessed')) eff = Math.max(eff, 20);
   if (fresh) eff = Math.max(eff, 40);
   const discPts = clamp(m.discount * 80, 0, 40);
   const value = clamp(eff + discPts, 0, 100);
-  if (m.eurPerProt != null && m.eurPerProt <= 2 && pf >= 0.4) add(10, `Goedkoop eiwit: ${fmtEur(m.eurPerProt)} per 100 g eiwit`);
-  if (m.discount >= 0.3) add(m.discount * 20, `${fmtNum(m.discount * 100)}% korting, ${fmtEur(it.priceNormal - price)} goedkoper`);
+  if (m.eurPerProt != null && m.eurPerProt <= 2.5 && dens != null && dens >= 10 && pf >= 0.4) add(10, `Goedkoop eiwit: ${fmtEur(m.eurPerProt)} per 100 g eiwit`);
+  if (m.discount >= 0.25) add(m.discount * 20, hasNormal ? `${fmtNum(m.discount * 100)}% korting, ${fmtEur(it.priceNormal - price)} goedkoper` : `${fmtNum(m.discount * 100)}% korting`);
 
   /* --- shelf life practicality --- */
   let risk = 0;
   const persons = Math.max(1, P.persons || 1);
   const canFreeze = !!it.freezable && !!P.freezer;
-  if (it.expiry === 'vandaag') {
+  const st = expState(it);
+  if (st === 'verlopen') { risk = 30; pins.push('Datum is verstreken'); }
+  else if (st === 'vandaag') {
     if (canFreeze) add(1, 'Vandaag opeten of invriezen');
     else {
       const share = kcalPack / ((P.kcal || 2000) * persons);
       if (share > 0.6) { risk = 12; add(-12, 'Veel om vandaag op te krijgen'); }
       else { risk = 3; add(-1, 'Vandaag opeten'); }
     }
-  } else if (it.expiry === 'morgen' && !canFreeze) {
+  } else if (st === 'morgen' && !canFreeze) {
     const share = kcalPack / ((P.kcal || 2000) * persons);
     if (share > 1.2) { risk = 6; add(-6, 'Veel om binnen twee dagen op te eten'); }
   }
 
-  let score = Math.round(0.55 * fit + 0.45 * value - risk);
+  let score = clamp(Math.round(0.6 * fit + 0.4 * value - risk), 0, 100);
   let verdict;
   if (hits.length) {
     verdict = 'nee';
     score = Math.min(score, 10);
-    R.unshift({ w: -100, s: `Bevat ${hits.map(t => TAG_NL[t] || t).join(', ')}: dat eet je niet` });
-  } else verdict = score >= 65 ? 'ja' : score >= 48 ? 'twijfel' : 'laten';
-  score = clamp(score, 0, 100);
-  const reasons = R.sort((a, b) => Math.abs(b.w) - Math.abs(a.w)).slice(0, 4).map(r => ({ pos: r.w > 0, neg: r.w < 0, s: r.s }));
-  return { score, verdict, fit: Math.round(fit), value: Math.round(value), risk, reasons, m };
+    pins.unshift(`Bevat ${hits.map(t => TAG_NL[t] || t).join(', ')}: dat eet je niet`);
+  } else if (st === 'verlopen') {
+    verdict = 'laten';
+  } else if (!known) {
+    verdict = 'twijfel';
+  } else if (fit < 42) {
+    verdict = 'laten';
+    score = Math.min(score, 45);
+  } else {
+    verdict = score >= 60 ? 'ja' : score >= 46 ? 'twijfel' : 'laten';
+    if (capTwijfel && verdict === 'ja') verdict = 'twijfel';
+  }
+  const sorted = R.sort((a, b) => Math.abs(b.w) - Math.abs(a.w)).map(r => ({ pos: r.w > 0, neg: r.w < 0, s: r.s }));
+  const reasons = pins.map(s => ({ pos: false, neg: true, s })).concat(sorted).slice(0, Math.max(4, pins.length + 2));
+  return { score, verdict, fit: Math.round(fit), value: Math.round(value), risk, reasons, m, exp: st };
 }
 const VERDICT_NL = { ja: 'Kopen', twijfel: 'Twijfel', laten: 'Laten liggen', nee: 'Past niet' };
 
@@ -722,7 +813,7 @@ function itemFromFood(f, over = {}) {
     id: uid(), foodId: f.id, name: f.name, cat: f.cat,
     n: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, sugar: f.sugar, fat: f.fat, satfat: f.satfat, fiber: f.fiber, salt: f.salt },
     tags: f.tags.slice(), freezable: !!f.freezable, grams: f.pack_g, priceNormal: f.price_eur, discountPct: 35, priceNow: null,
-    expiry: 'vandaag', qty: 1, source: 'db', addedAt: Date.now(),
+    expDate: todayISO(), qty: 1, source: 'db', addedAt: Date.now(),
   }, over);
 }
 function basketTotals(list, P) {
@@ -741,44 +832,57 @@ function basketTotals(list, P) {
    Meal ideas (rule based)
    ============================================================ */
 function rolesOf(it) {
-  const r = new Set(); const t = new Set(it.tags || []); const c = it.cat; const id = it.foodId || ''; const nm = norm(it.name);
+  const r = new Set(); const t = new Set(it.tags || []); const c = it.cat; const nm = norm(it.name);
+  const words = nm.split(' ');
+  const starchy = c === 'zetmeel' || /pasta|tortellini|gnocchi|noedel|rijst|aardappel|krieltjes|friet/.test(nm);
   if (['vlees', 'gevogelte', 'vis', 'vega'].includes(c)) r.add('eiwit');
-  if (c === 'vis' || t.has('fish') || t.has('shellfish')) r.add('vis');
-  if (c === 'ei' || /\beieren\b|\bei\b/.test(nm)) { r.add('ei'); r.add('eiwit'); }
-  if (/gehakt|burger|hamburger|gehaktbal/.test(nm)) r.add('gehakt');
-  if (c === 'groente') r.add('groente');
-  if (/spinazie|sla|rucola|veldsla|ijsberg|andijvie/.test(nm)) r.add('blad');
+  if (c === 'vis' || ((t.has('fish') || t.has('shellfish')) && c !== 'maaltijd' && c !== 'beleg')) r.add('vis');
+  if (c === 'ei' || words.includes('eieren') || words.includes('ei')) { if (c !== 'maaltijd' && c !== 'beleg') { r.add('ei'); r.add('eiwit'); } }
+  if ((c === 'vlees' || c === 'gevogelte') && /gehakt|burger|gehaktbal/.test(nm)) r.add('gehakt');
+  if (c === 'groente' && !starchy) r.add('groente');
+  if (c === 'groente' && words.some(w => /^(\w*sla|slamelange|slamix|spinazie|rucola|veldsla|andijvie|ijsberg\w*)$/.test(w))) r.add('blad');
   if (c === 'fruit') r.add('fruit');
-  if (c === 'zetmeel' || /pasta|tortellini|gnocchi|noedel|rijst|aardappel|krieltjes/.test(nm)) r.add('zetmeel');
-  if (c === 'brood' || /wrap|pita|tortilla|stokbrood|bagel/.test(nm)) r.add('brood');
-  if (c === 'zuivel' && /kwark|yoghurt|skyr|kefir|vla|melk|cottage|hutten/.test(nm)) r.add('zuivel');
-  if (c === 'kaas' || /mozzarella|feta|kaas/.test(nm)) r.add('kaas');
-  if (c === 'maaltijd' || c === 'salade' || t.has('ready_meal')) r.add('maaltijd');
+  if (starchy) r.add('zetmeel');
+  if (c === 'brood') r.add('brood');
+  if (c === 'zuivel' && /kwark|yoghurt|skyr|kefir|cottage|hutten/.test(nm)) r.add('zuivel');
+  if (c === 'kaas') r.add('kaas');
+  if (c === 'maaltijd' || c === 'salade') r.add('maaltijd');
   if (c === 'beleg') r.add('beleg');
-  if (/tomaat|tomaten|paprika/.test(nm)) r.add('tomaat');
+  if (c === 'groente' && /tomaat|tomaten|paprika/.test(nm)) r.add('tomaat');
   return r;
 }
 const MEALS = [
-  { id: 'roerbak', name: 'Roerbakschotel', needs: ['eiwit', 'groente'], opt: ['zetmeel'], how: 'Snijd alles in reepjes. Bak het eiwit 4 tot 6 minuten heet aan, groente erbij voor 3 tot 4 minuten. Sojasaus, knoflook en gember erdoor.' },
-  { id: 'tray', name: 'Traybake uit de oven', needs: ['eiwit', 'groente'], how: 'Alles in stukken op een bakplaat met olie, zout en kruiden. 25 tot 30 minuten op 200 °C. Kip en gehakt moeten helemaal gaar zijn.' },
-  { id: 'vis', name: 'Vis uit de oven met groente', needs: ['vis', 'groente'], how: 'Groente 15 minuten voorroosteren op 200 °C, vis erop met citroen en olie, nog 10 tot 12 minuten.' },
-  { id: 'gehakt', name: 'Gehaktballen of burgers met groente', needs: ['gehakt'], opt: ['groente', 'brood'], how: 'Kneed gehakt met zout, peper en wat paneermeel of ei. Bak rondom bruin en daarna op laag vuur gaar (geen roze binnenkant).' },
-  { id: 'wrap', name: 'Wraps of pita', needs: ['eiwit', 'brood'], opt: ['groente', 'kaas', 'blad'], how: 'Eiwit kruidig bakken, wraps of pita kort verwarmen, vullen met rauwe groente en een saus van yoghurt of hummus.' },
-  { id: 'omelet', name: 'Omelet of frittata', needs: ['ei', 'groente'], opt: ['kaas'], how: 'Bak de groente zacht, giet losgeklopte eieren erover, kaas erop en laat op laag vuur met deksel stollen.' },
-  { id: 'shakshuka', name: 'Shakshuka', needs: ['ei', 'tomaat'], opt: ['kaas', 'brood'], how: 'Ui, paprika en tomaat met komijn en paprikapoeder inkoken, kuiltjes maken, eieren erin, deksel erop tot het eiwit gestold is.' },
-  { id: 'salade', name: 'Maaltijdsalade', needs: ['blad', 'eiwit'], opt: ['kaas', 'groente', 'brood'], how: 'Blad als basis, eiwit gebakken of koud erop, groente en kaas erbij, dressing van olie, azijn en mosterd.' },
-  { id: 'pasta', name: 'Pasta met groente', needs: ['zetmeel', 'groente'], opt: ['eiwit', 'kaas'], carb: true, how: 'Pasta koken, groente in de pan met knoflook en olie, alles mengen. Kaas of eiwit erbij voor een volledige maaltijd.' },
-  { id: 'soep', name: 'Groentesoep', needs: ['groente', 'groente'], opt: ['eiwit'], how: 'Groente fruiten, bouillon erbij, 20 minuten trekken en eventueel pureren. Soep kan ook prima de vriezer in.' },
-  { id: 'bowl', name: 'Kwark- of yoghurtbowl', needs: ['zuivel', 'fruit'], how: 'Kwark of yoghurt met fruit en eventueel havermout of noten. Snel ontbijt of toetje met veel eiwit.' },
-  { id: 'smoothie', name: 'Smoothie', needs: ['fruit'], opt: ['zuivel', 'blad'], how: 'Fruit (ook bijna overrijp) met yoghurt, melk of water blenden. Rijp fruit kun je in stukjes invriezen.' },
-  { id: 'tosti', name: 'Tosti of broodmaaltijd', needs: ['brood', 'kaas'], opt: ['beleg', 'groente'], carb: true, how: 'Brood met kaas en beleg in de tostiapparaat of koekenpan. Rauwkost erbij.' },
-  { id: 'kantklaar', name: 'Kant-en-klaar, aangevuld', needs: ['maaltijd'], opt: ['groente', 'blad'], how: 'Volg de bereiding op de verpakking en voeg een portie groente of salade toe zodat het een volwaardige maaltijd wordt.' },
+  { id: 'roerbak', name: 'Roerbakschotel', needs: ['eiwit', 'groente'], opt: ['zetmeel'],
+    how: ex => `Snijd alles in reepjes. Bak het eiwit 4 tot 6 minuten heet aan, groente erbij voor 3 tot 4 minuten. ${ex.has('soy') || ex.has('gluten') ? 'Breng op smaak met knoflook, gember, limoen en zout.' : 'Sojasaus, knoflook en gember erdoor.'}` },
+  { id: 'tray', name: 'Traybake uit de oven', needs: ['eiwit', 'groente'], how: () => 'Alles in stukken op een bakplaat met olie, zout en kruiden. 25 tot 30 minuten op 200 °C. Kip en gehakt moeten helemaal gaar zijn.' },
+  { id: 'vis', name: 'Vis uit de oven met groente', needs: ['vis', 'groente'], how: () => 'Groente 15 minuten voorroosteren op 200 °C, vis erop met citroen en olie, nog 10 tot 12 minuten.' },
+  { id: 'gehakt', name: 'Gehaktballen of burgers met groente', needs: ['gehakt'], opt: ['groente', 'brood'],
+    how: ex => `Kneed het gehakt met zout, peper${ex.has('gluten') && ex.has('egg') ? '' : ex.has('gluten') ? ' en een ei' : ex.has('egg') ? ' en wat paneermeel' : ' en wat paneermeel of een ei'}. Bak rondom bruin en daarna op laag vuur gaar, zonder roze binnenkant.` },
+  { id: 'wrap', name: 'Wraps of pita', needs: ['eiwit', 'brood'], opt: ['groente', 'kaas', 'blad'],
+    how: ex => `Eiwit kruidig bakken, wraps of pita kort verwarmen, vullen met rauwe groente en ${ex.has('dairy') ? 'hummus' : 'yoghurtsaus of hummus'}.` },
+  { id: 'omelet', name: 'Omelet of frittata', needs: ['ei', 'groente'], opt: ['kaas'],
+    how: ex => `Bak de groente zacht, giet losgeklopte eieren erover${ex.has('dairy') ? '' : ', kaas erop'} en laat op laag vuur met deksel stollen.` },
+  { id: 'shakshuka', name: 'Shakshuka', needs: ['ei', 'tomaat'], opt: ['kaas', 'brood'], how: () => 'Ui, paprika en tomaat met komijn en paprikapoeder inkoken, kuiltjes maken, eieren erin, deksel erop tot het eiwit gestold is.' },
+  { id: 'salade', name: 'Maaltijdsalade', needs: ['blad', 'eiwit'], opt: ['kaas', 'groente', 'brood'], how: () => 'Blad als basis, eiwit gebakken of koud erop, groente erbij, dressing van olie, azijn en mosterd.' },
+  { id: 'pasta', name: 'Pasta met groente', needs: ['zetmeel', 'groente'], opt: ['eiwit', 'kaas'], carb: true,
+    how: ex => `Pasta koken, groente in de pan met knoflook en olie, alles mengen. ${ex.has('dairy') ? 'Eiwit' : 'Kaas of eiwit'} erbij voor een volledige maaltijd.` },
+  { id: 'soep', name: 'Groentesoep', needs: ['groente', 'groente'], opt: ['eiwit'], how: () => 'Groente fruiten, bouillon erbij, 20 minuten trekken en eventueel pureren. Soep kan prima de vriezer in.' },
+  { id: 'bowl', name: 'Kwark- of yoghurtbowl', needs: ['zuivel', 'fruit'], how: ex => `Kwark of yoghurt met fruit${ex.has('nuts') ? (ex.has('gluten') ? '' : ' en havermout') : (ex.has('gluten') ? ' en noten' : ' en havermout of noten')}. Snel ontbijt of toetje met veel eiwit.` },
+  { id: 'smoothie', name: 'Smoothie', needs: ['fruit'], opt: ['zuivel', 'blad'], how: ex => `Fruit, ook bijna overrijp, blenden met ${ex.has('dairy') ? 'plantaardige drink of water' : 'yoghurt, melk of water'}. Rijp fruit kun je in stukjes invriezen.` },
+  { id: 'tosti', name: 'Tosti of broodmaaltijd', needs: ['brood', 'kaas'], opt: ['beleg', 'groente'], carb: true, how: () => 'Brood met kaas en beleg in de tostiapparaat of koekenpan. Rauwkost erbij.' },
+  { id: 'kantklaar', name: 'Kant-en-klaar, aangevuld', needs: ['maaltijd'], opt: ['groente', 'blad'], carb: true, how: () => 'Volg de bereiding op de verpakking en voeg een portie groente of salade toe, dan is het een volwaardige maaltijd.' },
 ];
 function mealIdeas(items, P) {
   const ex = exclusionsFor(P);
-  const usable = items.filter(it => !(it.tags || []).some(t => ex.has(t)));
+  const lowCarb = P.goal === 'keto' || P.goal === 'lowcarb' || (P.carbsMax != null && P.carbsMax <= 100);
+  const carbCut = P.goal === 'keto' ? 10 : 30;
+  const usable = items.filter(it => {
+    if ((it.tags || []).some(t => ex.has(t))) return false;
+    if (expState(it) === 'verlopen') return false;
+    if (lowCarb && it.n && it.n.carbs != null && +it.n.carbs > carbCut) return false;
+    return true;
+  });
   const withRoles = usable.map(it => ({ it, roles: rolesOf(it) }));
-  const lowCarb = P.goal === 'keto' || P.goal === 'lowcarb';
   const res = [];
   for (const meal of MEALS) {
     if (lowCarb && (meal.carb || meal.needs.includes('zetmeel') || meal.needs.includes('brood'))) continue;
@@ -796,64 +900,113 @@ function mealIdeas(items, P) {
       if (cand) used.add(cand.it);
     }
     const list = [...used];
-    const urgent = list.filter(it => it.expiry === 'vandaag').length;
-    res.push({ meal, items: list, urgent });
+    res.push({ meal, items: list, urgent: list.filter(it => expState(it) === 'vandaag').length, how: meal.how(ex) });
   }
   res.sort((a, b) => b.urgent - a.urgent || b.items.length - a.items.length);
   return res;
 }
-function urgencyRank(it) { return it.expiry === 'vandaag' ? 0 : it.expiry === 'morgen' ? 1 : 2; }
+function urgencyRank(it) { const s = expState(it); return s === 'vandaag' ? 0 : s === 'morgen' ? 1 : 2; }
 
 /* ============================================================
-   Storage: artifact database when available, else this browser
+   Storage: the viewer's private space in the artifact database when
+   available, else this browser. A local mirror keeps every change, so
+   a visit that could not reach the database is synced on the next one.
    ============================================================ */
 const Store = {
-  db: null, mode: 'local', pending: {}, timers: {}, chain: Promise.resolve(), loaded: false, failedWrite: false,
+  db: null, uid: null, mode: 'local', inViewer: false, loaded: false,
+  pending: {}, timers: {}, chains: {}, failed: false, unsub: [],
   async init() {
-    let db = null;
-    if (window.claude && typeof window.claude.use === 'function') {
-      try { db = await window.claude.use('db'); } catch (e) { db = null; }
-    }
-    if (db) { this.db = db; this.mode = 'db'; }
+    this.inViewer = !!(window.claude && typeof window.claude.use === 'function');
+    if (!this.inViewer) return;
+    let db = null, user = null;
+    try { [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]); } catch (e) { db = null; }
+    if (!db || !user) return;
+    let id = null;
+    try { id = await user.id(); } catch (e) { id = null; }
+    if (!id) return;
+    this.db = db; this.uid = id; this.mode = 'db';
   },
-  localGet(key) { try { const s = localStorage.getItem('lk:' + key); return s ? JSON.parse(s) : null; } catch (e) { return null; } },
-  localSet(key, v) { try { localStorage.setItem('lk:' + key, JSON.stringify(v)); } catch (e) { /* storage may be blocked */ } },
+  lk(key) { return 'lk:' + (this.uid ? this.uid + ':' : '') + key; },
+  localGet(key) { try { const s = localStorage.getItem(this.lk(key)); return s ? JSON.parse(s) : null; } catch (e) { return null; } },
+  localSet(key, v) { try { localStorage.setItem(this.lk(key), JSON.stringify(v)); } catch (e) { /* storage may be blocked */ } },
+  ref(key) { return this.db.doc(`data/users/${this.uid}/${key}`); },
+  tripsCol() { return this.db.doc(`data/users/${this.uid}/log`).collection('trips'); },
+  async retry(fn) {
+    try { return await fn(); }
+    catch (e) {
+      const c = e && e.code;
+      if (c === 'invalid_argument' || c === 'quota_exceeded' || c === 'revoked' || c === 'not_granted') throw e;
+      await sleep(200 + Math.random() * 600);
+      return fn();
+    }
+  },
   async load(key) {
     if (!this.db) return this.localGet(key);
-    const snap = await this.db.doc('app/' + key).get();
-    return snap && snap.exists ? JSON.parse(JSON.stringify(snap.data())) : null;
+    const snap = await this.retry(() => this.ref(key).get());
+    return snap && snap.exists ? clone(snap.data()) : null;
   },
   save(key, value) {
+    value.savedAt = Date.now();
     this.localSet(key, value);
     if (!this.db || !this.loaded) return;
-    this.pending[key] = JSON.parse(JSON.stringify(value));
+    this.pending[key] = clone(value);
     clearTimeout(this.timers[key]);
     this.timers[key] = setTimeout(() => this.flush(key), 500);
   },
   flush(key) {
-    if (!(key in this.pending)) return;
+    if (!(key in this.pending) || !this.db) return Promise.resolve();
+    clearTimeout(this.timers[key]);
     const value = this.pending[key]; delete this.pending[key];
-    this.chain = this.chain.then(() => this.db.doc('app/' + key).set(value)).catch(e => this.onWriteError(e));
-    return this.chain;
+    this.chains[key] = (this.chains[key] || Promise.resolve())
+      .then(() => this.retry(() => this.ref(key).set(value)))
+      .then(() => this.onWriteOk(), e => this.onWriteError(e));
+    return this.chains[key];
   },
-  flushAll() { for (const k of Object.keys(this.pending)) { clearTimeout(this.timers[k]); this.flush(k); } return this.chain; },
+  flushAll() { return Promise.all(Object.keys(this.pending).map(k => this.flush(k))); },
+  onWriteOk() { if (this.failed) { this.failed = false; showLoadBanner(null); } },
   onWriteError(e) {
-    if (this.failedWrite) return;
-    this.failedWrite = true;
-    showLoadBanner(e && e.code === 'quota_exceeded' ? 'De opslag is vol. Verwijder oude ritten in het logboek.' : 'Opslaan in je account lukt niet; wijzigingen staan alleen op dit toestel.');
+    this.failed = true;
+    const c = e && e.code;
+    showLoadBanner(c === 'quota_exceeded' || c === 'invalid_argument'
+      ? 'Je gegevens zijn te groot om op te slaan. Wis oude producten of ritten.'
+      : 'Opslaan in je account lukt even niet. Alles staat op dit toestel en wordt bij je volgende bezoek bijgewerkt.');
   },
+  watch(key, getCur, apply) {
+    if (!this.db) return;
+    try {
+      const u = this.ref(key).onSnapshot(snap => {
+        if (!snap.exists || snap.metadata.hasPendingWrites || key in this.pending) return;
+        const d = snap.data();
+        if ((d.savedAt || 0) > ((getCur() || {}).savedAt || 0)) apply(clone(d));
+      }, () => { /* the listener ended; the page keeps working with what it has */ });
+      this.unsub.push(u);
+    } catch (e) { /* ignore */ }
+  },
+  unsynced() { return this.localGet('unsyncedTrips') || []; },
   async listTrips() {
     if (!this.db) return this.localGet('trips') || [];
-    const qs = await this.db.collection('trips').orderBy('date', 'desc').limit(300).get();
-    return qs.docs.map(d => Object.assign({ id: d.id }, JSON.parse(JSON.stringify(d.data()))));
+    const qs = await this.retry(() => this.tripsCol().orderBy('ts', 'desc').limit(300).get());
+    return qs.docs.map(d => Object.assign({ id: d.id }, clone(d.data())));
   },
   async addTrip(trip) {
-    if (!this.db) { const all = this.localGet('trips') || []; all.unshift(trip); this.localSet('trips', all.slice(0, 300)); return; }
-    await this.db.collection('trips').doc(trip.id).set(trip);
+    const all = [trip, ...(this.localGet('trips') || []).filter(t => t.id !== trip.id)].slice(0, 300);
+    this.localSet('trips', all);
+    if (!this.db) { if (this.inViewer) this.localSet('unsyncedTrips', [...this.unsynced().filter(t => t.id !== trip.id), trip]); return 'local'; }
+    try { await this.retry(() => this.tripsCol().doc(trip.id).set(trip)); return 'db'; }
+    catch (e) { this.localSet('unsyncedTrips', [...this.unsynced().filter(t => t.id !== trip.id), trip]); return 'local'; }
   },
   async deleteTrip(id) {
-    if (!this.db) { this.localSet('trips', (this.localGet('trips') || []).filter(t => t.id !== id)); return; }
-    await this.db.collection('trips').doc(id).delete();
+    this.localSet('trips', (this.localGet('trips') || []).filter(t => t.id !== id));
+    this.localSet('unsyncedTrips', this.unsynced().filter(t => t.id !== id));
+    if (this.db) await this.retry(() => this.tripsCol().doc(id).delete());
+  },
+  async syncTrips(dbTrips) {
+    const have = new Set(dbTrips.map(t => t.id));
+    const todo = this.unsynced().filter(t => !have.has(t.id));
+    const done = [];
+    for (const t of todo) { try { await this.retry(() => this.tripsCol().doc(t.id).set(t)); done.push(t); } catch (e) { break; } }
+    this.localSet('unsyncedTrips', this.unsynced().filter(t => !done.some(d => d.id === t.id) && !have.has(t.id)));
+    return done;
   },
 };
 window.addEventListener('pagehide', () => { try { Store.flushAll(); } catch (e) { /* ignore */ } });
@@ -864,15 +1017,30 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
    ============================================================ */
 const S = {
   profile: defaultProfile(),
-  session: { candidates: [], basket: [], store: null, startedAt: null },
+  draft: null,
+  session: emptySession(),
   trips: [],
   tab: 'winkel',
   editing: null,
   form: { disc: 35, exp: 'vandaag' },
   sample: null, sampleImages: false, sampleMax: 3,
-  adviceCtl: null, photoCtl: null,
+  adviceCtl: null, photoCtl: null, estCtl: null,
+  finishing: false, pendingTripId: null,
 };
-function P() { return S.profile; }
+function emptySession() { return { candidates: [], basket: [], pantry: [], startedAt: null, savedAt: 0 }; }
+function normalizeSession(d) {
+  const s = Object.assign(emptySession(), d || {});
+  for (const k of ['candidates', 'basket', 'pantry']) s[k] = (Array.isArray(s[k]) ? s[k] : []).map(migrateItem).filter(Boolean);
+  return s;
+}
+function pruneSession() {
+  const t = todayISO(), weekAgo = addDays(t, -7);
+  const s = S.session;
+  const before = s.candidates.length + s.pantry.length;
+  s.candidates = s.candidates.filter(it => !it.expDate || it.expDate >= t).slice(0, 150);
+  s.pantry = s.pantry.filter(it => !it.expDate || it.expDate >= weekAgo);
+  return before !== s.candidates.length + s.pantry.length;
+}
 function saveProfile() { Store.save('profile', S.profile); }
 function saveSession() { Store.save('session', S.session); }
 
@@ -884,6 +1052,7 @@ function renderStoreSelect() {
   const sel = $('#storeSel');
   sel.replaceChildren(h('option', { value: '' }, 'Kies je AH'), ...STORES.map(s => h('option', { value: s.id }, s.short || s.name)));
   sel.value = S.profile.store || '';
+  sel.disabled = !Store.loaded;
 }
 function showLoadBanner(msg, action) {
   const b = $('#loadBanner');
@@ -891,34 +1060,40 @@ function showLoadBanner(msg, action) {
   b.replaceChildren(h('span', null, msg), action || '');
   b.hidden = false;
 }
-function stickerFor(it) {
+function discountOf(it) {
   const price = itemPriceNow(it);
-  const pct = it.priceNormal > 0 && price != null ? Math.round((1 - price / it.priceNormal) * 100) : it.discountPct;
+  if (it.priceNormal > 0 && price != null) return Math.round((1 - price / it.priceNormal) * 100);
+  return price != null && it.discountPct > 0 ? it.discountPct : 0;
+}
+function stickerFor(it) {
+  const pct = discountOf(it);
   return pct > 0 ? h('div', { class: 'sticker', 'aria-label': `${pct} procent korting` }, `-${pct}%`) : null;
 }
+const EXP_NL = { vandaag: 'tot vandaag', morgen: 'tot morgen', verlopen: 'datum verstreken', later: null };
 function itemCard(it, where) {
   const ev = evaluate(it, S.profile);
   const price = itemPriceNow(it);
-  const meta = [it.grams ? `${fmtNum(it.grams)} g` : null, it.expiry === 'vandaag' ? 'tot vandaag' : it.expiry === 'morgen' ? 'tot morgen' : null, CATS[it.cat] || null].filter(Boolean).join(' · ');
+  const meta = [it.grams ? `${fmtNum(it.grams)} g` : null, EXP_NL[ev.exp], CATS[it.cat] || null, it.source === 'claude' ? 'gelezen door Claude' : null].filter(Boolean).join(' · ');
   const metrics = [];
-  const n100 = it.n || {};
+  const kcal100 = it.n && it.n.kcal != null ? +it.n.kcal : 0;
   if (ev.m.eurPerProt != null) {
     metrics.push(h('li', null, h('b', null, `${fmtNum(ev.m.protPack)} g`), ' eiwit'));
     metrics.push(h('li', null, h('b', null, fmtEur(ev.m.eurPerProt)), ' per 100 g eiwit'));
   }
-  if (ev.m.kcalPerEur != null && (+n100.kcal || 0) >= 150) metrics.push(h('li', null, h('b', null, fmtNum(ev.m.kcalPerEur)), ' kcal per €'));
+  if (ev.m.kcalPerEur != null && kcal100 >= 150) metrics.push(h('li', null, h('b', null, fmtNum(ev.m.kcalPerEur)), ' kcal per €'));
   if (ev.m.perKg != null) metrics.push(h('li', null, h('b', null, fmtEur(ev.m.perKg)), ' per kg'));
-  if (it.n && it.n.carbs != null && (S.profile.goal === 'keto' || S.profile.goal === 'lowcarb')) metrics.push(h('li', null, h('b', null, `${fmtNum(ev.m.carbPack)} g`), ' koolh.'));
+  if (ev.m.carbPack != null && (S.profile.goal === 'keto' || S.profile.goal === 'lowcarb' || S.profile.carbsMax != null)) metrics.push(h('li', null, h('b', null, `${fmtNum(ev.m.carbPack)} g`), ' koolh.'));
   const actions = [];
   if (where === 'cand') {
     actions.push(h('button', { class: 'btn btn-sm ' + (ev.verdict === 'ja' ? 'btn-primary' : ''), type: 'button', onclick: () => moveToBasket(it.id) }, 'In mandje'));
     actions.push(h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => editItem(it.id, 'cand') }, 'Wijzig'));
-    actions.push(h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'aria-label': `Verwijder ${it.name}`, onclick: () => removeItem(it.id, 'cand') }, 'Weg'));
+    actions.push(h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'aria-label': `Verwijder ${it.name}`, onclick: () => removeItem(it.id) }, 'Weg'));
   } else {
     actions.push(h('div', { class: 'qty' },
-      h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Eén minder', onclick: () => changeQty(it.id, -1) }, '−'),
+      h('button', { class: 'icon-btn', type: 'button', 'aria-label': `Eén ${it.name} minder`, onclick: () => changeQty(it.id, -1) }, '−'),
       h('span', { 'aria-label': 'Aantal' }, String(it.qty || 1)),
-      h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Eén meer', onclick: () => changeQty(it.id, 1) }, '+')));
+      h('button', { class: 'icon-btn', type: 'button', 'aria-label': `Eén ${it.name} meer`, onclick: () => changeQty(it.id, 1) }, '+')));
+    actions.push(h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => editItem(it.id, 'basket') }, 'Wijzig'));
     actions.push(h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => backToCand(it.id) }, 'Terugleggen'));
   }
   return h('article', { class: `item v-${ev.verdict}` },
@@ -928,7 +1103,7 @@ function itemCard(it, where) {
         h('div', { class: 'item-meta' }, meta)),
       h('div', { class: 'price' },
         it.priceNormal > 0 && price != null && price < it.priceNormal ? h('s', null, fmtEur(it.priceNormal)) : null,
-        h('b', null, fmtEur(price)),
+        h('b', null, price == null ? 'prijs?' : fmtEur(price)),
         stickerFor(it))),
     h('div', { class: 'verdict-row' },
       h('span', { class: `chip ${ev.verdict}` }, VERDICT_NL[ev.verdict]),
@@ -946,32 +1121,30 @@ function renderSummary() {
   const t = basketTotals(S.session.basket, S.profile);
   const budget = S.profile.budget > 0 ? S.profile.budget : null;
   const cell = (k, v) => h('div', null, h('div', { class: 'k' }, k), h('div', { class: 'v' }, v));
-  const kids = [
-    cell('Mandje', fmtEur(t.spent)),
-    cell('Bespaard', fmtEur(t.saved)),
-    cell('Eiwit', `${fmtNum(t.prot)} g`),
-    cell('Eiwit-dagen', fmtNum(t.protDays, 1)),
-  ];
+  const kids = [cell('Mandje', fmtEur(t.spent)), cell('Bespaard', fmtEur(t.saved)), cell('Eiwit', `${fmtNum(t.prot)} g`), cell('Eiwit-dagen', fmtNum(t.protDays, 1))];
   if (budget) {
     const pct = clamp(t.spent / budget * 100, 0, 100);
     kids.push(h('div', { class: 'budget-bar', role: 'img', 'aria-label': `${fmtNum(pct)}% van je weekbudget` }, h('i', { style: `width:${pct}%` })));
     kids.push(h('div', { class: 'note' }, `${fmtEur(Math.max(0, budget - t.spent))} over van je weekbudget van ${fmtEur(budget)}${S.profile.persons > 1 ? `, voor ${S.profile.persons} personen` : ''}`));
   }
-  $('#summary').replaceChildren(...kids);
+  fill($('#summary'), ...kids);
 }
 function renderCandidates() {
-  const list = S.session.candidates.slice().sort((a, b) => evaluate(b, S.profile).score - evaluate(a, S.profile).score);
+  const scored = S.session.candidates.map(it => ({ it, s: evaluate(it, S.profile).score }));
+  const list = scored.sort((a, b) => b.s - a.s).map(x => x.it);
   $('#candCount').textContent = list.length ? `${list.length} product${list.length === 1 ? '' : 'en'}` : '';
   if (!list.length) {
-    $('#candList').replaceChildren(h('div', { class: 'empty' },
+    fill($('#candList'), h('div', { class: 'empty' },
       h('strong', null, 'Nog niks gevonden'),
-      h('span', null, 'Loop langs vlees, vis, zuivel, brood en groente en zoek naar stickers met "35% korting". Voeg toe wat je ziet: de app zegt meteen of het past bij je dieet en of het een goede deal is.'),
+      h('span', null, S.sample && S.sampleImages
+        ? 'Maak thuis een screenshot van Laatste Kans Koopjes in de AH-app, of fotografeer in de winkel producten met een kortingssticker. Je kunt ook typen wat je ziet. De app zegt meteen of het past bij je dieet en of het een goede deal is.'
+        : 'Loop langs vlees, vis, zuivel, brood en groente en zoek de kortingsstickers. Typ wat je ziet: de app zegt meteen of het past bij je dieet en of het een goede deal is.'),
       h('div', { class: 'btn-row' }, h('button', { class: 'btn btn-sm', type: 'button', onclick: addExamples }, 'Laat voorbeelden zien'))));
     return;
   }
   const kids = list.map(it => itemCard(it, 'cand'));
   if (list.some(it => it.example)) kids.push(h('div', { class: 'btn-row' }, h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: clearExamples }, 'Wis voorbeelden')));
-  $('#candList').replaceChildren(...kids);
+  fill($('#candList'), ...kids);
 }
 function renderBasket() {
   const list = S.session.basket;
@@ -979,50 +1152,56 @@ function renderBasket() {
   $('#basketCount').textContent = n ? `${n} stuk${n === 1 ? '' : 's'}` : '';
   const badge = $('#badgeBasket'); badge.hidden = !n; badge.textContent = String(n);
   $('#finishRow').hidden = !list.length;
+  $('#finishConfirm').hidden = true;
   if (!list.length) {
-    $('#basketList').replaceChildren(h('div', { class: 'empty' }, h('strong', null, 'Je mandje is leeg'), h('span', null, 'Tik bij een gevonden product op "In mandje". Je ziet dan wat je uitgeeft, bespaart en hoeveel dagen eiwit je binnenhaalt.')));
+    fill($('#basketList'), h('div', { class: 'empty' }, h('strong', null, 'Je mandje is leeg'), h('span', null, 'Tik bij een gevonden product op "In mandje". Je ziet dan wat je uitgeeft, bespaart en hoeveel dagen eiwit je binnenhaalt.')));
     return;
   }
-  $('#basketList').replaceChildren(...list.map(it => itemCard(it, 'basket')));
+  fill($('#basketList'), ...list.map(it => itemCard(it, 'basket')));
 }
 function renderWinkel() {
-  $('#dietBanner').hidden = !!S.profile.setAt;
+  $('#dietBanner').hidden = !!S.profile.setAt || !Store.loaded;
   renderSummary(); renderCandidates(); renderBasket();
 }
+function closeFormIf(id) { if (S.editing && S.editing.id === id) closeForm(); }
 function moveToBasket(id) {
   const i = S.session.candidates.findIndex(x => x.id === id); if (i < 0) return;
+  closeFormIf(id);
   const [it] = S.session.candidates.splice(i, 1);
-  const same = S.session.basket.find(b => b.foodId && b.foodId === it.foodId && b.name === it.name && itemPriceNow(b) === itemPriceNow(it) && b.grams === it.grams && b.expiry === it.expiry);
+  const same = S.session.basket.find(b => b.foodId && b.foodId === it.foodId && !!b.example === !!it.example && b.name === it.name && itemPriceNow(b) === itemPriceNow(it) && b.grams === it.grams && b.expDate === it.expDate);
   if (same) same.qty = (same.qty || 1) + (it.qty || 1); else S.session.basket.push(it);
   if (!S.session.startedAt) S.session.startedAt = Date.now();
   saveSession(); renderWinkel(); toast(`${it.name} in je mandje`);
 }
 function backToCand(id) {
   const i = S.session.basket.findIndex(x => x.id === id); if (i < 0) return;
+  closeFormIf(id);
   const [it] = S.session.basket.splice(i, 1); it.qty = 1; S.session.candidates.unshift(it);
   saveSession(); renderWinkel();
 }
 function changeQty(id, d) {
   const it = S.session.basket.find(x => x.id === id); if (!it) return;
   it.qty = (it.qty || 1) + d;
-  if (it.qty <= 0) S.session.basket = S.session.basket.filter(x => x.id !== id);
+  if (it.qty <= 0) { closeFormIf(id); S.session.basket = S.session.basket.filter(x => x.id !== id); }
   saveSession(); renderWinkel();
 }
-function removeItem(id, where) {
-  if (where === 'cand') S.session.candidates = S.session.candidates.filter(x => x.id !== id);
+function removeItem(id) {
+  closeFormIf(id);
+  S.session.candidates = S.session.candidates.filter(x => x.id !== id);
   saveSession(); renderWinkel();
 }
 function addExamples() {
-  const picks = [['kipfilet', 35, 'vandaag'], ['magere_kwark', 35, 'vandaag'], ['croissant', 50, 'vandaag'], ['spinazie', 35, 'vandaag'], ['zalmfilet', 35, 'morgen']];
+  const picks = [['kipfilet', 35, 'vandaag'], ['magere_kwark', 40, 'vandaag'], ['croissant', 50, 'vandaag'], ['spinazie', 35, 'vandaag'], ['zalmfilet', 25, 'morgen']];
   for (const [id, pct, exp] of picks) {
-    const f = FOOD.find(x => x.id === id) || matchFood(id.replace(/_/g, ' '), 1)[0]?.f;
-    if (f) S.session.candidates.push(itemFromFood(f, { discountPct: pct, expiry: exp, example: true }));
+    const f = FOOD.find(x => x.id === id);
+    if (f) S.session.candidates.push(itemFromFood(f, { discountPct: pct, expDate: expDateFor(exp), example: true }));
   }
   saveSession(); renderWinkel();
 }
 function clearExamples() {
   S.session.candidates = S.session.candidates.filter(x => !x.example);
   S.session.basket = S.session.basket.filter(x => !x.example);
+  if (S.editing && S.editing.base && S.editing.base.example) closeForm();
   saveSession(); renderWinkel();
 }
 
@@ -1041,130 +1220,169 @@ function renderSuggest() {
   ul.hidden = !lis.length;
 }
 function setSeg(sel, v) { $$(sel + ' button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(v)))); }
+const fmtIn = v => v == null || v === '' ? '' : String(v).replace('.', ',');
 function openForm({ food, quick, item, where }) {
+  if (S.estCtl) { S.estCtl.abort(); S.estCtl = null; }
   const f = $('#addForm');
-  S.editing = item ? { id: item.id, where, food: item.foodId ? FOOD.find(x => x.id === item.foodId) || null : null, base: item } : { id: null, where: 'cand', food, base: null };
-  const base = item || (food ? itemFromFood(food) : { name: quick?.name || '', grams: null, priceNormal: null, discountPct: 35, expiry: 'vandaag', n: null, tags: [], cat: 'overig', freezable: false });
+  S.editing = item ? { id: item.id, where, food: item.foodId ? FOOD.find(x => x.id === item.foodId) || null : null, base: clone(item) } : { id: null, where: 'cand', food, base: null };
+  const base = item || (food ? itemFromFood(food) : { name: quick?.name || '', grams: null, priceNormal: null, discountPct: 35, expDate: todayISO(), n: null, tags: [], cat: 'overig', freezable: false });
   $('#fName').value = base.name || '';
   $('#fGrams').value = quick?.grams ?? base.grams ?? '';
-  const pn = quick?.price ?? base.priceNormal;
-  $('#fPrice').value = pn != null ? String(pn).replace('.', ',') : '';
-  $('#fNow').value = quick?.now != null ? String(quick.now).replace('.', ',') : (item && item.priceNow != null ? String(item.priceNow).replace('.', ',') : '');
+  const typedPrice = quick && (quick.price != null || quick.now != null);
+  $('#fPrice').value = fmtIn(typedPrice ? quick.price : base.priceNormal);
+  $('#fNow').value = fmtIn(quick?.now != null ? quick.now : (item && item.priceNow != null ? item.priceNow : ''));
   S.form.disc = quick?.pct ?? (item ? item.discountPct : 35);
-  if (quick?.now != null && quick?.pct == null) S.form.disc = null;
-  S.form.exp = base.expiry || 'vandaag';
+  if (typedPrice && quick.now != null && quick.pct == null) S.form.disc = null;
+  const st = expState(base);
+  S.form.exp = st === 'verlopen' ? 'vandaag' : st;
   setSeg('#fDisc', S.form.disc); setSeg('#fExp', S.form.exp);
   const n = base.n || {};
-  $('#nKcal').value = n.kcal ?? ''; $('#nProt').value = n.protein ?? ''; $('#nCarb').value = n.carbs ?? ''; $('#nFat').value = n.fat ?? '';
+  $('#nKcal').value = fmtIn(n.kcal); $('#nProt').value = fmtIn(n.protein); $('#nCarb').value = fmtIn(n.carbs); $('#nFat').value = fmtIn(n.fat);
   const known = !!(base.n && (base.n.kcal || base.n.protein));
   $('#nutriBox').open = !known;
-  $('#matchNote').textContent = food || (item && item.foodId) ? `Voedingswaarde uit de tabel (${(food || S.editing.food || {}).name || base.name}, NEVO of etiket). Pas aan als jouw product afwijkt.` : item && item.source === 'claude' ? 'Voedingswaarde geschat door Claude. Check het etiket als je twijfelt.' : 'Onbekend product. Vul de voedingswaarde van het etiket in, of laat Claude schatten.';
+  const ref = food || S.editing.food;
+  $('#matchNote').textContent = ref ? `Voedingswaarde: richtwaarde voor ${ref.name}. Pas aan met het etiket als jouw product afwijkt.` : item && item.source === 'claude' ? 'Voedingswaarde geschat door Claude. Check het etiket als je twijfelt.' : 'Onbekend product. Vul de voedingswaarde van het etiket in, of laat Claude schatten.';
   $('#estimateBtn').hidden = !S.sample;
   $('#estimateStatus').textContent = '';
   f.hidden = false; $('#addHint').hidden = true; $('#suggest').hidden = true;
-  $('#fPrice').focus({ preventScroll: true });
-  f.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  f.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
-function closeForm() { $('#addForm').hidden = true; $('#addHint').hidden = false; S.editing = null; $('#q').value = ''; renderSuggest(); }
+function closeForm() {
+  if (S.estCtl) { S.estCtl.abort(); S.estCtl = null; }
+  $('#addForm').hidden = true; $('#addHint').hidden = false; S.editing = null; $('#q').value = ''; renderSuggest();
+}
 function readForm() {
   const ed = S.editing; const base = ed.base || (ed.food ? itemFromFood(ed.food) : null);
-  const num = id => { const v = parseNum($(id).value); return v == null ? null : v; };
-  const n = { ...(base && base.n ? base.n : {}) };
-  const nk = num('#nKcal'), np = num('#nProt'), nc = num('#nCarb'), nf = num('#nFat');
-  if (nk != null) n.kcal = nk; if (np != null) n.protein = np; if (nc != null) n.carbs = nc; if (nf != null) n.fat = nf;
+  const num = id => parseNum($(id).value);
+  const n = Object.assign({}, base && base.n ? base.n : {});
+  // An emptied field means "unknown", not "keep the old value".
+  n.kcal = num('#nKcal'); n.protein = num('#nProt'); n.carbs = num('#nCarb'); n.fat = num('#nFat');
   const hasN = n.kcal != null || n.protein != null;
   const priceNormal = num('#fPrice');
   const now = num('#fNow');
+  const name = $('#fName').value.trim() || (base && base.name) || 'Product';
   const it = Object.assign({}, base || { id: uid(), foodId: null, cat: 'overig', tags: [], freezable: false, source: 'manual', qty: 1, addedAt: Date.now() }, {
-    name: $('#fName').value.trim() || (base && base.name) || 'Product',
-    grams: num('#fGrams'),
-    priceNormal,
+    name, grams: num('#fGrams'), priceNormal,
     discountPct: now != null ? (priceNormal > 0 ? Math.round((1 - now / priceNormal) * 100) : null) : (S.form.disc ?? 0),
     priceNow: now != null ? now : null,
-    expiry: S.form.exp,
+    expDate: expDateFor(S.form.exp),
     n: hasN ? n : null,
   });
+  if (!it.foodId && it.source === 'manual') it.tags = [...new Set([...(it.tags || []), ...inferTags(name)])];
   if (!ed.id) it.id = uid();
-  if (it.example) delete it.example;
+  delete it.example;
   return it;
 }
 function submitForm(e) {
   e.preventDefault();
+  if (!S.editing) return;
   const it = readForm();
   if (itemPriceNow(it) == null) { toast('Vul een prijs in'); $('#fPrice').focus(); return; }
   const ed = S.editing;
+  let placed = false;
   if (ed.id) {
-    const arr = ed.where === 'basket' ? S.session.basket : S.session.candidates;
-    const i = arr.findIndex(x => x.id === ed.id);
-    if (i >= 0) arr[i] = Object.assign(it, { id: ed.id, qty: arr[i].qty });
-  } else S.session.candidates.unshift(it);
+    for (const arr of [S.session.candidates, S.session.basket]) {
+      const i = arr.findIndex(x => x.id === ed.id);
+      if (i >= 0) { arr[i] = Object.assign(it, { id: ed.id, qty: arr[i].qty || 1 }); placed = true; break; }
+    }
+  }
+  if (!placed) { it.qty = 1; S.session.candidates.unshift(it); }
   saveSession(); closeForm(); renderWinkel();
-  const ev = evaluate(it, S.profile);
-  toast(`${it.name}: ${VERDICT_NL[ev.verdict]}`);
+  toast(`${it.name}: ${VERDICT_NL[evaluate(it, S.profile).verdict]}`);
 }
 function editItem(id, where) {
   const arr = where === 'basket' ? S.session.basket : S.session.candidates;
   const it = arr.find(x => x.id === id); if (it) openForm({ item: it, where });
 }
 function finishTrip() {
+  const real = S.session.basket.filter(x => !x.example);
   const conf = $('#finishConfirm');
-  const t = basketTotals(S.session.basket, S.profile);
+  if (!real.length) {
+    conf.replaceChildren(h('span', null, 'In je mandje liggen alleen voorbeelden. Wis ze of voeg echte producten toe.'));
+    conf.hidden = false; return;
+  }
+  S.pendingTripId = 't' + uid();
+  const t = basketTotals(real, S.profile);
   conf.replaceChildren(
-    h('span', null, `Rit opslaan: ${fmtEur(t.spent)} uitgegeven, ${fmtEur(t.saved)} bespaard. Daarna wordt je mandje leeggemaakt.`),
+    h('span', null, `Rit opslaan: ${fmtEur(t.spent)} uitgegeven, ${fmtEur(t.saved)} bespaard. Je mandje gaat naar je voorraad in Koken en Gevonden wordt leeggemaakt.`),
     h('div', { class: 'btn-row' },
-      h('button', { class: 'btn btn-sm btn-primary', type: 'button', onclick: confirmFinish }, 'Opslaan'),
+      h('button', { class: 'btn btn-sm btn-primary', type: 'button', id: 'confirmFinishBtn', onclick: confirmFinish }, 'Opslaan'),
       h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { conf.hidden = true; } }, 'Nog niet')));
   conf.hidden = false;
 }
 async function confirmFinish() {
-  const t = basketTotals(S.session.basket, S.profile);
-  const store = storeById(S.profile.store);
-  const trip = {
-    id: 't' + uid(), date: todayISO(), ts: Date.now(), store: store ? (store.short || store.name) : '', storeId: S.profile.store || null,
-    spent: t.spent, saved: t.saved, prot: Math.round(t.prot), kcal: Math.round(t.kcal),
-    items: S.session.basket.map(it => ({ name: it.name, qty: it.qty || 1, price: itemPriceNow(it), normal: it.priceNormal ?? null, grams: it.grams ?? null })),
-  };
-  try { await Store.addTrip(trip); }
-  catch (e) { toast('Opslaan van de rit lukte niet. Probeer het zo nog eens.'); return; }
-  S.trips.unshift(trip);
-  S.session.basket = []; S.session.candidates = S.session.candidates.filter(x => !x.example); S.session.startedAt = null;
-  saveSession();
-  $('#finishConfirm').hidden = true;
-  renderWinkel(); renderLogboek();
-  toast(`Opgeslagen. Je bespaarde ${fmtEur(trip.saved)}.`);
+  if (S.finishing) return;
+  const real = S.session.basket.filter(x => !x.example);
+  if (!real.length) { $('#finishConfirm').hidden = true; return; }
+  S.finishing = true;
+  const btn = $('#confirmFinishBtn'); if (btn) btn.disabled = true;
+  try {
+    const t = basketTotals(real, S.profile);
+    const store = storeById(S.profile.store);
+    const trip = {
+      id: S.pendingTripId || ('t' + uid()), date: todayISO(), ts: Date.now(), store: store ? (store.short || store.name) : '', storeId: S.profile.store || null,
+      spent: t.spent, saved: t.saved, prot: Math.round(t.prot), kcal: Math.round(t.kcal),
+      items: real.map(it => ({ name: it.name, qty: it.qty || 1, price: itemPriceNow(it), normal: it.priceNormal ?? null, grams: it.grams ?? null })),
+    };
+    const where = await Store.addTrip(trip);
+    S.trips = [trip, ...S.trips.filter(x => x.id !== trip.id)];
+    S.session.pantry = [...real.map(it => Object.assign({}, it, { boughtAt: Date.now() })), ...S.session.pantry].slice(0, 120);
+    S.session.basket = []; S.session.candidates = []; S.session.startedAt = null;
+    S.pendingTripId = null;
+    saveSession();
+    renderWinkel(); renderLogboek(); renderKoken();
+    toast(where === 'local' && Store.inViewer ? `Opgeslagen op dit toestel. Je bespaarde ${fmtEur(trip.saved)}.` : `Opgeslagen. Je bespaarde ${fmtEur(trip.saved)}.`);
+  } catch (e) {
+    toast('Opslaan van de rit lukte niet. Probeer het zo nog eens.');
+    if (btn) btn.disabled = false;
+  } finally { S.finishing = false; }
 }
 
 /* ============================================================
    Koken view
    ============================================================ */
+function kitchenItems() {
+  const have = [...S.session.basket, ...S.session.pantry];
+  return have.length ? { items: have, kind: 'have' } : { items: S.session.candidates, kind: 'seen' };
+}
 function renderKoken() {
-  const items = S.session.basket.length ? S.session.basket : S.session.candidates;
+  const { items, kind } = kitchenItems();
   const urg = $('#urgCard');
-  const groups = [
-    ['Vandaag opeten of invriezen', items.filter(it => it.expiry === 'vandaag')],
-    ['Morgen op', items.filter(it => it.expiry === 'morgen')],
-    ['Kan nog even', items.filter(it => it.expiry !== 'vandaag' && it.expiry !== 'morgen')],
-  ].filter(g => g[1].length);
   if (!items.length) {
-    urg.replaceChildren(h('h3', null, 'Eerst op'), h('div', { class: 'empty' }, h('strong', null, 'Nog geen buit'), h('span', null, 'Voeg in de winkel producten toe. Hier zie je daarna wat vandaag op of de vriezer in moet, en wat je ermee kookt.')));
+    fill(urg, h('h3', null, 'Eerst op'), h('div', { class: 'empty' }, h('strong', null, 'Nog geen buit'), h('span', null, 'Voeg in de winkel producten toe. Hier zie je daarna wat vandaag op of de vriezer in moet, en wat je ermee kookt.')));
   } else {
-    urg.replaceChildren(h('h3', null, S.session.basket.length ? 'Eerst op (uit je mandje)' : 'Eerst op (gevonden, nog niet in mandje)'),
-      ...groups.map(([title, list]) => h('div', { class: 'urg-group' }, h('h3', { class: 'muted' }, title),
-        ...list.map(it => h('div', { class: 'urg-row' }, h('span', null, it.name, it.qty > 1 ? ` ×${it.qty}` : ''),
-          h('span', { class: 'muted small' }, it.expiry === 'vandaag' ? (it.freezable && S.profile.freezer ? 'invriezen kan' : 'vandaag op') : it.freezable ? 'kan de vriezer in' : ''))))));
+    const groups = [
+      ['Datum verstreken', items.filter(it => expState(it) === 'verlopen'), 'alleen goed als je het hebt ingevroren'],
+      ['Vandaag opeten of invriezen', items.filter(it => expState(it) === 'vandaag'), null],
+      ['Morgen op', items.filter(it => expState(it) === 'morgen'), null],
+      ['Kan nog even', items.filter(it => expState(it) === 'later'), null],
+    ].filter(g => g[1].length);
+    const tail = kind === 'have' && S.session.pantry.length
+      ? h('div', { class: 'btn-row' }, h('button', { class: 'btn btn-sm btn-ghost', type: 'button', id: 'clearPantry', onclick: clearPantry }, 'Voorraad is op, wis hem'))
+      : null;
+    fill(urg, h('h3', null, kind === 'have' ? 'Eerst op (je mandje en voorraad)' : 'Eerst op (gevonden, nog niet gekocht)'),
+      ...groups.map(([title, list, note]) => h('div', { class: 'urg-group' }, h('h3', { class: 'muted' }, title),
+        ...list.map(it => h('div', { class: 'urg-row' }, h('span', null, it.name, (it.qty || 1) > 1 ? ` ×${it.qty}` : ''),
+          h('span', { class: 'muted small' }, note || (expState(it) === 'vandaag' ? (it.freezable && S.profile.freezer ? 'invriezen kan' : 'vandaag op') : it.freezable ? 'kan de vriezer in' : '')))))),
+      tail);
   }
   const ideas = mealIdeas(items, S.profile);
   $('#mealCount').textContent = ideas.length ? `${ideas.length}` : '';
   if (!ideas.length) {
-    $('#mealList').replaceChildren(h('div', { class: 'empty' }, h('strong', null, 'Nog geen ideeën'), h('span', null, 'Ideeën verschijnen zodra je bijvoorbeeld een eiwitbron en een groente hebt gevonden.')));
+    fill($('#mealList'), h('div', { class: 'empty' }, h('strong', null, 'Nog geen ideeën'), h('span', null, 'Ideeën verschijnen zodra je bijvoorbeeld een eiwitbron en een groente hebt.')));
   } else {
     const lowCarb = S.profile.goal === 'keto' || S.profile.goal === 'lowcarb';
-    $('#mealList').replaceChildren(...ideas.slice(0, 8).map(({ meal, items: used }) => h('div', { class: 'card meal' },
+    fill($('#mealList'), ...ideas.slice(0, 8).map(({ meal, items: used, how }) => h('div', { class: 'card meal' },
       h('h3', null, meal.name),
-      h('div', { class: 'uses' }, used.map(it => h('span', { class: it.expiry === 'vandaag' ? 'u' : '' }, it.name))),
-      h('p', { class: 'small' }, meal.how + (lowCarb && (meal.opt || []).includes('zetmeel') ? ' Laat rijst of pasta weg of neem bloemkoolrijst.' : '')))));
+      h('div', { class: 'uses' }, used.map(it => h('span', { class: expState(it) === 'vandaag' ? 'u' : '' }, it.name))),
+      h('p', { class: 'small' }, how + (lowCarb && (meal.opt || []).includes('zetmeel') ? ' Laat rijst of pasta weg of neem bloemkoolrijst.' : '')))));
   }
   $('#aiCard').hidden = !S.sample;
+}
+function clearPantry() {
+  const b = $('#clearPantry');
+  if (b && b.dataset.armed !== '1') { b.dataset.armed = '1'; b.textContent = 'Zeker weten? Tik nog eens'; setTimeout(() => { if (b.isConnected) { b.dataset.armed = ''; b.textContent = 'Voorraad is op, wis hem'; } }, 3000); return; }
+  S.session.pantry = []; saveSession(); renderKoken();
 }
 function renderAdvice(text) {
   const out = $('#adviceOut');
@@ -1178,13 +1396,12 @@ function renderAdvice(text) {
     else if (bullet) { if (!ul) { ul = h('ul'); kids.push(ul); } ul.append(inlineMd(bullet[1])); }
     else { ul = null; kids.push(inlineMd(line, 'p')); }
   }
-  out.replaceChildren(...kids);
+  fill(out, ...kids);
 }
 function stripMd(s) { return s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/__(.+?)__/g, '$1'); }
 function inlineMd(s, tag = 'li') {
   const el = h(tag);
-  const parts = s.split(/(\*\*[^*]+\*\*)/g);
-  for (const p of parts) {
+  for (const p of s.split(/(\*\*[^*]+\*\*)/g)) {
     if (/^\*\*[^*]+\*\*$/.test(p)) el.append(h('strong', null, p.slice(2, -2)));
     else if (p) el.append(document.createTextNode(p.replace(/\*([^*]+)\*/g, '$1')));
   }
@@ -1200,17 +1417,18 @@ function renderLogboek() {
   const tm = trips.filter(t => (t.date || '').startsWith(month));
   const sum = (arr, k) => arr.reduce((a, t) => a + (+t[k] || 0), 0);
   const kpi = (k, v) => h('div', { class: 'kpi' }, h('div', { class: 'k' }, k), h('div', { class: 'v' }, v));
-  $('#tripKpis').replaceChildren(kpi('Bespaard deze maand', fmtEur(sum(tm, 'saved'))), kpi('Uitgegeven', fmtEur(sum(tm, 'spent'))), kpi('Ritten', String(tm.length)));
+  fill($('#tripKpis'), kpi('Bespaard deze maand', fmtEur(sum(tm, 'saved'))), kpi('Uitgegeven', fmtEur(sum(tm, 'spent'))), kpi('Ritten', String(tm.length)));
   if (!trips.length) {
-    $('#tripList').replaceChildren(h('div', { class: 'empty' }, h('strong', null, 'Nog geen ritten'), h('span', null, 'Rond een boodschappenronde af in het tabblad Winkel. Dan zie je hier per rit wat je kocht en bespaarde, en je totaal per maand.')));
+    fill($('#tripList'), h('div', { class: 'empty' }, h('strong', null, 'Nog geen ritten'), h('span', null, 'Rond een boodschappenronde af in het tabblad Winkel. Dan zie je hier per rit wat je kocht en bespaarde, en je totaal per maand.')));
     return;
   }
-  $('#tripList').replaceChildren(...trips.slice(0, 60).map(t => {
+  fill($('#tripList'), ...trips.slice(0, 60).map(t => {
     const del = h('button', { class: 'btn btn-sm btn-ghost', type: 'button' }, 'Verwijder');
     del.addEventListener('click', async () => {
-      if (del.dataset.armed !== '1') { del.dataset.armed = '1'; del.textContent = 'Zeker weten?'; setTimeout(() => { del.dataset.armed = ''; del.textContent = 'Verwijder'; }, 3000); return; }
+      if (del.dataset.armed !== '1') { del.dataset.armed = '1'; del.textContent = 'Zeker weten?'; setTimeout(() => { if (del.isConnected) { del.dataset.armed = ''; del.textContent = 'Verwijder'; } }, 3000); return; }
+      del.disabled = true;
       try { await Store.deleteTrip(t.id); S.trips = S.trips.filter(x => x.id !== t.id); renderLogboek(); }
-      catch (e) { toast('Verwijderen lukte niet'); }
+      catch (e) { toast('Verwijderen lukte niet'); del.disabled = false; }
     });
     return h('div', { class: 'card' },
       h('div', { class: 'trip' },
@@ -1224,41 +1442,47 @@ function renderLogboek() {
 }
 
 /* ============================================================
-   Dieet view
+   Dieet view (edits a draft; nothing changes until Opslaan)
    ============================================================ */
 function renderDieet() {
-  const p = S.profile;
-  $('#dGoal').replaceChildren(...Object.entries(GOALS).map(([k, g]) => h('button', { type: 'button', 'data-v': k, 'aria-pressed': String(p.goal === k), onclick: () => { applyGoal(k); } }, g.label)));
+  const p = S.draft || (S.draft = clone(S.profile));
+  fill($('#dGoal'), ...Object.entries(GOALS).map(([k, g]) => h('button', { type: 'button', 'data-v': k, 'aria-pressed': String(p.goal === k), onclick: () => applyGoal(k) }, g.label)));
   $('#dGoalDesc').textContent = (GOALS[p.goal] || GOALS.balanced).desc;
-  $('#dEat').replaceChildren(...Object.entries(EATS).map(([k, e]) => h('button', { type: 'button', 'data-v': k, 'aria-pressed': String(p.eat === k), onclick: () => { p.eat = k; renderDieet(); } }, e.label)));
-  $('#dExcl').replaceChildren(...EXCL.map(([k, label]) => h('label', { class: 'check' }, h('input', { type: 'checkbox', id: 'x-' + k, checked: !!(p.excl || {})[k], onchange: e => { p.excl = { ...(p.excl || {}), [k]: e.target.checked }; } }), label)));
+  fill($('#dEat'), ...Object.entries(EATS).map(([k, e]) => h('button', { type: 'button', 'data-v': k, 'aria-pressed': String(p.eat === k), onclick: () => { S.draft.eat = k; setSeg('#dEat', k); } }, e.label)));
+  fill($('#dExcl'), ...EXCL.map(([k, label]) => h('label', { class: 'check' }, h('input', { type: 'checkbox', id: 'x-' + k, checked: !!(p.excl || {})[k], onchange: e => { S.draft.excl = Object.assign({}, S.draft.excl, { [k]: e.target.checked }); } }), label)));
   $('#dUltra').checked = !!p.avoidUltra;
   $('#dKcal').value = p.kcal ?? ''; $('#dProt').value = p.protein ?? ''; $('#dCarb').value = p.carbsMax ?? '';
   $('#dWeight').value = p.weight ?? ''; $('#dPersons').value = p.persons ?? 1; $('#dBudget').value = p.budget ?? '';
   $('#dFreezer').checked = !!p.freezer; $('#dNotes').value = p.notes || '';
+  $('#dietSubmit').disabled = !Store.loaded;
 }
 function applyGoal(k) {
-  const p = S.profile, g = GOALS[k];
-  p.goal = k;
-  p.kcal = g.kcal; p.carbsMax = g.carbsMax;
+  const g = GOALS[k];
+  S.draft.goal = k;
+  setSeg('#dGoal', k);
+  $('#dGoalDesc').textContent = g.desc;
   const w = parseNum($('#dWeight').value);
-  p.protein = w ? proteinFor(k, w) : g.protein;
-  renderDieet();
+  $('#dKcal').value = g.kcal;
+  $('#dProt').value = w ? proteinFor(k, w) : g.protein;
+  $('#dCarb').value = g.carbsMax ?? '';
 }
 function proteinFor(goal, w) { const f = goal === 'cut' ? 2.0 : goal === 'bulk' ? 1.8 : goal === 'keto' || goal === 'lowcarb' ? 1.4 : 1.0; return Math.round(w * f); }
 function submitDiet(e) {
   e.preventDefault();
-  const p = S.profile;
+  if (!Store.loaded) return;
+  const d = S.draft || clone(S.profile);
   const num = id => parseNum($(id).value);
-  p.kcal = clamp(num('#dKcal') || GOALS[p.goal].kcal, 800, 6000);
-  p.protein = clamp(num('#dProt') || GOALS[p.goal].protein, 20, 400);
-  const c = num('#dCarb'); p.carbsMax = c == null ? null : clamp(c, 0, 800);
-  p.weight = num('#dWeight');
-  p.persons = clamp(Math.round(num('#dPersons') || 1), 1, 10);
-  const b = num('#dBudget'); p.budget = b == null ? null : Math.max(0, b);
-  p.avoidUltra = $('#dUltra').checked; p.freezer = $('#dFreezer').checked;
-  p.notes = $('#dNotes').value.slice(0, 2000);
-  p.setAt = Date.now();
+  const G = GOALS[d.goal] || GOALS.balanced;
+  d.kcal = clamp(num('#dKcal') || G.kcal, 800, 6000);
+  d.protein = clamp(num('#dProt') || G.protein, 20, 400);
+  const c = num('#dCarb'); d.carbsMax = c == null ? null : clamp(c, 0, 800);
+  d.weight = num('#dWeight');
+  d.persons = clamp(Math.round(num('#dPersons') || 1), 1, 10);
+  const b = num('#dBudget'); d.budget = b == null ? null : Math.max(0, b);
+  d.avoidUltra = $('#dUltra').checked; d.freezer = $('#dFreezer').checked;
+  d.notes = $('#dNotes').value.slice(0, 2000);
+  S.profile = Object.assign({}, d, { store: S.profile.store, setAt: Date.now() });
+  S.draft = clone(S.profile);
   saveProfile(); renderAll();
   $('#dietSaved').textContent = 'Opgeslagen. Alle producten zijn opnieuw beoordeeld.';
   setTimeout(() => { $('#dietSaved').textContent = ''; }, 3500);
@@ -1269,39 +1493,44 @@ function submitDiet(e) {
    ============================================================ */
 function renderInfo() {
   const T = typeof TIPS !== 'undefined' ? TIPS : { when: [], stickers: [], sources: [] };
-  $('#tipCard').replaceChildren(h('h3', null, 'Zo werkt afprijzen bij AH'),
+  fill($('#tipCard'), h('h3', null, 'Zo werkt afprijzen bij AH'),
     h('ul', { class: 'tips' }, (T.stickers || []).map(s => h('li', null, s))),
     h('h3', null, 'Wanneer je de meeste kans hebt'),
     h('ul', { class: 'tips' }, (T.when || []).map(s => h('li', null, s))),
     T.digital && T.digital.length ? h('h3', null, 'Digitaal') : null,
     T.digital && T.digital.length ? h('ul', { class: 'tips' }, T.digital.map(s => h('li', null, s))) : null);
   const cur = S.profile.store;
-  $('#storeCard').replaceChildren(h('h3', null, `Albert Heijn in Groningen (${STORES.length})`),
+  fill($('#storeCard'), h('h3', null, `Albert Heijn in Groningen (${STORES.length})`),
     h('div', null, STORES.map(s => h('div', { class: 'store' + (s.id === cur ? ' on' : '') },
       h('div', { style: 'min-width:0' }, h('div', { class: 'nm' }, s.name), h('div', { class: 'ad' }, `${s.street}, ${s.postcode} ${s.city || 'Groningen'}${s.area ? ` · ${s.area}` : ''}`),
         s.hours ? h('div', { class: 'ad' }, `Open: ${s.hours}`) : null,
         s.note ? h('div', { class: 'ad' }, s.note) : null,
         s.url ? h('a', { class: 'ad', href: s.url, target: '_blank', rel: 'noopener' }, 'Actuele tijden op ah.nl') : null),
       h('div', { class: 'btn-row', style: 'flex:none' },
-        h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { S.profile.store = s.id; saveProfile(); renderStoreSelect(); renderInfo(); toast(`${s.short || s.name} is je winkel`); } }, s.id === cur ? 'Gekozen' : 'Kies'),
+        h('button', { class: 'btn btn-sm', type: 'button', disabled: !Store.loaded, onclick: () => pickStore(s.id) }, s.id === cur ? 'Gekozen' : 'Kies'),
         h('a', { class: 'btn btn-sm btn-ghost', href: mapsUrl(s), target: '_blank', rel: 'noopener' }, 'Route'))))),
-    h('p', { class: 'small muted' }, 'Openingstijden kunnen afwijken op feestdagen. Check ah.nl/winkels voor de actuele tijden.'));
+    h('p', { class: 'small muted' }, 'Openingstijden zijn een indicatie en wijken af op feestdagen. Check de winkelpagina op ah.nl.'));
   const SF = typeof SAFETY !== 'undefined' ? SAFETY : { rules: [], freeze: [] };
-  $('#safetyCard').replaceChildren(h('h3', null, 'Veilig omgaan met laatste-kans-producten'),
+  fill($('#safetyCard'), h('h3', null, 'Veilig omgaan met laatste-kans-producten'),
     h('ul', { class: 'tips' }, SF.rules.map(r => h('li', null, r))),
     SF.freeze.length ? h('div', { class: 'table-wrap' }, h('table', null,
       h('thead', null, h('tr', null, h('th', null, 'Product'), h('th', null, 'Vriezer'), h('th', null, 'Na ontdooien'))),
-      h('tbody', null, SF.freeze.map(r => h('tr', null, h('td', null, r.cat), h('td', null, r.months), h('td', null, r.after)))))) : null);
-  $('#aboutCard').replaceChildren(h('h3', null, 'Over deze app'),
-    h('p', { class: 'small' }, 'Albert Heijn publiceert geen lijst met afgeprijsde producten per winkel. Deze app werkt daarom met wat jij in de winkel ziet: typ het in of maak een foto. De beoordeling gebeurt op je toestel met voedingswaarden uit een tabel (NEVO en etiketten). Prijzen in de tabel zijn richtprijzen; de prijs op de sticker telt.'),
-    h('p', { class: 'small muted' }, `Opslag: ${Store.mode === 'db' ? 'in je Claude-account (alleen jij ziet het)' : 'alleen in deze browser'}. Claude: ${S.sample ? 'beschikbaar voor foto’s en plannen' : 'niet beschikbaar in deze weergave'}.`),
+      h('tbody', null, SF.freeze.map(r => h('tr', null, h('td', null, r.cat), h('td', null, r.months), h('td', null, r.after)))))) : null,
+    h('p', { class: 'small muted' }, 'Bron: Voedingscentrum en NVWA. Kijk bij twijfel in de Bewaarwijzer van het Voedingscentrum.'));
+  fill($('#aboutCard'), h('h3', null, 'Over deze app'),
+    h('p', { class: 'small' }, 'AH laat de Laatste Kans Koopjes per winkel alleen in de AH-app zien en heeft daar geen openbare koppeling voor. Deze app werkt daarom met wat jij ziet: een screenshot uit de AH-app, een foto in de winkel of wat je intypt. De beoordeling gebeurt op je toestel met richtwaarden voor voeding (NEVO-achtig en AH-etiketten). Prijzen in de tabel zijn richtprijzen; de prijs op de sticker telt.'),
+    h('p', { class: 'small muted' }, `Opslag: ${Store.mode === 'db' ? 'privé in je Claude-account (ook anderen met de link zien jouw gegevens niet)' : 'alleen in deze browser'}. Claude: ${S.sample ? 'beschikbaar voor screenshots, foto’s en plannen' : 'niet beschikbaar in deze weergave'}.`),
     h('p', { class: 'small muted' }, 'Geen officiële app van Albert Heijn.'),
     (T.sources || []).length ? h('details', null, h('summary', null, 'Bronnen'), h('ul', { class: 'tips small' }, T.sources.map(u => h('li', null, h('a', { href: u, target: '_blank', rel: 'noopener' }, u.replace(/^https?:\/\//, '')))))) : null);
 }
-function mapsUrl(s) {
-  const q = encodeURIComponent(`Albert Heijn ${s.street}, ${s.postcode} ${s.city || 'Groningen'}`);
-  return `https://maps.apple.com/?q=${q}`;
+function pickStore(id) {
+  if (!Store.loaded) return;
+  S.profile.store = id || null;
+  if (S.draft) S.draft.store = S.profile.store;
+  saveProfile(); renderStoreSelect(); renderInfo();
+  const s = storeById(id); if (s) toast(`${s.short || s.name} is je winkel`);
 }
+function mapsUrl(s) { return `https://maps.apple.com/?q=${encodeURIComponent(`Albert Heijn ${s.street}, ${s.postcode} ${s.city || 'Groningen'}`)}`; }
 
 /* ============================================================
    Claude features (optional)
@@ -1315,9 +1544,10 @@ async function initSample() {
   try { const lim = await s.limits(); S.sampleImages = !!(lim && lim.images); S.sampleMax = lim && lim.images ? lim.images.maxCount : 0; } catch (e) { S.sampleImages = false; }
   $('#photoRow').hidden = !S.sampleImages;
   $('#estimateBtn').hidden = $('#addForm').hidden;
-  renderKoken(); renderInfo();
+  renderCandidates(); renderKoken(); renderInfo();
 }
 function disableSample(code) {
+  if (code === 'images_unavailable') { S.sampleImages = false; $('#photoRow').hidden = true; return; }
   if (['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'].includes(code)) {
     S.sample = null; $('#photoRow').hidden = true; $('#aiCard').hidden = true; $('#estimateBtn').hidden = true;
   }
@@ -1327,9 +1557,10 @@ function sampleErrorText(e) {
   return c === 'rate_limited' ? 'Claude is even druk of je limiet is bereikt. Probeer het later opnieuw.'
     : c === 'not_granted' ? 'Je hebt Claude niet toegestaan voor deze app. Je kunt alles nog handmatig doen.'
     : c === 'session_expired' ? 'Log opnieuw in bij Claude en probeer het nog eens.'
-    : c === 'image_rejected' ? 'Deze foto werd niet geaccepteerd. Probeer een andere foto (JPEG of PNG).'
+    : c === 'image_rejected' ? 'Deze afbeelding werd niet geaccepteerd. Probeer een andere (JPEG of PNG).'
+    : c === 'images_unavailable' ? 'Afbeeldingen lezen kan hier niet. Typ de producten in.'
     : c === 'invalid_json' ? 'Het antwoord was niet goed leesbaar. Probeer het nog een keer.'
-    : c === 'refused' ? 'Claude kon deze foto niet verwerken. Probeer een andere foto.'
+    : c === 'refused' ? 'Claude kon dit niet verwerken. Probeer een andere afbeelding.'
     : c === 'cancelled' ? 'Gestopt.'
     : 'Er ging iets mis bij Claude. Probeer het opnieuw.';
 }
@@ -1340,7 +1571,7 @@ function profileText() {
     `Doel: ${g.label} (${g.desc})`,
     `Eetwijze: ${EATS[p.eat]?.label || 'Alles'}${ex.length ? `; eet geen: ${ex.join(', ')}` : ''}${p.excl?.halal ? '; alleen halal vlees' : ''}`,
     `Per persoon per dag: ${p.kcal} kcal, ${p.protein} g eiwit${p.carbsMax != null ? `, max ${p.carbsMax} g koolhydraten` : ''}`,
-    `Personen: ${p.persons}; budget per week: ${p.budget != null ? '€' + p.budget : 'onbekend'}; vriezer: ${p.freezer ? 'ja' : 'nee'}; ${p.avoidUltra ? 'vermijdt ultrabewerkt' : ''}`,
+    `Personen: ${p.persons}; budget per week: ${p.budget != null ? '€' + p.budget : 'onbekend'}; vriezer: ${p.freezer ? 'ja' : 'nee'}${p.avoidUltra ? '; vermijdt ultrabewerkt' : ''}`,
     p.notes ? `Eigen woorden: ${p.notes}` : '',
   ].filter(Boolean).join('\n');
 }
@@ -1355,112 +1586,131 @@ async function toJpeg(file, maxSide = 2000) {
     return blob || file;
   } catch (e) { return file; }
 }
-const PHOTO_PROMPT = () => `Je krijgt een of meer foto's uit een Albert Heijn-supermarkt. Zoek ALLE producten met een kortingssticker voor bijna verlopen producten (bijvoorbeeld "35% korting", "50%", een rode/oranje afprijssticker) of met een duidelijk afgeprijsde prijs.
+const PHOTO_PROMPT = () => `Je krijgt een of meer afbeeldingen. Het zijn screenshots uit de Albert Heijn-app (de lijst "Laatste Kans Koopjes" van een winkel, met per product naam, inhoud, oude en nieuwe prijs, kortingspercentage, houdbaarheidsdatum en soms voorraad) of foto's uit een AH-winkel van producten met een kortingssticker (blauw-oranje "Laatste Kans Koopje"-sticker, "35% korting", of een elektronisch prijskaartje met 25%, 40% of 70% korting).
+Zoek ALLE afgeprijsde producten op de afbeeldingen. Neem elk product één keer op, ook als het op twee screenshots staat.
 
 Geef per product:
 - name: korte Nederlandse productnaam zoals op het etiket (zonder merk "AH" ervoor)
 - grams: netto gewicht in gram of ml als getal, of null
-- priceNormal: de normale prijs in euro (getal), of null als je die niet kunt lezen
-- priceNow: de nieuwe prijs op de sticker in euro, of null
-- discountPct: het kortingspercentage op de sticker (getal 0-100), of null
+- priceNormal: de oude of normale prijs in euro (getal), of null als je die niet kunt lezen
+- priceNow: de nieuwe prijs in euro, of null
+- discountPct: het kortingspercentage (getal 0-100), of null
 - expiry: houdbaarheidsdatum als "YYYY-MM-DD" als die leesbaar is, anders null
 - cat: precies een van ${Object.keys(CATS).join(', ')}
 - per100: geschatte voedingswaarde per 100 g: {"kcal","protein","carbs","sugar","fat","satfat","fiber","salt"} in getallen. Lees het etiket als dat zichtbaar is, anders schat je op basis van NEVO-waarden voor dit type product.
-- tags: lijst uit ${ALLOWED_TAGS.join(', ')} die van toepassing zijn
+- tags: alle van toepassing zijnde waarden uit ${ALLOWED_TAGS.join(', ')}. Wees volledig bij dierlijke producten en allergenen (meat, poultry, pork, beef, fish, shellfish, dairy, lactose, egg, gluten, nuts, soy).
 - freezable: true als je dit product op de laatste dag kunt invriezen
-- confidence: "hoog", "middel" of "laag" voor hoe zeker je de prijs en naam hebt gelezen
+- confidence: "hoog", "middel" of "laag" voor hoe zeker je naam en prijs hebt gelezen
 
 Verzin geen prijzen: liever null. Vandaag is ${todayISO()}.
 Antwoord met alleen JSON in deze vorm: {"items":[{"name":"Kipfilet","grams":500,"priceNormal":6.49,"priceNow":4.22,"discountPct":35,"expiry":"${todayISO()}","cat":"gevogelte","per100":{"kcal":110,"protein":24,"carbs":0,"sugar":0,"fat":1.5,"satfat":0.4,"fiber":0,"salt":0.15},"tags":["meat","poultry"],"freezable":true,"confidence":"hoog"}]}`;
-function expiryFromDate(d) {
-  if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return 'vandaag';
-  const t = todayISO();
-  if (d <= t) return 'vandaag';
-  const tm = new Date(); tm.setDate(tm.getDate() + 1);
-  const tmISO = `${tm.getFullYear()}-${String(tm.getMonth() + 1).padStart(2, '0')}-${String(tm.getDate()).padStart(2, '0')}`;
-  return d === tmISO ? 'morgen' : 'later';
-}
 function itemFromClaude(x) {
   const name = String(x.name || 'Product').slice(0, 80);
   const match = matchFood(name, 1)[0];
+  const strong = match && match.s >= 70 ? match.f : null;
   const cat = CATS[x.cat] ? x.cat : (match ? match.f.cat : 'overig');
-  const tags = Array.isArray(x.tags) ? x.tags.filter(t => ALLOWED_TAGS.includes(t)) : (match ? match.f.tags.slice() : []);
+  const own = Array.isArray(x.tags) ? x.tags.filter(t => ALLOWED_TAGS.includes(t)) : [];
+  const tags = [...new Set([...own, ...(strong ? strong.tags : []), ...inferTags(name)])];
+  if (tags.includes('vegan') && ANIMAL.some(t => tags.includes(t))) tags.splice(tags.indexOf('vegan'), 1);
   const p100 = x.per100 && typeof x.per100 === 'object' ? x.per100 : null;
-  const n = p100 && (parseNum(p100.kcal) != null || parseNum(p100.protein) != null)
-    ? { kcal: parseNum(p100.kcal) ?? 0, protein: parseNum(p100.protein) ?? 0, carbs: parseNum(p100.carbs) ?? 0, sugar: parseNum(p100.sugar) ?? 0, fat: parseNum(p100.fat) ?? 0, satfat: parseNum(p100.satfat) ?? 0, fiber: parseNum(p100.fiber) ?? 0, salt: parseNum(p100.salt) ?? 0 }
+  const pv = k => p100 ? parseNum(p100[k]) : null;
+  const n = p100 && (pv('kcal') != null || pv('protein') != null)
+    ? { kcal: pv('kcal'), protein: pv('protein'), carbs: pv('carbs'), sugar: pv('sugar'), fat: pv('fat'), satfat: pv('satfat'), fiber: pv('fiber'), salt: pv('salt') }
     : match ? itemFromFood(match.f).n : null;
   const pn = parseNum(x.priceNormal), pnow = parseNum(x.priceNow), pct = parseNum(x.discountPct);
+  const d = typeof x.expiry === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.expiry) ? x.expiry : todayISO();
   return {
-    id: uid(), foodId: match && match.s >= 70 ? match.f.id : null, name, cat, n, tags,
+    id: uid(), foodId: strong ? strong.id : null, name, cat, n, tags,
     freezable: typeof x.freezable === 'boolean' ? x.freezable : !!(match && match.f.freezable),
     grams: parseNum(x.grams) ?? (match ? match.f.pack_g : null),
-    priceNormal: pn ?? (pnow != null && pct ? round2(pnow / (1 - pct / 100)) : null),
-    priceNow: pnow, discountPct: pct ?? (pn && pnow ? Math.round((1 - pnow / pn) * 100) : 35),
-    expiry: expiryFromDate(x.expiry), qty: 1, source: 'claude', confidence: x.confidence || null, addedAt: Date.now(),
+    priceNormal: pn ?? (pnow != null && pct > 0 && pct < 100 ? round2(pnow / (1 - pct / 100)) : null),
+    priceNow: pnow,
+    discountPct: pct ?? (pn && pnow ? Math.round((1 - pnow / pn) * 100) : null),
+    expDate: d < todayISO() ? todayISO() : d, qty: 1, source: 'claude', confidence: x.confidence || null, addedAt: Date.now(),
   };
 }
+function setPhotoBusy(b) {
+  for (const id of ['#shotIn', '#photoIn']) $(id).disabled = b;
+  $$('#photoRow label.btn').forEach(l => { l.setAttribute('aria-disabled', String(b)); l.style.opacity = b ? '0.5' : ''; });
+}
 async function onPhoto(e) {
-  const files = Array.from(e.target.files || []).slice(0, Math.max(1, S.sampleMax || 1));
-  e.target.value = '';
-  if (!files.length || !S.sample) return;
+  const input = e.target;
+  const files = Array.from(input.files || []).slice(0, Math.max(1, S.sampleMax || 1));
+  input.value = '';
+  if (!files.length || !S.sample || S.photoCtl) return;
+  const ctl = new AbortController(); S.photoCtl = ctl;
+  setPhotoBusy(true);
   const st = $('#photoStatus');
-  S.photoCtl = new AbortController();
-  const stop = h('button', { class: 'btn btn-sm', type: 'button', onclick: () => S.photoCtl && S.photoCtl.abort() }, 'Stop');
-  st.replaceChildren(h('span', null, `Foto${files.length > 1 ? "'s" : ''} lezen… dit duurt meestal 10 tot 40 seconden. `), stop);
+  st.replaceChildren(h('span', null, `${files.length > 1 ? files.length + " afbeeldingen" : 'Afbeelding'} lezen… meestal 10 tot 40 seconden. `), h('button', { class: 'btn btn-sm', type: 'button', onclick: () => ctl.abort() }, 'Stop'));
   try {
     const imgs = await Promise.all(files.map(f => toJpeg(f)));
-    const res = await S.sample.json(PHOTO_PROMPT(), { images: imgs, signal: S.photoCtl.signal, cache: false });
+    const res = await S.sample.json(PHOTO_PROMPT(), { images: imgs, signal: ctl.signal, cache: false });
     const arr = Array.isArray(res) ? res : (res && Array.isArray(res.items) ? res.items : []);
-    const items = arr.filter(x => x && typeof x === 'object' && x.name).slice(0, 40).map(itemFromClaude).filter(it => itemPriceNow(it) != null || it.name);
-    if (!items.length) { st.textContent = 'Geen afgeprijsde producten herkend. Zorg dat de sticker en het etiket goed in beeld zijn.'; return; }
-    S.session.candidates.unshift(...items);
+    const items = arr.filter(x => x && typeof x === 'object' && x.name).slice(0, 60).map(itemFromClaude);
+    if (!items.length) { st.textContent = 'Geen afgeprijsde producten herkend. Zorg dat de naam en de korting goed in beeld zijn.'; return; }
+    S.session.candidates = [...items, ...S.session.candidates].slice(0, 150);
     saveSession(); renderWinkel();
     const noPrice = items.filter(it => itemPriceNow(it) == null).length;
-    st.textContent = `${items.length} product${items.length === 1 ? '' : 'en'} toegevoegd aan Gevonden.${noPrice ? ` Bij ${noPrice} kon de prijs niet worden gelezen: tik op Wijzig.` : ''} Controleer prijzen even op de sticker.`;
+    st.textContent = `${items.length} product${items.length === 1 ? '' : 'en'} toegevoegd aan Gevonden.${noPrice ? ` Bij ${noPrice} kon de prijs niet worden gelezen: tik op Wijzig.` : ''} Check de prijzen even.`;
   } catch (err) {
     st.textContent = sampleErrorText(err);
     disableSample(err && err.code);
-  } finally { S.photoCtl = null; }
+  } finally {
+    if (S.photoCtl === ctl) S.photoCtl = null;
+    setPhotoBusy(false);
+  }
 }
 async function estimateNutrition() {
-  if (!S.sample) return;
+  if (!S.sample || !S.editing) return;
   const name = $('#fName').value.trim();
   if (!name) { toast('Vul eerst een productnaam in'); return; }
+  const ed = S.editing;
+  if (S.estCtl) S.estCtl.abort();
+  const ctl = new AbortController(); S.estCtl = ctl;
   const st = $('#estimateStatus'); st.textContent = 'Claude schat…';
   $('#estimateBtn').disabled = true;
   try {
-    const r = await S.sample.json(`Schat de voedingswaarde per 100 g van dit Nederlandse supermarktproduct (Albert Heijn): "${name}". Gebruik NEVO-achtige waarden. Antwoord met alleen JSON: {"kcal":0,"protein":0,"carbs":0,"sugar":0,"fat":0,"satfat":0,"fiber":0,"salt":0,"cat":"een van ${Object.keys(CATS).join('|')}","tags":["uit: ${ALLOWED_TAGS.join(', ')}"],"freezable":true,"grams":0}`, { modelTier: 'quick' });
+    const r = await S.sample.json(`Schat de voedingswaarde per 100 g van dit Nederlandse supermarktproduct (Albert Heijn): "${name}". Gebruik NEVO-achtige waarden. Geef bij tags alle dierlijke ingrediënten en allergenen die er normaal in zitten. Antwoord met alleen JSON: {"kcal":0,"protein":0,"carbs":0,"sugar":0,"fat":0,"satfat":0,"fiber":0,"salt":0,"cat":"een van ${Object.keys(CATS).join('|')}","tags":["uit: ${ALLOWED_TAGS.join(', ')}"],"freezable":true,"grams":0}`, { modelTier: 'quick', signal: ctl.signal });
+    if (ctl.signal.aborted || S.editing !== ed) return;
     if (!r || typeof r !== 'object') throw { code: 'invalid_json' };
-    $('#nKcal').value = parseNum(r.kcal) ?? ''; $('#nProt').value = parseNum(r.protein) ?? ''; $('#nCarb').value = parseNum(r.carbs) ?? ''; $('#nFat').value = parseNum(r.fat) ?? '';
+    $('#nKcal').value = fmtIn(parseNum(r.kcal)); $('#nProt').value = fmtIn(parseNum(r.protein)); $('#nCarb').value = fmtIn(parseNum(r.carbs)); $('#nFat').value = fmtIn(parseNum(r.fat));
     if (!$('#fGrams').value && parseNum(r.grams)) $('#fGrams').value = parseNum(r.grams);
-    const ed = S.editing;
-    const base = ed.base || { id: uid(), foodId: null, source: 'claude', qty: 1, addedAt: Date.now() };
+    const base = ed.base || { id: uid(), foodId: null, source: 'manual', qty: 1, addedAt: Date.now(), tags: [] };
+    const own = Array.isArray(r.tags) ? r.tags.filter(t => ALLOWED_TAGS.includes(t)) : [];
     ed.base = Object.assign({}, base, {
       cat: CATS[r.cat] ? r.cat : (base.cat || 'overig'),
-      tags: Array.isArray(r.tags) ? r.tags.filter(t => ALLOWED_TAGS.includes(t)) : (base.tags || []),
+      tags: [...new Set([...(base.tags || []), ...own, ...inferTags(name)])],
       freezable: typeof r.freezable === 'boolean' ? r.freezable : !!base.freezable,
-      n: { kcal: parseNum(r.kcal) ?? 0, protein: parseNum(r.protein) ?? 0, carbs: parseNum(r.carbs) ?? 0, sugar: parseNum(r.sugar) ?? 0, fat: parseNum(r.fat) ?? 0, satfat: parseNum(r.satfat) ?? 0, fiber: parseNum(r.fiber) ?? 0, salt: parseNum(r.salt) ?? 0 },
+      n: { kcal: parseNum(r.kcal), protein: parseNum(r.protein), carbs: parseNum(r.carbs), sugar: parseNum(r.sugar), fat: parseNum(r.fat), satfat: parseNum(r.satfat), fiber: parseNum(r.fiber), salt: parseNum(r.salt) },
       source: 'claude',
     });
     st.textContent = 'Geschat door Claude. Check het etiket als je twijfelt.';
-  } catch (err) { st.textContent = sampleErrorText(err); disableSample(err && err.code); }
-  finally { $('#estimateBtn').disabled = false; }
+  } catch (err) {
+    if (S.editing === ed) st.textContent = sampleErrorText(err);
+    disableSample(err && err.code);
+  } finally {
+    if (S.estCtl === ctl) S.estCtl = null;
+    $('#estimateBtn').disabled = false;
+  }
 }
 async function askAdvice() {
-  if (!S.sample) return;
+  if (!S.sample || S.adviceCtl) return;
   const btn = $('#adviceBtn'), stop = $('#adviceStop');
   const ctl = new AbortController(); S.adviceCtl = ctl;
   btn.disabled = true; stop.hidden = false;
-  $('#adviceOut').replaceChildren(h('p', { class: 'muted' }, 'Claude denkt na…'));
-  const fmtIt = it => { const ev = evaluate(it, S.profile); const n = it.n; return `- ${it.name}${it.qty > 1 ? ' x' + it.qty : ''}, ${it.grams || '?'} g, ${fmtEur(itemPriceNow(it))}${it.priceNormal ? ` (normaal ${fmtEur(it.priceNormal)})` : ''}, houdbaar: ${it.expiry}, invriesbaar: ${it.freezable ? 'ja' : 'nee'}${n ? `, per 100 g: ${n.kcal} kcal, ${n.protein} g eiwit, ${n.carbs} g koolh., ${n.fat} g vet` : ''}; app-oordeel: ${VERDICT_NL[ev.verdict]} (${ev.score}/100)`; };
+  fill($('#adviceOut'), h('p', { class: 'muted' }, 'Claude denkt na…'));
+  const fmtIt = it => { const ev = evaluate(it, S.profile); const n = it.n; return `- ${it.name}${(it.qty || 1) > 1 ? ' x' + it.qty : ''}, ${it.grams || '?'} g, ${fmtEur(itemPriceNow(it))}${it.priceNormal ? ` (normaal ${fmtEur(it.priceNormal)})` : ''}, houdbaar: ${expState(it)}, invriesbaar: ${it.freezable ? 'ja' : 'nee'}${n ? `, per 100 g: ${n.kcal ?? '?'} kcal, ${n.protein ?? '?'} g eiwit, ${n.carbs ?? '?'} g koolh., ${n.fat ?? '?'} g vet` : ''}; app-oordeel: ${VERDICT_NL[ev.verdict]} (${ev.score}/100)`; };
   const store = storeById(S.profile.store);
-  const prompt = `Je helpt iemand die in Groningen goedkoop boodschappen doet met afgeprijsde "laatste kans"-producten bij Albert Heijn${store ? ` (${store.name})` : ''}. Vandaag is ${new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}.
+  const prompt = `Je helpt iemand die in Groningen goedkoop boodschappen doet met Laatste Kans Koopjes (afgeprijsde producten) bij Albert Heijn${store ? ` (${store.name})` : ''}. Vandaag is ${new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}.
 
 Dieet:
 ${profileText()}
 
 In het mandje:
 ${S.session.basket.map(fmtIt).join('\n') || '(leeg)'}
+
+Thuis (net gekocht):
+${S.session.pantry.slice(0, 25).map(fmtIt).join('\n') || '(niets)'}
 
 Ook gezien, nog niet gekocht:
 ${S.session.candidates.slice(0, 25).map(fmtIt).join('\n') || '(niets)'}
@@ -1469,7 +1719,7 @@ Schrijf in het Nederlands, kort en concreet, met kopjes (##) en opsommingen:
 ## Kopen of laten
 Welke van de geziene producten nog meenemen en welke laten liggen, met een reden in een paar woorden.
 ## Vandaag en morgen
-Wat vandaag op moet, wat de vriezer in moet (alleen als dat veilig kan), met hoeveelheden.
+Wat vandaag op moet en wat de vriezer in moet (alleen als dat veilig kan), met hoeveelheden.
 ## Maaltijden
 3 tot 5 maaltijden voor de komende dagen die deze producten gebruiken en passen bij het dieet, met per maaltijd geschatte kcal en eiwit per persoon.
 ## Aanvullen
@@ -1480,7 +1730,7 @@ Gebruik geen em-dashes. Maximaal 350 woorden.`;
     renderAdvice(text + (truncated ? '\n\n(Ingekort. Vraag opnieuw met minder producten.)' : ''));
   } catch (err) {
     if (err && err.text) renderAdvice(err.text + '\n\n' + (err.code === 'cancelled' ? '(gestopt)' : '(onderbroken)'));
-    else $('#adviceOut').replaceChildren(h('p', null, sampleErrorText(err)));
+    else fill($('#adviceOut'), h('p', null, sampleErrorText(err)));
     disableSample(err && err.code);
   } finally { btn.disabled = false; stop.hidden = true; S.adviceCtl = null; }
 }
@@ -1491,14 +1741,16 @@ Gebruik geen em-dashes. Maximaal 350 woorden.`;
 const TABS = ['winkel', 'koken', 'logboek', 'dieet', 'info'];
 function route() {
   const t = (location.hash || '').replace('#', '');
+  const prev = S.tab;
   S.tab = TABS.includes(t) ? t : 'winkel';
   for (const k of TABS) $('#view-' + k).hidden = k !== S.tab;
   $$('.tabbar a').forEach(a => { if (a.dataset.tab === S.tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  if (S.tab === 'winkel') renderWinkel();
   if (S.tab === 'koken') renderKoken();
-  if (S.tab === 'dieet') renderDieet();
+  if (S.tab === 'dieet') { if (prev !== 'dieet' || !S.draft) S.draft = clone(S.profile); renderDieet(); }
   if (S.tab === 'info') renderInfo();
   if (S.tab === 'logboek') renderLogboek();
-  window.scrollTo(0, 0);
+  if (prev !== S.tab) window.scrollTo(0, 0);
 }
 function renderAll() { renderStoreSelect(); renderWinkel(); renderKoken(); renderLogboek(); if (S.tab === 'dieet') renderDieet(); renderInfo(); }
 
@@ -1519,60 +1771,73 @@ function bind() {
   $('#fNow').addEventListener('input', () => { if ($('#fNow').value.trim()) { S.form.disc = null; setSeg('#fDisc', null); } });
   $('#estimateBtn').addEventListener('click', estimateNutrition);
   $('#photoIn').addEventListener('change', onPhoto);
+  $('#shotIn').addEventListener('change', onPhoto);
   $('#finishBtn').addEventListener('click', finishTrip);
   $('#adviceBtn').addEventListener('click', askAdvice);
   $('#adviceStop').addEventListener('click', () => S.adviceCtl && S.adviceCtl.abort());
-  $('#storeSel').addEventListener('change', e => { S.profile.store = e.target.value || null; saveProfile(); renderInfo(); });
+  $('#storeSel').addEventListener('change', e => pickStore(e.target.value));
   $('#dietForm').addEventListener('submit', submitDiet);
-  $('#dUltra').addEventListener('change', e => { S.profile.avoidUltra = e.target.checked; });
-  $('#dFreezer').addEventListener('change', e => { S.profile.freezer = e.target.checked; });
+  $('#dUltra').addEventListener('change', e => { if (S.draft) S.draft.avoidUltra = e.target.checked; });
+  $('#dFreezer').addEventListener('change', e => { if (S.draft) S.draft.freezer = e.target.checked; });
   $('#calcProt').addEventListener('click', () => {
     const w = parseNum($('#dWeight').value);
     if (!w) { toast('Vul eerst je gewicht in'); $('#dWeight').focus(); return; }
-    $('#dProt').value = proteinFor(S.profile.goal, w);
+    $('#dProt').value = proteinFor((S.draft || S.profile).goal, w);
     toast(`Eiwit: ${$('#dProt').value} g per dag`);
   });
   window.addEventListener('hashchange', route);
 }
 
+function newerOf(remote, local) {
+  if (local && (local.savedAt || 0) > ((remote && remote.savedAt) || 0)) return { v: local, push: true };
+  return { v: remote, push: false };
+}
 async function boot() {
   bind();
-  renderStoreSelect(); route(); renderWinkel();
-  const inViewer = !!(window.claude && typeof window.claude.use === 'function');
-  if (inViewer) showLoadBanner('Je gegevens laden…');
+  renderStoreSelect(); route();
+  const viewer = !!(window.claude && typeof window.claude.use === 'function');
+  if (viewer) showLoadBanner('Je gegevens laden…');
   initSample();
   await Store.init();
-  let loadErr = null;
-  const loadAll = async () => {
-    const [profile, session, trips] = await Promise.all([Store.load('profile'), Store.load('session'), Store.listTrips()]);
-    return { profile, session, trips };
-  };
-  let timer = setTimeout(() => showLoadBanner('Je opgeslagen gegevens zijn nog niet bereikbaar. Wijzigingen worden bewaard zodra de verbinding er is.'), 10000);
-  let data = null;
-  try { data = await loadAll(); }
-  catch (e) { loadErr = e; }
+  const timer = setTimeout(() => { if (!Store.loaded) showLoadBanner('Je opgeslagen gegevens zijn nog niet bereikbaar. Wat je in de winkel toevoegt, wordt bewaard zodra de verbinding er is.'); }, 10000);
+  let data = null, push = { profile: false, session: false }, note = null;
+  if (Store.db) {
+    try {
+      const [p, s, t] = await Promise.all([Store.load('profile'), Store.load('session'), Store.listTrips()]);
+      const np = newerOf(p, Store.localGet('profile')), ns = newerOf(s, Store.localGet('session'));
+      push = { profile: np.push, session: ns.push };
+      const synced = await Store.syncTrips(t);
+      const trips = [...synced, ...t].sort((a, b) => (b.ts || 0) - (a.ts || 0));
+      data = { profile: np.v, session: ns.v, trips };
+    } catch (e) {
+      Store.db = null; Store.mode = 'local';
+      note = 'Je account-opslag is nu niet bereikbaar. Alles wordt op dit toestel bewaard en bij je volgende bezoek bijgewerkt.';
+    }
+  } else if (viewer) {
+    note = null; // a viewer without private storage (signed out or not allowed): this browser only
+  }
+  if (!data) data = { profile: Store.localGet('profile'), session: Store.localGet('session'), trips: Store.localGet('trips') || [] };
   clearTimeout(timer);
-  if (loadErr) {
-    // Fall back to this device and keep working.
-    Store.db = null; Store.mode = 'local';
-    data = { profile: Store.localGet('profile'), session: Store.localGet('session'), trips: Store.localGet('trips') || [] };
-    showLoadBanner('Je account-opslag is niet bereikbaar. Alles wordt nu alleen op dit toestel bewaard.');
-  } else showLoadBanner(null);
-  // Merge anything the user did while loading.
+  showLoadBanner(note);
+  // Keep anything added to Gevonden or the basket while loading.
   const live = S.session;
   if (data.profile) S.profile = Object.assign(defaultProfile(), data.profile);
-  if (data.session) {
-    S.session = Object.assign({ candidates: [], basket: [], store: null, startedAt: null }, data.session);
-    if (live.candidates.length) S.session.candidates = live.candidates.filter(x => !S.session.candidates.some(y => y.id === x.id)).concat(S.session.candidates);
-    if (live.basket.length) S.session.basket = live.basket.filter(x => !S.session.basket.some(y => y.id === x.id)).concat(S.session.basket);
-  }
+  S.session = normalizeSession(data.session);
+  if (live.candidates.length) S.session.candidates = live.candidates.filter(x => !S.session.candidates.some(y => y.id === x.id)).concat(S.session.candidates);
+  if (live.basket.length) S.session.basket = live.basket.filter(x => !S.session.basket.some(y => y.id === x.id)).concat(S.session.basket);
   S.trips = Array.isArray(data.trips) ? data.trips : [];
+  Store.localSet('trips', S.trips);
   Store.loaded = true;
-  if (live.candidates.length || live.basket.length) saveSession();
+  const pruned = pruneSession();
+  if (push.profile) saveProfile();
+  if (push.session || pruned || live.candidates.length || live.basket.length) saveSession();
+  Store.watch('profile', () => S.profile, d => { S.profile = Object.assign(defaultProfile(), d); if (S.tab !== 'dieet') S.draft = null; renderAll(); });
+  Store.watch('session', () => S.session, d => { S.session = normalizeSession(d); renderWinkel(); if (S.tab === 'koken') renderKoken(); });
+  S.draft = null;
   renderAll(); route();
 }
 
-window.LK = { evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, exclusionsFor, defaultProfile, GOALS, S, Store };
+window.LK = { evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, inferTags, exclusionsFor, defaultProfile, expState, GOALS, S, Store };
 boot();
 </script>
 
