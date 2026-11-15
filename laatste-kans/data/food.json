@@ -1,0 +1,174 @@
+[
+ {
+  "id": "kipfilet",
+  "name": "Kipfilet",
+  "aliases": [
+   "kippenborst"
+  ],
+  "cat": "gevogelte",
+  "kcal": 110,
+  "protein": 24,
+  "carbs": 0,
+  "sugar": 0,
+  "fat": 1.5,
+  "satfat": 0.4,
+  "fiber": 0,
+  "salt": 0.15,
+  "pack_g": 500,
+  "price_eur": 6.49,
+  "tags": [
+   "meat",
+   "poultry",
+   "halal_possible"
+  ],
+  "freezable": true,
+  "src": "tmp"
+ },
+ {
+  "id": "croissant",
+  "name": "Croissant",
+  "aliases": [],
+  "cat": "brood",
+  "kcal": 410,
+  "protein": 8,
+  "carbs": 45,
+  "sugar": 8,
+  "fat": 21,
+  "satfat": 13,
+  "fiber": 2,
+  "salt": 1.1,
+  "pack_g": 240,
+  "price_eur": 2.49,
+  "tags": [
+   "gluten",
+   "dairy",
+   "lactose",
+   "bakery",
+   "processed"
+  ],
+  "freezable": true,
+  "src": "tmp"
+ },
+ {
+  "id": "magere_kwark",
+  "name": "Magere kwark",
+  "aliases": [
+   "kwark"
+  ],
+  "cat": "zuivel",
+  "kcal": 58,
+  "protein": 10,
+  "carbs": 3.7,
+  "sugar": 3.7,
+  "fat": 0.2,
+  "satfat": 0.1,
+  "fiber": 0,
+  "salt": 0.1,
+  "pack_g": 500,
+  "price_eur": 1.69,
+  "tags": [
+   "dairy",
+   "lactose",
+   "vegetarian"
+  ],
+  "freezable": false,
+  "src": "tmp"
+ },
+ {
+  "id": "spinazie",
+  "name": "Spinazie",
+  "aliases": [
+   "verse spinazie"
+  ],
+  "cat": "groente",
+  "kcal": 23,
+  "protein": 2.9,
+  "carbs": 1.1,
+  "sugar": 0.4,
+  "fat": 0.4,
+  "satfat": 0.1,
+  "fiber": 2.2,
+  "salt": 0.2,
+  "pack_g": 300,
+  "price_eur": 1.99,
+  "tags": [
+   "fresh_produce",
+   "vegan",
+   "vegetarian"
+  ],
+  "freezable": false,
+  "src": "tmp"
+ },
+ {
+  "id": "zalmfilet",
+  "name": "Zalmfilet",
+  "aliases": [
+   "zalm"
+  ],
+  "cat": "vis",
+  "kcal": 200,
+  "protein": 20,
+  "carbs": 0,
+  "sugar": 0,
+  "fat": 13,
+  "satfat": 2.5,
+  "fiber": 0,
+  "salt": 0.1,
+  "pack_g": 250,
+  "price_eur": 6.29,
+  "tags": [
+   "fish"
+  ],
+  "freezable": true,
+  "src": "tmp"
+ },
+ {
+  "id": "bananen",
+  "name": "Bananen",
+  "aliases": [
+   "banaan"
+  ],
+  "cat": "fruit",
+  "kcal": 95,
+  "protein": 1.2,
+  "carbs": 21,
+  "sugar": 17,
+  "fat": 0.3,
+  "satfat": 0.1,
+  "fiber": 1.9,
+  "salt": 0,
+  "pack_g": 1000,
+  "price_eur": 1.99,
+  "tags": [
+   "fresh_produce",
+   "vegan",
+   "vegetarian"
+  ],
+  "freezable": true,
+  "src": "tmp"
+ },
+ {
+  "id": "eieren",
+  "name": "Eieren",
+  "aliases": [
+   "ei"
+  ],
+  "cat": "ei",
+  "kcal": 130,
+  "protein": 12.5,
+  "carbs": 0.4,
+  "sugar": 0.4,
+  "fat": 9,
+  "satfat": 2.6,
+  "fiber": 0,
+  "salt": 0.35,
+  "pack_g": 600,
+  "price_eur": 3.49,
+  "tags": [
+   "egg",
+   "vegetarian"
+  ],
+  "freezable": false,
+  "src": "tmp"
+ }
+]

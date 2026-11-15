@@ -1,0 +1,1561 @@
+<title>Laatste Kans Groningen</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Vind afgeprijsde producten bij Albert Heijn in Groningen die passen bij je dieet.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one phone column; sticky top bar with the store, fixed bottom tab bar; discounts drawn as round price stickers */
+:root {
+  --bg: #F2F4F0;
+  --surface: #FFFFFF;
+  --surface-2: #E7ECE5;
+  --ink: #15211B;
+  --muted: #56655C;
+  --line: #D3DBD1;
+  --brand: #1F5C45;
+  --brand-ink: #FFFFFF;
+  --sticker: #F2541B;
+  --sticker-ink: #FFFFFF;
+  --good: #19724A;
+  --good-bg: #DDF1E5;
+  --warn: #8A5A00;
+  --warn-bg: #F8EDD3;
+  --bad: #A8261E;
+  --bad-bg: #F9E1DE;
+  --focus: #2F7DE1;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r: 14px;
+  --r-sm: 9px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1411; --surface: #17201B; --surface-2: #202B25; --ink: #E5EDE8; --muted: #9AABA1; --line: #2B3832;
+    --brand: #6CC79C; --brand-ink: #08130D; --sticker: #FF7543; --sticker-ink: #1A0700;
+    --good: #66D6A0; --good-bg: #123022; --warn: #F0B94E; --warn-bg: #33260C; --bad: #FF8F85; --bad-bg: #3B1613; --focus: #7DB3FF;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1411; --surface: #17201B; --surface-2: #202B25; --ink: #E5EDE8; --muted: #9AABA1; --line: #2B3832;
+  --brand: #6CC79C; --brand-ink: #08130D; --sticker: #FF7543; --sticker-ink: #1A0700;
+  --good: #66D6A0; --good-bg: #123022; --warn: #F0B94E; --warn-bg: #33260C; --bad: #FF8F85; --bad-bg: #3B1613; --focus: #7DB3FF;
+  color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--ink); }
+body { font-family: var(--font-body); font-size: 15px; line-height: 1.45; -webkit-text-size-adjust: 100%; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+* { box-sizing: border-box; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 1.2rem; font-weight: 800; }
+h3 { font-size: 1rem; font-weight: 600; }
+p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.small { font-size: 0.82rem; }
+
+.wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* Top bar */
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: var(--bg); border-bottom: 1px solid var(--line); }
+.topbar .wrap { display: flex; align-items: center; gap: 12px; padding-block: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+.brand-mark { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--sticker); color: var(--sticker-ink); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 1rem; transform: rotate(-12deg); }
+.brand h1 { font-size: 1.12rem; font-weight: 800; line-height: 1.1; }
+.brand p { font-size: 0.76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.store-pick select { max-width: 46vw; min-height: 38px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; font-size: 0.86rem; font-weight: 600; }
+
+main { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+.view { display: flex; flex-direction: column; gap: 18px; padding-block: 16px 8px; }
+.section { display: flex; flex-direction: column; gap: 10px; }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.count { font-family: var(--font-num); font-size: 0.85rem; color: var(--muted); font-weight: 500; }
+
+/* Cards and controls */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; cursor: pointer; text-decoration: none; color: var(--ink); }
+.btn:active { transform: translateY(1px); }
+.btn[disabled] { opacity: 0.5; cursor: default; }
+.btn-primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.btn-sticker { background: var(--sticker); border-color: var(--sticker); color: var(--sticker-ink); }
+.btn-ghost { background: transparent; }
+.btn-sm { min-height: 36px; padding: 6px 12px; font-size: 0.86rem; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-block { width: 100%; }
+.icon-btn { min-width: 40px; min-height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: inline-grid; place-items: center; cursor: pointer; font-weight: 700; }
+
+label.field { display: flex; flex-direction: column; gap: 4px; font-size: 0.84rem; font-weight: 600; color: var(--muted); min-width: 0; }
+input[type="text"], input[type="search"], input[type="number"], input[type="date"], select, textarea {
+  width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); padding: 9px 12px; font-size: 16px; color: var(--ink);
+}
+textarea { min-height: 84px; resize: vertical; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 360px) { .grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { min-height: 38px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; font-size: 0.88rem; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+.check { display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 0.92rem; }
+.check input { width: 20px; height: 20px; accent-color: var(--brand); flex: none; }
+.checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 10px; }
+
+/* Summary */
+.summary { background: var(--ink); color: var(--bg); border-radius: var(--r); padding: 14px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.summary .k { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.72; }
+.summary .v { font-family: var(--font-num); font-weight: 600; font-size: 1.02rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 380px) { .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.budget-bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--bg) 22%, transparent); overflow: hidden; }
+.budget-bar i { display: block; height: 100%; background: var(--sticker); border-radius: 3px; }
+.summary .note { grid-column: 1 / -1; font-size: 0.78rem; opacity: 0.8; }
+
+/* Banner */
+.banner { border-radius: var(--r); padding: 12px 14px; background: var(--warn-bg); color: var(--warn); display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-weight: 500; }
+.banner.info { background: var(--surface-2); color: var(--ink); }
+
+/* Add panel */
+.search-box { position: relative; }
+.suggest { list-style: none; margin: 4px 0 0; padding: 4px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); display: flex; flex-direction: column; }
+.suggest li button { width: 100%; text-align: left; background: none; border: 0; padding: 10px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; min-height: 44px; align-items: center; }
+.suggest li button:hover, .suggest li button:focus-visible { background: var(--surface-2); }
+.suggest .cat { font-size: 0.76rem; color: var(--muted); white-space: nowrap; }
+.match-note { font-size: 0.82rem; color: var(--muted); }
+.nutri-in { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.photo-status { font-size: 0.9rem; }
+
+/* Item cards */
+.list { display: flex; flex-direction: column; gap: 10px; }
+.item { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; position: relative; min-width: 0; }
+.item.v-ja { border-left: 5px solid var(--good); }
+.item.v-twijfel { border-left: 5px solid var(--warn); }
+.item.v-laten, .item.v-nee { border-left: 5px solid var(--bad); }
+.item-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.item-name { font-weight: 700; font-size: 1rem; line-height: 1.25; min-width: 0; overflow-wrap: anywhere; }
+.item-meta { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
+.price { display: flex; align-items: center; gap: 8px; flex: none; }
+.price s { color: var(--muted); font-family: var(--font-num); font-size: 0.82rem; }
+.price b { font-family: var(--font-num); font-size: 1.05rem; }
+.sticker { width: 46px; height: 46px; border-radius: 50%; background: var(--sticker); color: var(--sticker-ink); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 0.86rem; transform: rotate(-10deg); flex: none; letter-spacing: -0.02em; }
+.verdict-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 10px; font-size: 0.8rem; font-weight: 700; }
+.chip.ja { background: var(--good-bg); color: var(--good); }
+.chip.twijfel { background: var(--warn-bg); color: var(--warn); }
+.chip.laten, .chip.nee { background: var(--bad-bg); color: var(--bad); }
+.chip.ex { background: var(--surface-2); color: var(--muted); }
+.chip.urgent { background: var(--surface-2); color: var(--ink); }
+.scorebar { flex: 1; min-width: 80px; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.scorebar i { display: block; height: 100%; border-radius: 3px; background: var(--muted); }
+.v-ja .scorebar i { background: var(--good); }
+.v-twijfel .scorebar i { background: var(--warn); }
+.v-laten .scorebar i, .v-nee .scorebar i { background: var(--bad); }
+.score { font-family: var(--font-num); font-size: 0.82rem; color: var(--muted); }
+.metrics { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; font-size: 0.82rem; color: var(--muted); }
+.metrics b { color: var(--ink); font-family: var(--font-num); font-weight: 600; }
+.reasons { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; font-size: 0.86rem; }
+.reasons li { display: flex; gap: 8px; align-items: baseline; }
+.reasons li::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; margin-top: 6px; background: var(--muted); transform: translateY(-1px); }
+.reasons li.pos::before { background: var(--good); }
+.reasons li.neg::before { background: var(--bad); }
+.item-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.qty { display: inline-flex; align-items: center; gap: 6px; }
+.qty span { min-width: 24px; text-align: center; font-family: var(--font-num); font-weight: 600; }
+
+.empty { border: 1.5px dashed var(--line); border-radius: var(--r); padding: 18px 16px; display: flex; flex-direction: column; gap: 8px; color: var(--muted); }
+.empty strong { color: var(--ink); font-family: var(--font-display); font-size: 1rem; }
+
+/* Meals and advice */
+.meal { display: flex; flex-direction: column; gap: 6px; }
+.meal .uses { display: flex; flex-wrap: wrap; gap: 6px; }
+.meal .uses span { background: var(--surface-2); border-radius: 999px; padding: 2px 10px; font-size: 0.8rem; font-weight: 600; }
+.meal .uses span.u { background: var(--warn-bg); color: var(--warn); }
+.advice { display: flex; flex-direction: column; gap: 8px; font-size: 0.95rem; }
+.advice ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.advice h4 { margin: 6px 0 0; font-family: var(--font-display); font-size: 1rem; }
+.urg-group h3 { font-size: 0.92rem; margin-bottom: 6px; }
+.urg-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 0.92rem; }
+.urg-row:first-of-type { border-top: 0; }
+
+/* Info */
+.store { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.store:first-child { border-top: 0; }
+.store .nm { font-weight: 700; }
+.store .ad { font-size: 0.86rem; color: var(--muted); }
+.store.on .nm::after { content: "jouw winkel"; margin-left: 8px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; background: var(--brand); color: var(--brand-ink); padding: 2px 6px; border-radius: 6px; vertical-align: 2px; }
+.tips { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+.trip { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.kpi-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; }
+.kpi .k { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.kpi .v { font-family: var(--font-num); font-weight: 600; font-size: 1.05rem; }
+
+/* Tab bar */
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.tabbar .tabs { max-width: 640px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.tabbar a { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px 6px; min-height: 56px; color: var(--muted); text-decoration: none; font-size: 0.7rem; font-weight: 600; position: relative; }
+.tabbar a svg { width: 24px; height: 24px; }
+.tabbar a[aria-current="page"] { color: var(--ink); }
+.tabbar a[aria-current="page"]::before { content: ""; position: absolute; top: 0; left: 28%; right: 28%; height: 3px; border-radius: 0 0 3px 3px; background: var(--sticker); }
+.tabbar .badge { position: absolute; top: 4px; right: calc(50% - 22px); min-width: 18px; height: 18px; border-radius: 9px; background: var(--sticker); color: var(--sticker-ink); font-size: 0.68rem; display: grid; place-items: center; padding: 0 4px; font-family: var(--font-num); }
+
+.toast { position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: 0.9rem; z-index: 20; max-width: calc(100vw - 32px); text-align: center; }
+@media (prefers-reduced-motion: no-preference) {
+  .item { animation: pop 0.18s ease-out; }
+  @keyframes pop { from { transform: translateY(4px); } to { transform: none; } }
+}
+</style>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">%</div>
+      <div style="min-width:0">
+        <h1>Laatste Kans</h1>
+        <p id="subline">Afgeprijsd bij AH in Groningen, gekeurd op jouw dieet</p>
+      </div>
+    </div>
+    <label class="store-pick"><span class="sr">Jouw winkel</span><select id="storeSel"></select></label>
+  </div>
+</header>
+
+<main>
+  <!-- WINKEL -->
+  <section class="view wrap" id="view-winkel" aria-labelledby="h-winkel">
+    <h2 class="sr" id="h-winkel">In de winkel</h2>
+    <div id="loadBanner" class="banner info" hidden></div>
+    <div id="dietBanner" class="banner" hidden>
+      <span>Stel eerst je dieet in, dan kloppen de adviezen.</span>
+      <a class="btn btn-sm" href="#dieet">Dieet instellen</a>
+    </div>
+    <div class="summary" id="summary" aria-live="polite"></div>
+
+    <div class="card" id="addCard">
+      <div class="section-head"><h2>Wat ligt er met korting?</h2></div>
+      <div id="photoRow" class="section" hidden>
+        <label class="btn btn-sticker btn-block" for="photoIn">Maak foto van de stickers</label>
+        <input type="file" id="photoIn" class="sr" accept="image/*" capture="environment" multiple>
+        <p class="small muted">Claude leest naam, prijs, korting en datum van de foto en beoordeelt elk product.</p>
+        <div id="photoStatus" class="photo-status" aria-live="polite"></div>
+      </div>
+      <div class="search-box">
+        <label class="field" for="q">Typ wat je ziet
+          <input id="q" type="search" placeholder="bv. kipfilet 500g 6,49 35%" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
+        </label>
+        <ul id="suggest" class="suggest" hidden></ul>
+      </div>
+      <form id="addForm" class="section" hidden novalidate>
+        <p class="match-note" id="matchNote"></p>
+        <label class="field" for="fName">Product
+          <input id="fName" type="text" autocomplete="off">
+        </label>
+        <div class="grid3">
+          <label class="field" for="fGrams">Gewicht (g)
+            <input id="fGrams" type="number" inputmode="decimal" min="0" step="any">
+          </label>
+          <label class="field" for="fPrice">Normale prijs
+            <input id="fPrice" type="text" inputmode="decimal" placeholder="€">
+          </label>
+          <label class="field" for="fNow">Nu (sticker)
+            <input id="fNow" type="text" inputmode="decimal" placeholder="€">
+          </label>
+        </div>
+        <div class="field">Korting
+          <div class="seg" id="fDisc" role="group" aria-label="Korting">
+            <button type="button" data-v="35">35%</button>
+            <button type="button" data-v="50">50%</button>
+            <button type="button" data-v="25">25%</button>
+            <button type="button" data-v="0">Geen</button>
+          </div>
+        </div>
+        <div class="field">Houdbaar tot
+          <div class="seg" id="fExp" role="group" aria-label="Houdbaar tot">
+            <button type="button" data-v="vandaag">Vandaag</button>
+            <button type="button" data-v="morgen">Morgen</button>
+            <button type="button" data-v="later">Later</button>
+          </div>
+        </div>
+        <details id="nutriBox">
+          <summary>Voedingswaarde per 100 g</summary>
+          <div class="nutri-in" style="margin-top:8px">
+            <label class="field" for="nKcal">kcal<input id="nKcal" type="number" inputmode="decimal" step="any"></label>
+            <label class="field" for="nProt">Eiwit<input id="nProt" type="number" inputmode="decimal" step="any"></label>
+            <label class="field" for="nCarb">Koolh.<input id="nCarb" type="number" inputmode="decimal" step="any"></label>
+            <label class="field" for="nFat">Vet<input id="nFat" type="number" inputmode="decimal" step="any"></label>
+          </div>
+          <div class="btn-row" style="margin-top:8px">
+            <button type="button" class="btn btn-sm" id="estimateBtn" hidden>Laat Claude schatten</button>
+            <span class="small muted" id="estimateStatus" aria-live="polite"></span>
+          </div>
+        </details>
+        <div class="btn-row">
+          <button type="submit" class="btn btn-primary">Beoordeel</button>
+          <button type="button" class="btn btn-ghost" id="cancelAdd">Annuleer</button>
+        </div>
+      </form>
+      <p class="small muted" id="addHint">Kies een product uit de lijst of typ zelf een naam, gewicht, prijs en korting.</p>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>Gevonden</h2><span class="count" id="candCount"></span></div>
+      <div class="list" id="candList"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>In je mandje</h2><span class="count" id="basketCount"></span></div>
+      <div class="list" id="basketList"></div>
+      <div class="btn-row" id="finishRow" hidden>
+        <button class="btn btn-primary" id="finishBtn" type="button">Boodschappen afronden</button>
+      </div>
+      <div id="finishConfirm" class="banner info" hidden></div>
+    </div>
+  </section>
+
+  <!-- KOKEN -->
+  <section class="view wrap" id="view-koken" hidden aria-labelledby="h-koken">
+    <h2 id="h-koken">Koken met je buit</h2>
+    <div class="card" id="urgCard"></div>
+    <div class="section">
+      <div class="section-head"><h2>Maaltijdideeën</h2><span class="count" id="mealCount"></span></div>
+      <div class="list" id="mealList"></div>
+    </div>
+    <div class="card" id="aiCard" hidden>
+      <div class="section-head"><h2>Plan van Claude</h2></div>
+      <p class="small muted">Claude kijkt naar je mandje, wat je nog zag liggen en je dieet, en maakt een plan voor de komende dagen.</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="adviceBtn" type="button">Maak een plan</button>
+        <button class="btn" id="adviceStop" type="button" hidden>Stop</button>
+      </div>
+      <div class="advice" id="adviceOut" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- LOGBOEK -->
+  <section class="view wrap" id="view-logboek" hidden aria-labelledby="h-logboek">
+    <h2 id="h-logboek">Logboek</h2>
+    <div class="kpi-row" id="tripKpis"></div>
+    <div class="list" id="tripList"></div>
+  </section>
+
+  <!-- DIEET -->
+  <section class="view wrap" id="view-dieet" hidden aria-labelledby="h-dieet">
+    <h2 id="h-dieet">Jouw dieet</h2>
+    <form id="dietForm" class="section" novalidate>
+      <div class="card">
+        <h3>Doel</h3>
+        <div class="seg" id="dGoal" role="group" aria-label="Doel"></div>
+        <p class="small muted" id="dGoalDesc"></p>
+      </div>
+      <div class="card">
+        <h3>Wat eet je?</h3>
+        <div class="seg" id="dEat" role="group" aria-label="Eetwijze"></div>
+        <div class="checks" id="dExcl"></div>
+        <label class="check"><input type="checkbox" id="dUltra"> Vermijd ultrabewerkt</label>
+      </div>
+      <div class="card">
+        <h3>Per dag</h3>
+        <div class="grid3">
+          <label class="field" for="dKcal">kcal<input id="dKcal" type="number" inputmode="numeric" min="800" max="6000" step="10"></label>
+          <label class="field" for="dProt">Eiwit (g)<input id="dProt" type="number" inputmode="numeric" min="20" max="400" step="1"></label>
+          <label class="field" for="dCarb">Max. koolh. (g)<input id="dCarb" type="number" inputmode="numeric" min="0" max="800" step="1" placeholder="geen"></label>
+        </div>
+        <div class="grid2">
+          <label class="field" for="dWeight">Lichaamsgewicht (kg)<input id="dWeight" type="number" inputmode="decimal" min="30" max="250" step="0.1" placeholder="optioneel"></label>
+          <div class="field">Eiwit berekenen<button type="button" class="btn btn-sm" id="calcProt">Op basis van gewicht</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Huishouden en budget</h3>
+        <div class="grid2">
+          <label class="field" for="dPersons">Personen<input id="dPersons" type="number" inputmode="numeric" min="1" max="10" step="1"></label>
+          <label class="field" for="dBudget">Budget per week (€)<input id="dBudget" type="number" inputmode="decimal" min="0" step="1"></label>
+        </div>
+        <label class="check"><input type="checkbox" id="dFreezer"> Ik heb ruimte in de vriezer</label>
+      </div>
+      <div class="card">
+        <h3>In je eigen woorden</h3>
+        <label class="field" for="dNotes">Wat Claude moet weten (allergieën, wat je lekker vindt, kookgerei)
+          <textarea id="dNotes" placeholder="bv. Ik lust geen champignons, ik heb een airfryer, ik train 4x per week."></textarea>
+        </label>
+      </div>
+      <div class="btn-row"><button class="btn btn-primary" type="submit">Opslaan</button><span class="small muted" id="dietSaved" aria-live="polite"></span></div>
+    </form>
+  </section>
+
+  <!-- INFO -->
+  <section class="view wrap" id="view-info" hidden aria-labelledby="h-info">
+    <h2 id="h-info">Slim afprijs-jagen</h2>
+    <div class="card" id="tipCard"></div>
+    <div class="card" id="storeCard"></div>
+    <div class="card" id="safetyCard"></div>
+    <div class="card" id="aboutCard"></div>
+  </section>
+</main>
+
+<nav class="tabbar" aria-label="Hoofdmenu">
+  <div class="tabs">
+    <a href="#winkel" data-tab="winkel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h2l2.2 10.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"/><circle cx="9.5" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg>Winkel<span class="badge" id="badgeBasket" hidden></span></a>
+    <a href="#koken" data-tab="koken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11h16v2a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7z"/><path d="M9 7c0-1.5 1-2 1-3M13 7c0-1.5 1-2 1-3"/></svg>Koken</a>
+    <a href="#logboek" data-tab="logboek"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5M4 19h16"/><path d="M8 15l3-4 3 2 4-6"/></svg>Logboek</a>
+    <a href="#dieet" data-tab="dieet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21c-4.5 0-7-3-7-7 0-4.5 3-8 7-8s7 3.5 7 8c0 4-2.5 7-7 7z"/><path d="M12 6c0-1.5.8-3 2.5-3.5"/></svg>Dieet</a>
+    <a href="#info" data-tab="info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>Info</a>
+  </div>
+</nav>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+/*@@DATA@@*/
+</script>
+<script>
+'use strict';
+/* ============================================================
+   Basics
+   ============================================================ */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'text') el.textContent = v;
+    else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? '' : String(v));
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid == null || kid === false) continue;
+    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+const EUR = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' });
+const fmtEur = v => (v == null || !isFinite(v)) ? '-' : EUR.format(v);
+const fmtNum = (v, d = 0) => (v == null || !isFinite(v)) ? '-' : new Intl.NumberFormat('nl-NL', { maximumFractionDigits: d, minimumFractionDigits: d }).format(v);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const round2 = v => Math.round(v * 100) / 100;
+function parseNum(s) {
+  if (s == null) return null;
+  if (typeof s === 'number') return isFinite(s) ? s : null;
+  let t = String(s).replace(/[^\d,.\-]/g, '');
+  if (!t) return null;
+  if (t.includes(',') && t.includes('.')) t = t.replace(/\./g, '').replace(',', '.');
+  else t = t.replace(',', '.');
+  const v = parseFloat(t);
+  return isFinite(v) ? v : null;
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function todayISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function lerp(x, pts) {
+  if (x <= pts[0][0]) return pts[0][1];
+  for (let i = 1; i < pts.length; i++) {
+    if (x <= pts[i][0]) { const [x0, y0] = pts[i - 1], [x1, y1] = pts[i]; return y0 + (y1 - y0) * (x - x0) / (x1 - x0); }
+  }
+  return pts[pts.length - 1][1];
+}
+function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+let toastTimer;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2200); }
+
+/* ============================================================
+   Diet model
+   ============================================================ */
+const GOALS = {
+  balanced: { label: 'Gezond basis', desc: 'Schijf van Vijf: veel groente en fruit, volkoren, genoeg eiwit, weinig bewerkt vlees, suiker en zout.', kcal: 2000, protein: 90, pf: 0.4, carbsMax: null },
+  cut: { label: 'Afvallen, eiwitrijk', desc: 'Veel eiwit per kcal zodat je vol zit en spiermassa houdt. Calorierijke producten met weinig eiwit vallen af.', kcal: 1800, protein: 140, pf: 0.9, carbsMax: null },
+  bulk: { label: 'Spieropbouw', desc: 'Veel eiwit en genoeg energie per euro. Rijst, brood en zuivel tellen mee als goedkope energie.', kcal: 2800, protein: 160, pf: 0.7, carbsMax: null },
+  lowcarb: { label: 'Koolhydraatarm', desc: 'Rond de 100 g koolhydraten per dag of minder: brood, pasta en zoet worden kritisch bekeken.', kcal: 2000, protein: 110, pf: 0.6, carbsMax: 100 },
+  keto: { label: 'Keto', desc: 'Onder de 30 g koolhydraten per dag. Vooral vlees, vis, eieren, kaas, groente boven de grond.', kcal: 2000, protein: 110, pf: 0.5, carbsMax: 30 },
+  med: { label: 'Mediterraan', desc: 'Vis, groente, peulvruchten, volkoren en noten; weinig rood en bewerkt vlees.', kcal: 2000, protein: 90, pf: 0.4, carbsMax: null },
+};
+const EATS = {
+  alles: { label: 'Alles' },
+  flexi: { label: 'Weinig vlees' },
+  pesco: { label: 'Pescotarisch' },
+  vega: { label: 'Vegetarisch' },
+  vegan: { label: 'Veganistisch' },
+};
+const EXCL = [
+  ['pork', 'Geen varkensvlees'], ['beef', 'Geen rundvlees'], ['fish', 'Geen vis'], ['shellfish', 'Geen schaaldieren'],
+  ['lactose', 'Lactosevrij'], ['dairy', 'Geen zuivel'], ['gluten', 'Glutenvrij'], ['egg', 'Geen ei'],
+  ['nuts', 'Notenallergie'], ['soy', 'Geen soja'], ['halal', 'Halal'],
+];
+const TAG_NL = { meat: 'vlees', poultry: 'gevogelte', pork: 'varkensvlees', beef: 'rundvlees', fish: 'vis', shellfish: 'schaaldieren', dairy: 'zuivel', egg: 'ei', gluten: 'gluten', lactose: 'lactose', nuts: 'noten', soy: 'soja' };
+const ALLOWED_TAGS = ['meat', 'poultry', 'pork', 'beef', 'fish', 'shellfish', 'dairy', 'egg', 'gluten', 'lactose', 'nuts', 'soy', 'vegetarian', 'vegan', 'halal_possible', 'processed', 'ultraprocessed', 'wholegrain', 'high_sugar', 'fresh_produce', 'ready_meal', 'bakery'];
+const CATS = { vlees: 'Vlees', gevogelte: 'Gevogelte', vis: 'Vis', vega: 'Vega', zuivel: 'Zuivel', kaas: 'Kaas', ei: 'Eieren', beleg: 'Beleg', brood: 'Brood', groente: 'Groente', fruit: 'Fruit', maaltijd: 'Maaltijd', salade: 'Salade', zetmeel: 'Pasta en co', overig: 'Overig' };
+
+function defaultProfile() {
+  return { goal: 'balanced', eat: 'alles', kcal: 2000, protein: 90, carbsMax: null, excl: {}, avoidUltra: false, freezer: true, persons: 1, budget: 40, notes: '', weight: null, store: null, setAt: null };
+}
+function exclusionsFor(P) {
+  const ex = new Set();
+  if (P.eat === 'vega' || P.eat === 'vegan') ['meat', 'poultry', 'pork', 'beef', 'fish', 'shellfish'].forEach(t => ex.add(t));
+  if (P.eat === 'vegan') ['dairy', 'egg', 'lactose'].forEach(t => ex.add(t));
+  if (P.eat === 'pesco') ['meat', 'poultry', 'pork', 'beef'].forEach(t => ex.add(t));
+  const e = P.excl || {};
+  if (e.pork || e.halal) ex.add('pork');
+  if (e.beef) ex.add('beef');
+  if (e.fish) { ex.add('fish'); ex.add('shellfish'); }
+  if (e.shellfish) ex.add('shellfish');
+  if (e.dairy) { ex.add('dairy'); ex.add('lactose'); }
+  if (e.lactose) ex.add('lactose');
+  for (const k of ['gluten', 'egg', 'nuts', 'soy']) if (e[k]) ex.add(k);
+  return ex;
+}
+const ANIMAL = ['meat', 'poultry', 'pork', 'beef', 'fish', 'shellfish', 'dairy', 'egg', 'lactose'];
+
+/* ============================================================
+   Food lookup and quick parsing
+   ============================================================ */
+const STOP = new Set(['ah', 'albert', 'heijn', 'excellent', 'terra', 'basic', 'biologisch', 'bio', 'de', 'het', 'een', 'van', 'met', 'g', 'gr', 'gram', 'kg', 'stuks', 'st', 'ml', 'l', 'vers', 'verse', 'korting', 'per', 'stuk']);
+function tokens(s) { return norm(s).split(' ').filter(t => t && !STOP.has(t) && !/^\d/.test(t)); }
+const FOOD_INDEX = (typeof FOOD !== 'undefined' ? FOOD : []).map(f => {
+  const names = [f.name, ...(f.aliases || [])];
+  return { f, names: names.map(norm), toks: [...new Set(names.flatMap(tokens))] };
+});
+function matchFood(q, limit = 6) {
+  const nq = tokens(q);
+  if (!nq.length) return [];
+  const joined = nq.join(' ');
+  const out = [];
+  for (const ix of FOOD_INDEX) {
+    let s = 0;
+    for (const n of ix.names) {
+      const nt = n.split(' ').filter(t => !STOP.has(t)).join(' ');
+      if (nt === joined) s = Math.max(s, 100);
+      else if (nt.startsWith(joined)) s = Math.max(s, 85);
+      else if (nt.includes(joined)) s = Math.max(s, 70);
+    }
+    if (s < 70) {
+      let hit = 0;
+      for (const t of nq) {
+        if (ix.toks.some(x => x === t)) hit += 1;
+        else if (ix.toks.some(x => x.startsWith(t) || (t.length >= 5 && x.includes(t)) || (x.length >= 5 && t.includes(x)))) hit += 0.7;
+      }
+      if (hit > 0) s = Math.max(s, Math.round(60 * hit / nq.length) - Math.max(0, ix.toks.length - nq.length));
+    }
+    if (s >= 25) out.push({ f: ix.f, s });
+  }
+  out.sort((a, b) => b.s - a.s || a.f.name.length - b.f.name.length);
+  return out.slice(0, limit);
+}
+function parseQuick(text) {
+  let s = ' ' + String(text || '') + ' ';
+  const r = { name: '', grams: null, price: null, now: null, pct: null };
+  const pct = s.match(/(-?\d{1,2})\s*%/);
+  if (pct) { r.pct = Math.abs(parseInt(pct[1], 10)); s = s.replace(pct[0], ' '); }
+  const w = s.match(/(\d+(?:[.,]\d+)?)\s*(kg|kilo|g|gr|gram|ml|l|liter|cl)\b/i);
+  if (w) {
+    let v = parseNum(w[1]); const u = w[2].toLowerCase();
+    if (u === 'kg' || u === 'kilo' || u === 'l' || u === 'liter') v *= 1000; else if (u === 'cl') v *= 10;
+    r.grams = Math.round(v); s = s.replace(w[0], ' ');
+  }
+  const prices = [...s.matchAll(/€?\s?(\d{1,3}[.,]\d{2})(?!\d)/g)];
+  if (prices.length) {
+    const vals = prices.map(m => parseNum(m[1]));
+    if (vals.length >= 2) { r.price = Math.max(vals[0], vals[1]); r.now = Math.min(vals[0], vals[1]); }
+    else r.price = vals[0];
+    for (const m of prices) s = s.replace(m[0], ' ');
+  }
+  r.name = s.replace(/€/g, ' ').replace(/\s+/g, ' ').trim();
+  return r;
+}
+
+/* ============================================================
+   Scoring engine (pure)
+   ============================================================ */
+function itemPriceNow(it) {
+  if (it.priceNow != null && isFinite(it.priceNow)) return it.priceNow;
+  if (it.priceNormal != null && it.discountPct != null) return round2(it.priceNormal * (1 - it.discountPct / 100));
+  return it.priceNormal ?? null;
+}
+function evaluate(it, P) {
+  const G = GOALS[P.goal] || GOALS.balanced;
+  const pf = G.pf;
+  const n = it.n || null;
+  const g = it.grams > 0 ? it.grams : 0;
+  const price = itemPriceNow(it);
+  const tags = new Set(it.tags || []);
+  const ex = exclusionsFor(P);
+  const hits = [...ex].filter(t => tags.has(t));
+  const R = [];
+  const add = (w, s) => R.push({ w, s });
+
+  const kcal = n ? +n.kcal || 0 : 0, prot = n ? +n.protein || 0 : 0, carbs = n ? +n.carbs || 0 : 0;
+  const fiber = n ? +n.fiber || 0 : 0, sugar = n ? +n.sugar || 0 : 0, satfat = n ? +n.satfat || 0 : 0, salt = n ? +n.salt || 0 : 0;
+  const protPack = prot * g / 100, kcalPack = kcal * g / 100, carbPack = carbs * g / 100;
+  const m = {
+    protPack, kcalPack, carbPack,
+    eurPerProt: (price > 0 && prot >= 5 && protPack >= 5) ? price / protPack * 100 : null,
+    perKg: (price > 0 && g > 0) ? price / g * 1000 : null,
+    kcalPerEur: (price > 0 && kcalPack > 0) ? kcalPack / price : null,
+    protPer100kcal: kcal > 0 ? prot / kcal * 100 : 0,
+    discount: (it.priceNormal > 0 && price != null) ? clamp(1 - price / it.priceNormal, 0, 1) : clamp((it.discountPct || 0) / 100, 0, 1),
+    price,
+  };
+  const fresh = tags.has('fresh_produce');
+
+  /* --- diet fit --- */
+  let fit = 60;
+  if (!n || !(kcal > 0 || prot > 0)) {
+    fit = 50;
+    add(-1, 'Voedingswaarde onbekend: vul die in of laat Claude schatten');
+  } else {
+    if (prot >= 8) {
+      const d = m.protPer100kcal;
+      const b = d >= 15 ? 25 : d >= 10 ? 15 : d >= 6 ? 5 : 0;
+      fit += pf * b;
+      if (b >= 15 && pf >= 0.5) add(pf * b, `Veel eiwit per kcal (${fmtNum(prot, 0)} g per 100 g)`);
+      else if (b >= 5 && pf >= 0.5) add(pf * b, `Redelijk eiwitrijk (${fmtNum(prot, 0)} g per 100 g)`);
+    } else if (kcal >= 250) {
+      fit -= 10 * pf;
+      if (pf >= 0.5) add(-10 * pf, 'Veel kcal, weinig eiwit');
+    }
+    const goal = P.goal;
+    if (goal === 'cut') {
+      if (kcal <= 150 && prot >= 10) { fit += 8; add(8, 'Weinig kcal, veel eiwit'); }
+      if (kcal >= 350 && m.protPer100kcal < 10) { fit -= 12; add(-12, `Calorierijk (${fmtNum(kcal)} kcal per 100 g)`); }
+      if (fresh) fit += 6;
+    } else if (goal === 'bulk') {
+      if (kcal >= 200 && prot >= 10) { fit += 10; add(10, 'Eiwit plus energie'); }
+      if (m.kcalPerEur != null && m.kcalPerEur >= 600) fit += 5;
+    } else if (goal === 'lowcarb') {
+      if (carbs <= 10) { fit += 10; add(10, `Weinig koolhydraten (${fmtNum(carbs, 0)} g per 100 g)`); }
+      else if (carbs > 30) { fit -= 20; add(-20, `Veel koolhydraten (${fmtNum(carbs, 0)} g per 100 g)`); }
+      else if (carbs > 15) { fit -= 8; add(-8, `Vrij veel koolhydraten (${fmtNum(carbs, 0)} g per 100 g)`); }
+    } else if (goal === 'keto') {
+      if (carbs <= 5) { fit += 18; add(18, `Past in keto (${fmtNum(carbs, 1)} g koolh. per 100 g)`); }
+      else if (carbs <= 10) { fit += 2; }
+      else if (carbs <= 20) { fit -= 15; add(-15, `Lastig voor keto (${fmtNum(carbs, 0)} g koolh. per 100 g)`); }
+      else { fit -= 35; add(-35, `Te veel koolhydraten voor keto (${fmtNum(carbs, 0)} g per 100 g)`); }
+    } else if (goal === 'med') {
+      if (tags.has('fish') || tags.has('shellfish')) { fit += 10; add(10, 'Vis past goed in mediterraan'); }
+      if (fresh) { fit += 8; add(8, 'Verse groente of fruit'); }
+      if (tags.has('wholegrain')) { fit += 6; add(6, 'Volkoren'); }
+      if (tags.has('beef') || tags.has('pork')) { fit -= 6; add(-6, 'Rood vlees: liever af en toe'); }
+      if (tags.has('processed') && (tags.has('meat') || tags.has('pork') || tags.has('beef'))) { fit -= 8; add(-8, 'Bewerkt vlees'); }
+    } else if (goal === 'balanced') {
+      if (fresh) { fit += 12; add(12, 'Verse groente of fruit'); }
+      if (tags.has('fish')) { fit += 6; add(6, 'Vis: Schijf van Vijf raadt 1x per week aan'); }
+      if (tags.has('wholegrain')) { fit += 6; add(6, 'Volkoren'); }
+      if (tags.has('processed') && (tags.has('meat') || tags.has('pork') || tags.has('beef'))) { fit -= 6; add(-6, 'Bewerkt vlees: Schijf van Vijf raadt dit af'); }
+    }
+    if (fiber >= 6) { fit += 6; add(6, `Vezelrijk (${fmtNum(fiber, 0)} g per 100 g)`); }
+    else if (fiber >= 3) fit += 3;
+    if (!fresh && sugar > 30) { fit -= 14; add(-14, `Veel suiker (${fmtNum(sugar, 0)} g per 100 g)`); }
+    else if (!fresh && sugar > 15) { fit -= 8; add(-8, `Vrij veel suiker (${fmtNum(sugar, 0)} g per 100 g)`); }
+    if (satfat > 8) { const p = P.goal === 'bulk' || P.goal === 'keto' ? 3 : 6; fit -= p; add(-p, `Veel verzadigd vet (${fmtNum(satfat, 0)} g per 100 g)`); }
+    if (salt > 2.5) { fit -= 9; add(-9, `Erg zout (${fmtNum(salt, 1)} g per 100 g)`); }
+    else if (salt > 1.5) { fit -= 5; add(-5, `Vrij zout (${fmtNum(salt, 1)} g per 100 g)`); }
+  }
+  if (tags.has('ultraprocessed')) { const p = P.avoidUltra ? 15 : 4; fit -= p; if (P.avoidUltra) add(-p, 'Ultrabewerkt'); }
+  else if (tags.has('processed') && P.avoidUltra) fit -= 5;
+  if (P.eat === 'vegan' && !tags.has('vegan') && !ANIMAL.some(t => tags.has(t)) && !fresh) { fit -= 10; add(-10, 'Check het etiket op dierlijke ingrediënten'); }
+  if (P.excl && P.excl.halal && (tags.has('meat') || tags.has('poultry') || tags.has('beef')) && !hits.length) add(-2, 'Check of het vlees halal is');
+  if (P.eat === 'flexi' && (tags.has('meat') || tags.has('beef') || tags.has('pork'))) { fit -= 5; }
+  fit = clamp(fit, 0, 100);
+
+  /* --- value for money --- */
+  const protPts = m.eurPerProt != null ? lerp(m.eurPerProt, [[0.8, 60], [1.5, 52], [2.5, 38], [4, 22], [6, 8], [10, 0]]) : 0;
+  const kcalPts = m.kcalPerEur != null ? lerp(m.kcalPerEur, [[50, 0], [100, 6], [250, 20], [500, 36], [900, 50], [1500, 60]]) : 0;
+  const wp = P.goal === 'cut' ? 0.9 : P.goal === 'bulk' ? 0.6 : P.goal === 'keto' || P.goal === 'lowcarb' ? 0.6 : 0.45;
+  let eff = wp * protPts + (1 - wp) * kcalPts;
+  if (fresh) eff = Math.max(eff, 40);
+  const discPts = clamp(m.discount * 80, 0, 40);
+  const value = clamp(eff + discPts, 0, 100);
+  if (m.eurPerProt != null && m.eurPerProt <= 2 && pf >= 0.4) add(10, `Goedkoop eiwit: ${fmtEur(m.eurPerProt)} per 100 g eiwit`);
+  if (m.discount >= 0.3) add(m.discount * 20, `${fmtNum(m.discount * 100)}% korting, ${fmtEur(it.priceNormal - price)} goedkoper`);
+
+  /* --- shelf life practicality --- */
+  let risk = 0;
+  const persons = Math.max(1, P.persons || 1);
+  const canFreeze = !!it.freezable && !!P.freezer;
+  if (it.expiry === 'vandaag') {
+    if (canFreeze) add(1, 'Vandaag opeten of invriezen');
+    else {
+      const share = kcalPack / ((P.kcal || 2000) * persons);
+      if (share > 0.6) { risk = 12; add(-12, 'Veel om vandaag op te krijgen'); }
+      else { risk = 3; add(-1, 'Vandaag opeten'); }
+    }
+  } else if (it.expiry === 'morgen' && !canFreeze) {
+    const share = kcalPack / ((P.kcal || 2000) * persons);
+    if (share > 1.2) { risk = 6; add(-6, 'Veel om binnen twee dagen op te eten'); }
+  }
+
+  let score = Math.round(0.55 * fit + 0.45 * value - risk);
+  let verdict;
+  if (hits.length) {
+    verdict = 'nee';
+    score = Math.min(score, 10);
+    R.unshift({ w: -100, s: `Bevat ${hits.map(t => TAG_NL[t] || t).join(', ')}: dat eet je niet` });
+  } else verdict = score >= 65 ? 'ja' : score >= 48 ? 'twijfel' : 'laten';
+  score = clamp(score, 0, 100);
+  const reasons = R.sort((a, b) => Math.abs(b.w) - Math.abs(a.w)).slice(0, 4).map(r => ({ pos: r.w > 0, neg: r.w < 0, s: r.s }));
+  return { score, verdict, fit: Math.round(fit), value: Math.round(value), risk, reasons, m };
+}
+const VERDICT_NL = { ja: 'Kopen', twijfel: 'Twijfel', laten: 'Laten liggen', nee: 'Past niet' };
+
+function itemFromFood(f, over = {}) {
+  return Object.assign({
+    id: uid(), foodId: f.id, name: f.name, cat: f.cat,
+    n: { kcal: f.kcal, protein: f.protein, carbs: f.carbs, sugar: f.sugar, fat: f.fat, satfat: f.satfat, fiber: f.fiber, salt: f.salt },
+    tags: f.tags.slice(), freezable: !!f.freezable, grams: f.pack_g, priceNormal: f.price_eur, discountPct: 35, priceNow: null,
+    expiry: 'vandaag', qty: 1, source: 'db', addedAt: Date.now(),
+  }, over);
+}
+function basketTotals(list, P) {
+  let spent = 0, saved = 0, kcal = 0, prot = 0;
+  for (const it of list) {
+    const q = it.qty || 1, now = itemPriceNow(it) || 0;
+    spent += now * q;
+    if (it.priceNormal > 0) saved += Math.max(0, it.priceNormal - now) * q;
+    if (it.n) { kcal += (+it.n.kcal || 0) * (it.grams || 0) / 100 * q; prot += (+it.n.protein || 0) * (it.grams || 0) / 100 * q; }
+  }
+  const persons = Math.max(1, P.persons || 1);
+  return { spent: round2(spent), saved: round2(saved), kcal, prot, protDays: P.protein > 0 ? prot / (P.protein * persons) : 0, kcalDays: P.kcal > 0 ? kcal / (P.kcal * persons) : 0 };
+}
+
+/* ============================================================
+   Meal ideas (rule based)
+   ============================================================ */
+function rolesOf(it) {
+  const r = new Set(); const t = new Set(it.tags || []); const c = it.cat; const id = it.foodId || ''; const nm = norm(it.name);
+  if (['vlees', 'gevogelte', 'vis', 'vega'].includes(c)) r.add('eiwit');
+  if (c === 'vis' || t.has('fish') || t.has('shellfish')) r.add('vis');
+  if (c === 'ei' || /\beieren\b|\bei\b/.test(nm)) { r.add('ei'); r.add('eiwit'); }
+  if (/gehakt|burger|hamburger|gehaktbal/.test(nm)) r.add('gehakt');
+  if (c === 'groente') r.add('groente');
+  if (/spinazie|sla|rucola|veldsla|ijsberg|andijvie/.test(nm)) r.add('blad');
+  if (c === 'fruit') r.add('fruit');
+  if (c === 'zetmeel' || /pasta|tortellini|gnocchi|noedel|rijst|aardappel|krieltjes/.test(nm)) r.add('zetmeel');
+  if (c === 'brood' || /wrap|pita|tortilla|stokbrood|bagel/.test(nm)) r.add('brood');
+  if (c === 'zuivel' && /kwark|yoghurt|skyr|kefir|vla|melk|cottage|hutten/.test(nm)) r.add('zuivel');
+  if (c === 'kaas' || /mozzarella|feta|kaas/.test(nm)) r.add('kaas');
+  if (c === 'maaltijd' || c === 'salade' || t.has('ready_meal')) r.add('maaltijd');
+  if (c === 'beleg') r.add('beleg');
+  if (/tomaat|tomaten|paprika/.test(nm)) r.add('tomaat');
+  return r;
+}
+const MEALS = [
+  { id: 'roerbak', name: 'Roerbakschotel', needs: ['eiwit', 'groente'], opt: ['zetmeel'], how: 'Snijd alles in reepjes. Bak het eiwit 4 tot 6 minuten heet aan, groente erbij voor 3 tot 4 minuten. Sojasaus, knoflook en gember erdoor.' },
+  { id: 'tray', name: 'Traybake uit de oven', needs: ['eiwit', 'groente'], how: 'Alles in stukken op een bakplaat met olie, zout en kruiden. 25 tot 30 minuten op 200 °C. Kip en gehakt moeten helemaal gaar zijn.' },
+  { id: 'vis', name: 'Vis uit de oven met groente', needs: ['vis', 'groente'], how: 'Groente 15 minuten voorroosteren op 200 °C, vis erop met citroen en olie, nog 10 tot 12 minuten.' },
+  { id: 'gehakt', name: 'Gehaktballen of burgers met groente', needs: ['gehakt'], opt: ['groente', 'brood'], how: 'Kneed gehakt met zout, peper en wat paneermeel of ei. Bak rondom bruin en daarna op laag vuur gaar (geen roze binnenkant).' },
+  { id: 'wrap', name: 'Wraps of pita', needs: ['eiwit', 'brood'], opt: ['groente', 'kaas', 'blad'], how: 'Eiwit kruidig bakken, wraps of pita kort verwarmen, vullen met rauwe groente en een saus van yoghurt of hummus.' },
+  { id: 'omelet', name: 'Omelet of frittata', needs: ['ei', 'groente'], opt: ['kaas'], how: 'Bak de groente zacht, giet losgeklopte eieren erover, kaas erop en laat op laag vuur met deksel stollen.' },
+  { id: 'shakshuka', name: 'Shakshuka', needs: ['ei', 'tomaat'], opt: ['kaas', 'brood'], how: 'Ui, paprika en tomaat met komijn en paprikapoeder inkoken, kuiltjes maken, eieren erin, deksel erop tot het eiwit gestold is.' },
+  { id: 'salade', name: 'Maaltijdsalade', needs: ['blad', 'eiwit'], opt: ['kaas', 'groente', 'brood'], how: 'Blad als basis, eiwit gebakken of koud erop, groente en kaas erbij, dressing van olie, azijn en mosterd.' },
+  { id: 'pasta', name: 'Pasta met groente', needs: ['zetmeel', 'groente'], opt: ['eiwit', 'kaas'], carb: true, how: 'Pasta koken, groente in de pan met knoflook en olie, alles mengen. Kaas of eiwit erbij voor een volledige maaltijd.' },
+  { id: 'soep', name: 'Groentesoep', needs: ['groente', 'groente'], opt: ['eiwit'], how: 'Groente fruiten, bouillon erbij, 20 minuten trekken en eventueel pureren. Soep kan ook prima de vriezer in.' },
+  { id: 'bowl', name: 'Kwark- of yoghurtbowl', needs: ['zuivel', 'fruit'], how: 'Kwark of yoghurt met fruit en eventueel havermout of noten. Snel ontbijt of toetje met veel eiwit.' },
+  { id: 'smoothie', name: 'Smoothie', needs: ['fruit'], opt: ['zuivel', 'blad'], how: 'Fruit (ook bijna overrijp) met yoghurt, melk of water blenden. Rijp fruit kun je in stukjes invriezen.' },
+  { id: 'tosti', name: 'Tosti of broodmaaltijd', needs: ['brood', 'kaas'], opt: ['beleg', 'groente'], carb: true, how: 'Brood met kaas en beleg in de tostiapparaat of koekenpan. Rauwkost erbij.' },
+  { id: 'kantklaar', name: 'Kant-en-klaar, aangevuld', needs: ['maaltijd'], opt: ['groente', 'blad'], how: 'Volg de bereiding op de verpakking en voeg een portie groente of salade toe zodat het een volwaardige maaltijd wordt.' },
+];
+function mealIdeas(items, P) {
+  const ex = exclusionsFor(P);
+  const usable = items.filter(it => !(it.tags || []).some(t => ex.has(t)));
+  const withRoles = usable.map(it => ({ it, roles: rolesOf(it) }));
+  const lowCarb = P.goal === 'keto' || P.goal === 'lowcarb';
+  const res = [];
+  for (const meal of MEALS) {
+    if (lowCarb && (meal.carb || meal.needs.includes('zetmeel') || meal.needs.includes('brood'))) continue;
+    if (P.goal === 'keto' && meal.needs.includes('fruit')) continue;
+    const used = new Set(); let ok = true;
+    for (const role of meal.needs) {
+      const cand = withRoles.filter(x => x.roles.has(role) && !used.has(x.it)).sort((a, b) => urgencyRank(a.it) - urgencyRank(b.it))[0];
+      if (!cand) { ok = false; break; }
+      used.add(cand.it);
+    }
+    if (!ok) continue;
+    for (const role of meal.opt || []) {
+      if (lowCarb && (role === 'zetmeel' || role === 'brood')) continue;
+      const cand = withRoles.filter(x => x.roles.has(role) && !used.has(x.it)).sort((a, b) => urgencyRank(a.it) - urgencyRank(b.it))[0];
+      if (cand) used.add(cand.it);
+    }
+    const list = [...used];
+    const urgent = list.filter(it => it.expiry === 'vandaag').length;
+    res.push({ meal, items: list, urgent });
+  }
+  res.sort((a, b) => b.urgent - a.urgent || b.items.length - a.items.length);
+  return res;
+}
+function urgencyRank(it) { return it.expiry === 'vandaag' ? 0 : it.expiry === 'morgen' ? 1 : 2; }
+
+/* ============================================================
+   Storage: artifact database when available, else this browser
+   ============================================================ */
+const Store = {
+  db: null, mode: 'local', pending: {}, timers: {}, chain: Promise.resolve(), loaded: false, failedWrite: false,
+  async init() {
+    let db = null;
+    if (window.claude && typeof window.claude.use === 'function') {
+      try { db = await window.claude.use('db'); } catch (e) { db = null; }
+    }
+    if (db) { this.db = db; this.mode = 'db'; }
+  },
+  localGet(key) { try { const s = localStorage.getItem('lk:' + key); return s ? JSON.parse(s) : null; } catch (e) { return null; } },
+  localSet(key, v) { try { localStorage.setItem('lk:' + key, JSON.stringify(v)); } catch (e) { /* storage may be blocked */ } },
+  async load(key) {
+    if (!this.db) return this.localGet(key);
+    const snap = await this.db.doc('app/' + key).get();
+    return snap && snap.exists ? JSON.parse(JSON.stringify(snap.data())) : null;
+  },
+  save(key, value) {
+    this.localSet(key, value);
+    if (!this.db || !this.loaded) return;
+    this.pending[key] = JSON.parse(JSON.stringify(value));
+    clearTimeout(this.timers[key]);
+    this.timers[key] = setTimeout(() => this.flush(key), 500);
+  },
+  flush(key) {
+    if (!(key in this.pending)) return;
+    const value = this.pending[key]; delete this.pending[key];
+    this.chain = this.chain.then(() => this.db.doc('app/' + key).set(value)).catch(e => this.onWriteError(e));
+    return this.chain;
+  },
+  flushAll() { for (const k of Object.keys(this.pending)) { clearTimeout(this.timers[k]); this.flush(k); } return this.chain; },
+  onWriteError(e) {
+    if (this.failedWrite) return;
+    this.failedWrite = true;
+    showLoadBanner(e && e.code === 'quota_exceeded' ? 'De opslag is vol. Verwijder oude ritten in het logboek.' : 'Opslaan in je account lukt niet; wijzigingen staan alleen op dit toestel.');
+  },
+  async listTrips() {
+    if (!this.db) return this.localGet('trips') || [];
+    const qs = await this.db.collection('trips').orderBy('date', 'desc').limit(300).get();
+    return qs.docs.map(d => Object.assign({ id: d.id }, JSON.parse(JSON.stringify(d.data()))));
+  },
+  async addTrip(trip) {
+    if (!this.db) { const all = this.localGet('trips') || []; all.unshift(trip); this.localSet('trips', all.slice(0, 300)); return; }
+    await this.db.collection('trips').doc(trip.id).set(trip);
+  },
+  async deleteTrip(id) {
+    if (!this.db) { this.localSet('trips', (this.localGet('trips') || []).filter(t => t.id !== id)); return; }
+    await this.db.collection('trips').doc(id).delete();
+  },
+};
+window.addEventListener('pagehide', () => { try { Store.flushAll(); } catch (e) { /* ignore */ } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { try { Store.flushAll(); } catch (e) { /* ignore */ } } });
+
+/* ============================================================
+   App state
+   ============================================================ */
+const S = {
+  profile: defaultProfile(),
+  session: { candidates: [], basket: [], store: null, startedAt: null },
+  trips: [],
+  tab: 'winkel',
+  editing: null,
+  form: { disc: 35, exp: 'vandaag' },
+  sample: null, sampleImages: false, sampleMax: 3,
+  adviceCtl: null, photoCtl: null,
+};
+function P() { return S.profile; }
+function saveProfile() { Store.save('profile', S.profile); }
+function saveSession() { Store.save('session', S.session); }
+
+/* ============================================================
+   Rendering: shared bits
+   ============================================================ */
+function storeById(id) { return (typeof STORES !== 'undefined' ? STORES : []).find(s => s.id === id) || null; }
+function renderStoreSelect() {
+  const sel = $('#storeSel');
+  sel.replaceChildren(h('option', { value: '' }, 'Kies je AH'), ...STORES.map(s => h('option', { value: s.id }, s.short || s.name)));
+  sel.value = S.profile.store || '';
+}
+function showLoadBanner(msg, action) {
+  const b = $('#loadBanner');
+  if (!msg) { b.hidden = true; return; }
+  b.replaceChildren(h('span', null, msg), action || '');
+  b.hidden = false;
+}
+function stickerFor(it) {
+  const price = itemPriceNow(it);
+  const pct = it.priceNormal > 0 && price != null ? Math.round((1 - price / it.priceNormal) * 100) : it.discountPct;
+  return pct > 0 ? h('div', { class: 'sticker', 'aria-label': `${pct} procent korting` }, `-${pct}%`) : null;
+}
+function itemCard(it, where) {
+  const ev = evaluate(it, S.profile);
+  const price = itemPriceNow(it);
+  const meta = [it.grams ? `${fmtNum(it.grams)} g` : null, it.expiry === 'vandaag' ? 'tot vandaag' : it.expiry === 'morgen' ? 'tot morgen' : null, CATS[it.cat] || null].filter(Boolean).join(' · ');
+  const metrics = [];
+  const n100 = it.n || {};
+  if (ev.m.eurPerProt != null) {
+    metrics.push(h('li', null, h('b', null, `${fmtNum(ev.m.protPack)} g`), ' eiwit'));
+    metrics.push(h('li', null, h('b', null, fmtEur(ev.m.eurPerProt)), ' per 100 g eiwit'));
+  }
+  if (ev.m.kcalPerEur != null && (+n100.kcal || 0) >= 150) metrics.push(h('li', null, h('b', null, fmtNum(ev.m.kcalPerEur)), ' kcal per €'));
+  if (ev.m.perKg != null) metrics.push(h('li', null, h('b', null, fmtEur(ev.m.perKg)), ' per kg'));
+  if (it.n && it.n.carbs != null && (S.profile.goal === 'keto' || S.profile.goal === 'lowcarb')) metrics.push(h('li', null, h('b', null, `${fmtNum(ev.m.carbPack)} g`), ' koolh.'));
+  const actions = [];
+  if (where === 'cand') {
+    actions.push(h('button', { class: 'btn btn-sm ' + (ev.verdict === 'ja' ? 'btn-primary' : ''), type: 'button', onclick: () => moveToBasket(it.id) }, 'In mandje'));
+    actions.push(h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => editItem(it.id, 'cand') }, 'Wijzig'));
+    actions.push(h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'aria-label': `Verwijder ${it.name}`, onclick: () => removeItem(it.id, 'cand') }, 'Weg'));
+  } else {
+    actions.push(h('div', { class: 'qty' },
+      h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Eén minder', onclick: () => changeQty(it.id, -1) }, '−'),
+      h('span', { 'aria-label': 'Aantal' }, String(it.qty || 1)),
+      h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Eén meer', onclick: () => changeQty(it.id, 1) }, '+')));
+    actions.push(h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => backToCand(it.id) }, 'Terugleggen'));
+  }
+  return h('article', { class: `item v-${ev.verdict}` },
+    h('div', { class: 'item-top' },
+      h('div', { style: 'min-width:0' },
+        h('div', { class: 'item-name' }, it.name, it.example ? h('span', { class: 'chip ex', style: 'margin-left:6px;vertical-align:2px' }, 'Voorbeeld') : null),
+        h('div', { class: 'item-meta' }, meta)),
+      h('div', { class: 'price' },
+        it.priceNormal > 0 && price != null && price < it.priceNormal ? h('s', null, fmtEur(it.priceNormal)) : null,
+        h('b', null, fmtEur(price)),
+        stickerFor(it))),
+    h('div', { class: 'verdict-row' },
+      h('span', { class: `chip ${ev.verdict}` }, VERDICT_NL[ev.verdict]),
+      h('div', { class: 'scorebar', role: 'img', 'aria-label': `Score ${ev.score} van 100` }, h('i', { style: `width:${ev.score}%` })),
+      h('span', { class: 'score' }, `${ev.score}/100`)),
+    metrics.length ? h('ul', { class: 'metrics' }, metrics) : null,
+    ev.reasons.length ? h('ul', { class: 'reasons' }, ev.reasons.map(r => h('li', { class: r.pos ? 'pos' : r.neg ? 'neg' : '' }, r.s))) : null,
+    h('div', { class: 'item-actions' }, actions));
+}
+
+/* ============================================================
+   Winkel view
+   ============================================================ */
+function renderSummary() {
+  const t = basketTotals(S.session.basket, S.profile);
+  const budget = S.profile.budget > 0 ? S.profile.budget : null;
+  const cell = (k, v) => h('div', null, h('div', { class: 'k' }, k), h('div', { class: 'v' }, v));
+  const kids = [
+    cell('Mandje', fmtEur(t.spent)),
+    cell('Bespaard', fmtEur(t.saved)),
+    cell('Eiwit', `${fmtNum(t.prot)} g`),
+    cell('Eiwit-dagen', fmtNum(t.protDays, 1)),
+  ];
+  if (budget) {
+    const pct = clamp(t.spent / budget * 100, 0, 100);
+    kids.push(h('div', { class: 'budget-bar', role: 'img', 'aria-label': `${fmtNum(pct)}% van je weekbudget` }, h('i', { style: `width:${pct}%` })));
+    kids.push(h('div', { class: 'note' }, `${fmtEur(Math.max(0, budget - t.spent))} over van je weekbudget van ${fmtEur(budget)}${S.profile.persons > 1 ? `, voor ${S.profile.persons} personen` : ''}`));
+  }
+  $('#summary').replaceChildren(...kids);
+}
+function renderCandidates() {
+  const list = S.session.candidates.slice().sort((a, b) => evaluate(b, S.profile).score - evaluate(a, S.profile).score);
+  $('#candCount').textContent = list.length ? `${list.length} product${list.length === 1 ? '' : 'en'}` : '';
+  if (!list.length) {
+    $('#candList').replaceChildren(h('div', { class: 'empty' },
+      h('strong', null, 'Nog niks gevonden'),
+      h('span', null, 'Loop langs vlees, vis, zuivel, brood en groente en zoek naar stickers met "35% korting". Voeg toe wat je ziet: de app zegt meteen of het past bij je dieet en of het een goede deal is.'),
+      h('div', { class: 'btn-row' }, h('button', { class: 'btn btn-sm', type: 'button', onclick: addExamples }, 'Laat voorbeelden zien'))));
+    return;
+  }
+  const kids = list.map(it => itemCard(it, 'cand'));
+  if (list.some(it => it.example)) kids.push(h('div', { class: 'btn-row' }, h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: clearExamples }, 'Wis voorbeelden')));
+  $('#candList').replaceChildren(...kids);
+}
+function renderBasket() {
+  const list = S.session.basket;
+  const n = list.reduce((a, it) => a + (it.qty || 1), 0);
+  $('#basketCount').textContent = n ? `${n} stuk${n === 1 ? '' : 's'}` : '';
+  const badge = $('#badgeBasket'); badge.hidden = !n; badge.textContent = String(n);
+  $('#finishRow').hidden = !list.length;
+  if (!list.length) {
+    $('#basketList').replaceChildren(h('div', { class: 'empty' }, h('strong', null, 'Je mandje is leeg'), h('span', null, 'Tik bij een gevonden product op "In mandje". Je ziet dan wat je uitgeeft, bespaart en hoeveel dagen eiwit je binnenhaalt.')));
+    return;
+  }
+  $('#basketList').replaceChildren(...list.map(it => itemCard(it, 'basket')));
+}
+function renderWinkel() {
+  $('#dietBanner').hidden = !!S.profile.setAt;
+  renderSummary(); renderCandidates(); renderBasket();
+}
+function moveToBasket(id) {
+  const i = S.session.candidates.findIndex(x => x.id === id); if (i < 0) return;
+  const [it] = S.session.candidates.splice(i, 1);
+  const same = S.session.basket.find(b => b.foodId && b.foodId === it.foodId && b.name === it.name && itemPriceNow(b) === itemPriceNow(it) && b.grams === it.grams && b.expiry === it.expiry);
+  if (same) same.qty = (same.qty || 1) + (it.qty || 1); else S.session.basket.push(it);
+  if (!S.session.startedAt) S.session.startedAt = Date.now();
+  saveSession(); renderWinkel(); toast(`${it.name} in je mandje`);
+}
+function backToCand(id) {
+  const i = S.session.basket.findIndex(x => x.id === id); if (i < 0) return;
+  const [it] = S.session.basket.splice(i, 1); it.qty = 1; S.session.candidates.unshift(it);
+  saveSession(); renderWinkel();
+}
+function changeQty(id, d) {
+  const it = S.session.basket.find(x => x.id === id); if (!it) return;
+  it.qty = (it.qty || 1) + d;
+  if (it.qty <= 0) S.session.basket = S.session.basket.filter(x => x.id !== id);
+  saveSession(); renderWinkel();
+}
+function removeItem(id, where) {
+  if (where === 'cand') S.session.candidates = S.session.candidates.filter(x => x.id !== id);
+  saveSession(); renderWinkel();
+}
+function addExamples() {
+  const picks = [['kipfilet', 35, 'vandaag'], ['magere_kwark', 35, 'vandaag'], ['croissant', 50, 'vandaag'], ['spinazie', 35, 'vandaag'], ['zalmfilet', 35, 'morgen']];
+  for (const [id, pct, exp] of picks) {
+    const f = FOOD.find(x => x.id === id) || matchFood(id.replace(/_/g, ' '), 1)[0]?.f;
+    if (f) S.session.candidates.push(itemFromFood(f, { discountPct: pct, expiry: exp, example: true }));
+  }
+  saveSession(); renderWinkel();
+}
+function clearExamples() {
+  S.session.candidates = S.session.candidates.filter(x => !x.example);
+  S.session.basket = S.session.basket.filter(x => !x.example);
+  saveSession(); renderWinkel();
+}
+
+/* --- search + add form --- */
+function renderSuggest() {
+  const q = $('#q').value;
+  const ul = $('#suggest');
+  if (!q.trim()) { ul.hidden = true; ul.replaceChildren(); return; }
+  const pq = parseQuick(q);
+  const matches = matchFood(pq.name || q, 6);
+  const lis = matches.map(({ f }) => h('li', null, h('button', { type: 'button', onclick: () => openForm({ food: f, quick: pq }) },
+    h('span', null, f.name), h('span', { class: 'cat' }, `${CATS[f.cat] || ''} · ${fmtNum(f.pack_g)} g`))));
+  if (pq.name) lis.push(h('li', null, h('button', { type: 'button', onclick: () => openForm({ food: null, quick: pq }) },
+    h('span', null, `"${pq.name}" als nieuw product`), h('span', { class: 'cat' }, 'zelf invullen'))));
+  ul.replaceChildren(...lis);
+  ul.hidden = !lis.length;
+}
+function setSeg(sel, v) { $$(sel + ' button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(v)))); }
+function openForm({ food, quick, item, where }) {
+  const f = $('#addForm');
+  S.editing = item ? { id: item.id, where, food: item.foodId ? FOOD.find(x => x.id === item.foodId) || null : null, base: item } : { id: null, where: 'cand', food, base: null };
+  const base = item || (food ? itemFromFood(food) : { name: quick?.name || '', grams: null, priceNormal: null, discountPct: 35, expiry: 'vandaag', n: null, tags: [], cat: 'overig', freezable: false });
+  $('#fName').value = base.name || '';
+  $('#fGrams').value = quick?.grams ?? base.grams ?? '';
+  const pn = quick?.price ?? base.priceNormal;
+  $('#fPrice').value = pn != null ? String(pn).replace('.', ',') : '';
+  $('#fNow').value = quick?.now != null ? String(quick.now).replace('.', ',') : (item && item.priceNow != null ? String(item.priceNow).replace('.', ',') : '');
+  S.form.disc = quick?.pct ?? (item ? item.discountPct : 35);
+  if (quick?.now != null && quick?.pct == null) S.form.disc = null;
+  S.form.exp = base.expiry || 'vandaag';
+  setSeg('#fDisc', S.form.disc); setSeg('#fExp', S.form.exp);
+  const n = base.n || {};
+  $('#nKcal').value = n.kcal ?? ''; $('#nProt').value = n.protein ?? ''; $('#nCarb').value = n.carbs ?? ''; $('#nFat').value = n.fat ?? '';
+  const known = !!(base.n && (base.n.kcal || base.n.protein));
+  $('#nutriBox').open = !known;
+  $('#matchNote').textContent = food || (item && item.foodId) ? `Voedingswaarde uit de tabel (${(food || S.editing.food || {}).name || base.name}, NEVO of etiket). Pas aan als jouw product afwijkt.` : item && item.source === 'claude' ? 'Voedingswaarde geschat door Claude. Check het etiket als je twijfelt.' : 'Onbekend product. Vul de voedingswaarde van het etiket in, of laat Claude schatten.';
+  $('#estimateBtn').hidden = !S.sample;
+  $('#estimateStatus').textContent = '';
+  f.hidden = false; $('#addHint').hidden = true; $('#suggest').hidden = true;
+  $('#fPrice').focus({ preventScroll: true });
+  f.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+function closeForm() { $('#addForm').hidden = true; $('#addHint').hidden = false; S.editing = null; $('#q').value = ''; renderSuggest(); }
+function readForm() {
+  const ed = S.editing; const base = ed.base || (ed.food ? itemFromFood(ed.food) : null);
+  const num = id => { const v = parseNum($(id).value); return v == null ? null : v; };
+  const n = { ...(base && base.n ? base.n : {}) };
+  const nk = num('#nKcal'), np = num('#nProt'), nc = num('#nCarb'), nf = num('#nFat');
+  if (nk != null) n.kcal = nk; if (np != null) n.protein = np; if (nc != null) n.carbs = nc; if (nf != null) n.fat = nf;
+  const hasN = n.kcal != null || n.protein != null;
+  const priceNormal = num('#fPrice');
+  const now = num('#fNow');
+  const it = Object.assign({}, base || { id: uid(), foodId: null, cat: 'overig', tags: [], freezable: false, source: 'manual', qty: 1, addedAt: Date.now() }, {
+    name: $('#fName').value.trim() || (base && base.name) || 'Product',
+    grams: num('#fGrams'),
+    priceNormal,
+    discountPct: now != null ? (priceNormal > 0 ? Math.round((1 - now / priceNormal) * 100) : null) : (S.form.disc ?? 0),
+    priceNow: now != null ? now : null,
+    expiry: S.form.exp,
+    n: hasN ? n : null,
+  });
+  if (!ed.id) it.id = uid();
+  if (it.example) delete it.example;
+  return it;
+}
+function submitForm(e) {
+  e.preventDefault();
+  const it = readForm();
+  if (itemPriceNow(it) == null) { toast('Vul een prijs in'); $('#fPrice').focus(); return; }
+  const ed = S.editing;
+  if (ed.id) {
+    const arr = ed.where === 'basket' ? S.session.basket : S.session.candidates;
+    const i = arr.findIndex(x => x.id === ed.id);
+    if (i >= 0) arr[i] = Object.assign(it, { id: ed.id, qty: arr[i].qty });
+  } else S.session.candidates.unshift(it);
+  saveSession(); closeForm(); renderWinkel();
+  const ev = evaluate(it, S.profile);
+  toast(`${it.name}: ${VERDICT_NL[ev.verdict]}`);
+}
+function editItem(id, where) {
+  const arr = where === 'basket' ? S.session.basket : S.session.candidates;
+  const it = arr.find(x => x.id === id); if (it) openForm({ item: it, where });
+}
+function finishTrip() {
+  const conf = $('#finishConfirm');
+  const t = basketTotals(S.session.basket, S.profile);
+  conf.replaceChildren(
+    h('span', null, `Rit opslaan: ${fmtEur(t.spent)} uitgegeven, ${fmtEur(t.saved)} bespaard. Daarna wordt je mandje leeggemaakt.`),
+    h('div', { class: 'btn-row' },
+      h('button', { class: 'btn btn-sm btn-primary', type: 'button', onclick: confirmFinish }, 'Opslaan'),
+      h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { conf.hidden = true; } }, 'Nog niet')));
+  conf.hidden = false;
+}
+async function confirmFinish() {
+  const t = basketTotals(S.session.basket, S.profile);
+  const store = storeById(S.profile.store);
+  const trip = {
+    id: 't' + uid(), date: todayISO(), ts: Date.now(), store: store ? (store.short || store.name) : '', storeId: S.profile.store || null,
+    spent: t.spent, saved: t.saved, prot: Math.round(t.prot), kcal: Math.round(t.kcal),
+    items: S.session.basket.map(it => ({ name: it.name, qty: it.qty || 1, price: itemPriceNow(it), normal: it.priceNormal ?? null, grams: it.grams ?? null })),
+  };
+  try { await Store.addTrip(trip); }
+  catch (e) { toast('Opslaan van de rit lukte niet. Probeer het zo nog eens.'); return; }
+  S.trips.unshift(trip);
+  S.session.basket = []; S.session.candidates = S.session.candidates.filter(x => !x.example); S.session.startedAt = null;
+  saveSession();
+  $('#finishConfirm').hidden = true;
+  renderWinkel(); renderLogboek();
+  toast(`Opgeslagen. Je bespaarde ${fmtEur(trip.saved)}.`);
+}
+
+/* ============================================================
+   Koken view
+   ============================================================ */
+function renderKoken() {
+  const items = S.session.basket.length ? S.session.basket : S.session.candidates;
+  const urg = $('#urgCard');
+  const groups = [
+    ['Vandaag opeten of invriezen', items.filter(it => it.expiry === 'vandaag')],
+    ['Morgen op', items.filter(it => it.expiry === 'morgen')],
+    ['Kan nog even', items.filter(it => it.expiry !== 'vandaag' && it.expiry !== 'morgen')],
+  ].filter(g => g[1].length);
+  if (!items.length) {
+    urg.replaceChildren(h('h3', null, 'Eerst op'), h('div', { class: 'empty' }, h('strong', null, 'Nog geen buit'), h('span', null, 'Voeg in de winkel producten toe. Hier zie je daarna wat vandaag op of de vriezer in moet, en wat je ermee kookt.')));
+  } else {
+    urg.replaceChildren(h('h3', null, S.session.basket.length ? 'Eerst op (uit je mandje)' : 'Eerst op (gevonden, nog niet in mandje)'),
+      ...groups.map(([title, list]) => h('div', { class: 'urg-group' }, h('h3', { class: 'muted' }, title),
+        ...list.map(it => h('div', { class: 'urg-row' }, h('span', null, it.name, it.qty > 1 ? ` ×${it.qty}` : ''),
+          h('span', { class: 'muted small' }, it.expiry === 'vandaag' ? (it.freezable && S.profile.freezer ? 'invriezen kan' : 'vandaag op') : it.freezable ? 'kan de vriezer in' : ''))))));
+  }
+  const ideas = mealIdeas(items, S.profile);
+  $('#mealCount').textContent = ideas.length ? `${ideas.length}` : '';
+  if (!ideas.length) {
+    $('#mealList').replaceChildren(h('div', { class: 'empty' }, h('strong', null, 'Nog geen ideeën'), h('span', null, 'Ideeën verschijnen zodra je bijvoorbeeld een eiwitbron en een groente hebt gevonden.')));
+  } else {
+    const lowCarb = S.profile.goal === 'keto' || S.profile.goal === 'lowcarb';
+    $('#mealList').replaceChildren(...ideas.slice(0, 8).map(({ meal, items: used }) => h('div', { class: 'card meal' },
+      h('h3', null, meal.name),
+      h('div', { class: 'uses' }, used.map(it => h('span', { class: it.expiry === 'vandaag' ? 'u' : '' }, it.name))),
+      h('p', { class: 'small' }, meal.how + (lowCarb && (meal.opt || []).includes('zetmeel') ? ' Laat rijst of pasta weg of neem bloemkoolrijst.' : '')))));
+  }
+  $('#aiCard').hidden = !S.sample;
+}
+function renderAdvice(text) {
+  const out = $('#adviceOut');
+  const kids = []; let ul = null;
+  for (const raw of String(text).split('\n')) {
+    const line = raw.trim();
+    if (!line) { ul = null; continue; }
+    const bullet = line.match(/^[-*•]\s+(.*)$/) || line.match(/^\d+[.)]\s+(.*)$/);
+    const head = line.match(/^#{1,4}\s+(.*)$/);
+    if (head) { ul = null; kids.push(h('h4', null, stripMd(head[1]))); }
+    else if (bullet) { if (!ul) { ul = h('ul'); kids.push(ul); } ul.append(inlineMd(bullet[1])); }
+    else { ul = null; kids.push(inlineMd(line, 'p')); }
+  }
+  out.replaceChildren(...kids);
+}
+function stripMd(s) { return s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/__(.+?)__/g, '$1'); }
+function inlineMd(s, tag = 'li') {
+  const el = h(tag);
+  const parts = s.split(/(\*\*[^*]+\*\*)/g);
+  for (const p of parts) {
+    if (/^\*\*[^*]+\*\*$/.test(p)) el.append(h('strong', null, p.slice(2, -2)));
+    else if (p) el.append(document.createTextNode(p.replace(/\*([^*]+)\*/g, '$1')));
+  }
+  return el;
+}
+
+/* ============================================================
+   Logboek view
+   ============================================================ */
+function renderLogboek() {
+  const trips = S.trips;
+  const month = todayISO().slice(0, 7);
+  const tm = trips.filter(t => (t.date || '').startsWith(month));
+  const sum = (arr, k) => arr.reduce((a, t) => a + (+t[k] || 0), 0);
+  const kpi = (k, v) => h('div', { class: 'kpi' }, h('div', { class: 'k' }, k), h('div', { class: 'v' }, v));
+  $('#tripKpis').replaceChildren(kpi('Bespaard deze maand', fmtEur(sum(tm, 'saved'))), kpi('Uitgegeven', fmtEur(sum(tm, 'spent'))), kpi('Ritten', String(tm.length)));
+  if (!trips.length) {
+    $('#tripList').replaceChildren(h('div', { class: 'empty' }, h('strong', null, 'Nog geen ritten'), h('span', null, 'Rond een boodschappenronde af in het tabblad Winkel. Dan zie je hier per rit wat je kocht en bespaarde, en je totaal per maand.')));
+    return;
+  }
+  $('#tripList').replaceChildren(...trips.slice(0, 60).map(t => {
+    const del = h('button', { class: 'btn btn-sm btn-ghost', type: 'button' }, 'Verwijder');
+    del.addEventListener('click', async () => {
+      if (del.dataset.armed !== '1') { del.dataset.armed = '1'; del.textContent = 'Zeker weten?'; setTimeout(() => { del.dataset.armed = ''; del.textContent = 'Verwijder'; }, 3000); return; }
+      try { await Store.deleteTrip(t.id); S.trips = S.trips.filter(x => x.id !== t.id); renderLogboek(); }
+      catch (e) { toast('Verwijderen lukte niet'); }
+    });
+    return h('div', { class: 'card' },
+      h('div', { class: 'trip' },
+        h('div', null, h('div', { style: 'font-weight:700' }, new Date(t.ts || t.date).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' }), t.store ? ` · ${t.store}` : ''),
+          h('div', { class: 'small muted' }, `${(t.items || []).reduce((a, i) => a + (i.qty || 1), 0)} producten · ${fmtNum(t.prot)} g eiwit`)),
+        h('div', { style: 'text-align:right' }, h('div', { class: 'num', style: 'font-weight:600' }, fmtEur(t.spent)), h('div', { class: 'small', style: 'color:var(--good);font-weight:600' }, `${fmtEur(t.saved)} bespaard`))),
+      h('details', null, h('summary', null, 'Wat je kocht'),
+        h('ul', { class: 'tips small' }, (t.items || []).map(i => h('li', null, `${i.qty > 1 ? i.qty + '× ' : ''}${i.name}: ${fmtEur(i.price)}${i.normal ? ` (was ${fmtEur(i.normal)})` : ''}`)))),
+      h('div', { class: 'btn-row' }, del));
+  }));
+}
+
+/* ============================================================
+   Dieet view
+   ============================================================ */
+function renderDieet() {
+  const p = S.profile;
+  $('#dGoal').replaceChildren(...Object.entries(GOALS).map(([k, g]) => h('button', { type: 'button', 'data-v': k, 'aria-pressed': String(p.goal === k), onclick: () => { applyGoal(k); } }, g.label)));
+  $('#dGoalDesc').textContent = (GOALS[p.goal] || GOALS.balanced).desc;
+  $('#dEat').replaceChildren(...Object.entries(EATS).map(([k, e]) => h('button', { type: 'button', 'data-v': k, 'aria-pressed': String(p.eat === k), onclick: () => { p.eat = k; renderDieet(); } }, e.label)));
+  $('#dExcl').replaceChildren(...EXCL.map(([k, label]) => h('label', { class: 'check' }, h('input', { type: 'checkbox', id: 'x-' + k, checked: !!(p.excl || {})[k], onchange: e => { p.excl = { ...(p.excl || {}), [k]: e.target.checked }; } }), label)));
+  $('#dUltra').checked = !!p.avoidUltra;
+  $('#dKcal').value = p.kcal ?? ''; $('#dProt').value = p.protein ?? ''; $('#dCarb').value = p.carbsMax ?? '';
+  $('#dWeight').value = p.weight ?? ''; $('#dPersons').value = p.persons ?? 1; $('#dBudget').value = p.budget ?? '';
+  $('#dFreezer').checked = !!p.freezer; $('#dNotes').value = p.notes || '';
+}
+function applyGoal(k) {
+  const p = S.profile, g = GOALS[k];
+  p.goal = k;
+  p.kcal = g.kcal; p.carbsMax = g.carbsMax;
+  const w = parseNum($('#dWeight').value);
+  p.protein = w ? proteinFor(k, w) : g.protein;
+  renderDieet();
+}
+function proteinFor(goal, w) { const f = goal === 'cut' ? 2.0 : goal === 'bulk' ? 1.8 : goal === 'keto' || goal === 'lowcarb' ? 1.4 : 1.0; return Math.round(w * f); }
+function submitDiet(e) {
+  e.preventDefault();
+  const p = S.profile;
+  const num = id => parseNum($(id).value);
+  p.kcal = clamp(num('#dKcal') || GOALS[p.goal].kcal, 800, 6000);
+  p.protein = clamp(num('#dProt') || GOALS[p.goal].protein, 20, 400);
+  const c = num('#dCarb'); p.carbsMax = c == null ? null : clamp(c, 0, 800);
+  p.weight = num('#dWeight');
+  p.persons = clamp(Math.round(num('#dPersons') || 1), 1, 10);
+  const b = num('#dBudget'); p.budget = b == null ? null : Math.max(0, b);
+  p.avoidUltra = $('#dUltra').checked; p.freezer = $('#dFreezer').checked;
+  p.notes = $('#dNotes').value.slice(0, 2000);
+  p.setAt = Date.now();
+  saveProfile(); renderAll();
+  $('#dietSaved').textContent = 'Opgeslagen. Alle producten zijn opnieuw beoordeeld.';
+  setTimeout(() => { $('#dietSaved').textContent = ''; }, 3500);
+}
+
+/* ============================================================
+   Info view
+   ============================================================ */
+function renderInfo() {
+  const T = typeof TIPS !== 'undefined' ? TIPS : { when: [], stickers: [], sources: [] };
+  $('#tipCard').replaceChildren(h('h3', null, 'Zo werkt afprijzen bij AH'),
+    h('ul', { class: 'tips' }, (T.stickers || []).map(s => h('li', null, s))),
+    h('h3', null, 'Wanneer je de meeste kans hebt'),
+    h('ul', { class: 'tips' }, (T.when || []).map(s => h('li', null, s))),
+    T.digital && T.digital.length ? h('h3', null, 'Digitaal') : null,
+    T.digital && T.digital.length ? h('ul', { class: 'tips' }, T.digital.map(s => h('li', null, s))) : null);
+  const cur = S.profile.store;
+  $('#storeCard').replaceChildren(h('h3', null, `Albert Heijn in Groningen (${STORES.length})`),
+    h('div', null, STORES.map(s => h('div', { class: 'store' + (s.id === cur ? ' on' : '') },
+      h('div', { style: 'min-width:0' }, h('div', { class: 'nm' }, s.name), h('div', { class: 'ad' }, `${s.street}, ${s.postcode} ${s.city || 'Groningen'}${s.area ? ` · ${s.area}` : ''}`),
+        s.hours ? h('div', { class: 'ad' }, `Open: ${s.hours}`) : null,
+        s.note ? h('div', { class: 'ad' }, s.note) : null,
+        s.url ? h('a', { class: 'ad', href: s.url, target: '_blank', rel: 'noopener' }, 'Actuele tijden op ah.nl') : null),
+      h('div', { class: 'btn-row', style: 'flex:none' },
+        h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { S.profile.store = s.id; saveProfile(); renderStoreSelect(); renderInfo(); toast(`${s.short || s.name} is je winkel`); } }, s.id === cur ? 'Gekozen' : 'Kies'),
+        h('a', { class: 'btn btn-sm btn-ghost', href: mapsUrl(s), target: '_blank', rel: 'noopener' }, 'Route'))))),
+    h('p', { class: 'small muted' }, 'Openingstijden kunnen afwijken op feestdagen. Check ah.nl/winkels voor de actuele tijden.'));
+  const SF = typeof SAFETY !== 'undefined' ? SAFETY : { rules: [], freeze: [] };
+  $('#safetyCard').replaceChildren(h('h3', null, 'Veilig omgaan met laatste-kans-producten'),
+    h('ul', { class: 'tips' }, SF.rules.map(r => h('li', null, r))),
+    SF.freeze.length ? h('div', { class: 'table-wrap' }, h('table', null,
+      h('thead', null, h('tr', null, h('th', null, 'Product'), h('th', null, 'Vriezer'), h('th', null, 'Na ontdooien'))),
+      h('tbody', null, SF.freeze.map(r => h('tr', null, h('td', null, r.cat), h('td', null, r.months), h('td', null, r.after)))))) : null);
+  $('#aboutCard').replaceChildren(h('h3', null, 'Over deze app'),
+    h('p', { class: 'small' }, 'Albert Heijn publiceert geen lijst met afgeprijsde producten per winkel. Deze app werkt daarom met wat jij in de winkel ziet: typ het in of maak een foto. De beoordeling gebeurt op je toestel met voedingswaarden uit een tabel (NEVO en etiketten). Prijzen in de tabel zijn richtprijzen; de prijs op de sticker telt.'),
+    h('p', { class: 'small muted' }, `Opslag: ${Store.mode === 'db' ? 'in je Claude-account (alleen jij ziet het)' : 'alleen in deze browser'}. Claude: ${S.sample ? 'beschikbaar voor foto’s en plannen' : 'niet beschikbaar in deze weergave'}.`),
+    h('p', { class: 'small muted' }, 'Geen officiële app van Albert Heijn.'),
+    (T.sources || []).length ? h('details', null, h('summary', null, 'Bronnen'), h('ul', { class: 'tips small' }, T.sources.map(u => h('li', null, h('a', { href: u, target: '_blank', rel: 'noopener' }, u.replace(/^https?:\/\//, '')))))) : null);
+}
+function mapsUrl(s) {
+  const q = encodeURIComponent(`Albert Heijn ${s.street}, ${s.postcode} ${s.city || 'Groningen'}`);
+  return `https://maps.apple.com/?q=${q}`;
+}
+
+/* ============================================================
+   Claude features (optional)
+   ============================================================ */
+async function initSample() {
+  if (!(window.claude && typeof window.claude.use === 'function')) return;
+  let s = null;
+  try { s = await window.claude.use('sample'); } catch (e) { s = null; }
+  if (!s) return;
+  S.sample = s;
+  try { const lim = await s.limits(); S.sampleImages = !!(lim && lim.images); S.sampleMax = lim && lim.images ? lim.images.maxCount : 0; } catch (e) { S.sampleImages = false; }
+  $('#photoRow').hidden = !S.sampleImages;
+  $('#estimateBtn').hidden = $('#addForm').hidden;
+  renderKoken(); renderInfo();
+}
+function disableSample(code) {
+  if (['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'].includes(code)) {
+    S.sample = null; $('#photoRow').hidden = true; $('#aiCard').hidden = true; $('#estimateBtn').hidden = true;
+  }
+}
+function sampleErrorText(e) {
+  const c = e && e.code;
+  return c === 'rate_limited' ? 'Claude is even druk of je limiet is bereikt. Probeer het later opnieuw.'
+    : c === 'not_granted' ? 'Je hebt Claude niet toegestaan voor deze app. Je kunt alles nog handmatig doen.'
+    : c === 'session_expired' ? 'Log opnieuw in bij Claude en probeer het nog eens.'
+    : c === 'image_rejected' ? 'Deze foto werd niet geaccepteerd. Probeer een andere foto (JPEG of PNG).'
+    : c === 'invalid_json' ? 'Het antwoord was niet goed leesbaar. Probeer het nog een keer.'
+    : c === 'refused' ? 'Claude kon deze foto niet verwerken. Probeer een andere foto.'
+    : c === 'cancelled' ? 'Gestopt.'
+    : 'Er ging iets mis bij Claude. Probeer het opnieuw.';
+}
+function profileText() {
+  const p = S.profile; const g = GOALS[p.goal] || GOALS.balanced;
+  const ex = [...exclusionsFor(p)].map(t => TAG_NL[t] || t);
+  return [
+    `Doel: ${g.label} (${g.desc})`,
+    `Eetwijze: ${EATS[p.eat]?.label || 'Alles'}${ex.length ? `; eet geen: ${ex.join(', ')}` : ''}${p.excl?.halal ? '; alleen halal vlees' : ''}`,
+    `Per persoon per dag: ${p.kcal} kcal, ${p.protein} g eiwit${p.carbsMax != null ? `, max ${p.carbsMax} g koolhydraten` : ''}`,
+    `Personen: ${p.persons}; budget per week: ${p.budget != null ? '€' + p.budget : 'onbekend'}; vriezer: ${p.freezer ? 'ja' : 'nee'}; ${p.avoidUltra ? 'vermijdt ultrabewerkt' : ''}`,
+    p.notes ? `Eigen woorden: ${p.notes}` : '',
+  ].filter(Boolean).join('\n');
+}
+async function toJpeg(file, maxSide = 2000) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const sc = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * sc); c.height = Math.round(bmp.height * sc);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    if (bmp.close) bmp.close();
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.86));
+    return blob || file;
+  } catch (e) { return file; }
+}
+const PHOTO_PROMPT = () => `Je krijgt een of meer foto's uit een Albert Heijn-supermarkt. Zoek ALLE producten met een kortingssticker voor bijna verlopen producten (bijvoorbeeld "35% korting", "50%", een rode/oranje afprijssticker) of met een duidelijk afgeprijsde prijs.
+
+Geef per product:
+- name: korte Nederlandse productnaam zoals op het etiket (zonder merk "AH" ervoor)
+- grams: netto gewicht in gram of ml als getal, of null
+- priceNormal: de normale prijs in euro (getal), of null als je die niet kunt lezen
+- priceNow: de nieuwe prijs op de sticker in euro, of null
+- discountPct: het kortingspercentage op de sticker (getal 0-100), of null
+- expiry: houdbaarheidsdatum als "YYYY-MM-DD" als die leesbaar is, anders null
+- cat: precies een van ${Object.keys(CATS).join(', ')}
+- per100: geschatte voedingswaarde per 100 g: {"kcal","protein","carbs","sugar","fat","satfat","fiber","salt"} in getallen. Lees het etiket als dat zichtbaar is, anders schat je op basis van NEVO-waarden voor dit type product.
+- tags: lijst uit ${ALLOWED_TAGS.join(', ')} die van toepassing zijn
+- freezable: true als je dit product op de laatste dag kunt invriezen
+- confidence: "hoog", "middel" of "laag" voor hoe zeker je de prijs en naam hebt gelezen
+
+Verzin geen prijzen: liever null. Vandaag is ${todayISO()}.
+Antwoord met alleen JSON in deze vorm: {"items":[{"name":"Kipfilet","grams":500,"priceNormal":6.49,"priceNow":4.22,"discountPct":35,"expiry":"${todayISO()}","cat":"gevogelte","per100":{"kcal":110,"protein":24,"carbs":0,"sugar":0,"fat":1.5,"satfat":0.4,"fiber":0,"salt":0.15},"tags":["meat","poultry"],"freezable":true,"confidence":"hoog"}]}`;
+function expiryFromDate(d) {
+  if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return 'vandaag';
+  const t = todayISO();
+  if (d <= t) return 'vandaag';
+  const tm = new Date(); tm.setDate(tm.getDate() + 1);
+  const tmISO = `${tm.getFullYear()}-${String(tm.getMonth() + 1).padStart(2, '0')}-${String(tm.getDate()).padStart(2, '0')}`;
+  return d === tmISO ? 'morgen' : 'later';
+}
+function itemFromClaude(x) {
+  const name = String(x.name || 'Product').slice(0, 80);
+  const match = matchFood(name, 1)[0];
+  const cat = CATS[x.cat] ? x.cat : (match ? match.f.cat : 'overig');
+  const tags = Array.isArray(x.tags) ? x.tags.filter(t => ALLOWED_TAGS.includes(t)) : (match ? match.f.tags.slice() : []);
+  const p100 = x.per100 && typeof x.per100 === 'object' ? x.per100 : null;
+  const n = p100 && (parseNum(p100.kcal) != null || parseNum(p100.protein) != null)
+    ? { kcal: parseNum(p100.kcal) ?? 0, protein: parseNum(p100.protein) ?? 0, carbs: parseNum(p100.carbs) ?? 0, sugar: parseNum(p100.sugar) ?? 0, fat: parseNum(p100.fat) ?? 0, satfat: parseNum(p100.satfat) ?? 0, fiber: parseNum(p100.fiber) ?? 0, salt: parseNum(p100.salt) ?? 0 }
+    : match ? itemFromFood(match.f).n : null;
+  const pn = parseNum(x.priceNormal), pnow = parseNum(x.priceNow), pct = parseNum(x.discountPct);
+  return {
+    id: uid(), foodId: match && match.s >= 70 ? match.f.id : null, name, cat, n, tags,
+    freezable: typeof x.freezable === 'boolean' ? x.freezable : !!(match && match.f.freezable),
+    grams: parseNum(x.grams) ?? (match ? match.f.pack_g : null),
+    priceNormal: pn ?? (pnow != null && pct ? round2(pnow / (1 - pct / 100)) : null),
+    priceNow: pnow, discountPct: pct ?? (pn && pnow ? Math.round((1 - pnow / pn) * 100) : 35),
+    expiry: expiryFromDate(x.expiry), qty: 1, source: 'claude', confidence: x.confidence || null, addedAt: Date.now(),
+  };
+}
+async function onPhoto(e) {
+  const files = Array.from(e.target.files || []).slice(0, Math.max(1, S.sampleMax || 1));
+  e.target.value = '';
+  if (!files.length || !S.sample) return;
+  const st = $('#photoStatus');
+  S.photoCtl = new AbortController();
+  const stop = h('button', { class: 'btn btn-sm', type: 'button', onclick: () => S.photoCtl && S.photoCtl.abort() }, 'Stop');
+  st.replaceChildren(h('span', null, `Foto${files.length > 1 ? "'s" : ''} lezen… dit duurt meestal 10 tot 40 seconden. `), stop);
+  try {
+    const imgs = await Promise.all(files.map(f => toJpeg(f)));
+    const res = await S.sample.json(PHOTO_PROMPT(), { images: imgs, signal: S.photoCtl.signal, cache: false });
+    const arr = Array.isArray(res) ? res : (res && Array.isArray(res.items) ? res.items : []);
+    const items = arr.filter(x => x && typeof x === 'object' && x.name).slice(0, 40).map(itemFromClaude).filter(it => itemPriceNow(it) != null || it.name);
+    if (!items.length) { st.textContent = 'Geen afgeprijsde producten herkend. Zorg dat de sticker en het etiket goed in beeld zijn.'; return; }
+    S.session.candidates.unshift(...items);
+    saveSession(); renderWinkel();
+    const noPrice = items.filter(it => itemPriceNow(it) == null).length;
+    st.textContent = `${items.length} product${items.length === 1 ? '' : 'en'} toegevoegd aan Gevonden.${noPrice ? ` Bij ${noPrice} kon de prijs niet worden gelezen: tik op Wijzig.` : ''} Controleer prijzen even op de sticker.`;
+  } catch (err) {
+    st.textContent = sampleErrorText(err);
+    disableSample(err && err.code);
+  } finally { S.photoCtl = null; }
+}
+async function estimateNutrition() {
+  if (!S.sample) return;
+  const name = $('#fName').value.trim();
+  if (!name) { toast('Vul eerst een productnaam in'); return; }
+  const st = $('#estimateStatus'); st.textContent = 'Claude schat…';
+  $('#estimateBtn').disabled = true;
+  try {
+    const r = await S.sample.json(`Schat de voedingswaarde per 100 g van dit Nederlandse supermarktproduct (Albert Heijn): "${name}". Gebruik NEVO-achtige waarden. Antwoord met alleen JSON: {"kcal":0,"protein":0,"carbs":0,"sugar":0,"fat":0,"satfat":0,"fiber":0,"salt":0,"cat":"een van ${Object.keys(CATS).join('|')}","tags":["uit: ${ALLOWED_TAGS.join(', ')}"],"freezable":true,"grams":0}`, { modelTier: 'quick' });
+    if (!r || typeof r !== 'object') throw { code: 'invalid_json' };
+    $('#nKcal').value = parseNum(r.kcal) ?? ''; $('#nProt').value = parseNum(r.protein) ?? ''; $('#nCarb').value = parseNum(r.carbs) ?? ''; $('#nFat').value = parseNum(r.fat) ?? '';
+    if (!$('#fGrams').value && parseNum(r.grams)) $('#fGrams').value = parseNum(r.grams);
+    const ed = S.editing;
+    const base = ed.base || { id: uid(), foodId: null, source: 'claude', qty: 1, addedAt: Date.now() };
+    ed.base = Object.assign({}, base, {
+      cat: CATS[r.cat] ? r.cat : (base.cat || 'overig'),
+      tags: Array.isArray(r.tags) ? r.tags.filter(t => ALLOWED_TAGS.includes(t)) : (base.tags || []),
+      freezable: typeof r.freezable === 'boolean' ? r.freezable : !!base.freezable,
+      n: { kcal: parseNum(r.kcal) ?? 0, protein: parseNum(r.protein) ?? 0, carbs: parseNum(r.carbs) ?? 0, sugar: parseNum(r.sugar) ?? 0, fat: parseNum(r.fat) ?? 0, satfat: parseNum(r.satfat) ?? 0, fiber: parseNum(r.fiber) ?? 0, salt: parseNum(r.salt) ?? 0 },
+      source: 'claude',
+    });
+    st.textContent = 'Geschat door Claude. Check het etiket als je twijfelt.';
+  } catch (err) { st.textContent = sampleErrorText(err); disableSample(err && err.code); }
+  finally { $('#estimateBtn').disabled = false; }
+}
+async function askAdvice() {
+  if (!S.sample) return;
+  const btn = $('#adviceBtn'), stop = $('#adviceStop');
+  const ctl = new AbortController(); S.adviceCtl = ctl;
+  btn.disabled = true; stop.hidden = false;
+  $('#adviceOut').replaceChildren(h('p', { class: 'muted' }, 'Claude denkt na…'));
+  const fmtIt = it => { const ev = evaluate(it, S.profile); const n = it.n; return `- ${it.name}${it.qty > 1 ? ' x' + it.qty : ''}, ${it.grams || '?'} g, ${fmtEur(itemPriceNow(it))}${it.priceNormal ? ` (normaal ${fmtEur(it.priceNormal)})` : ''}, houdbaar: ${it.expiry}, invriesbaar: ${it.freezable ? 'ja' : 'nee'}${n ? `, per 100 g: ${n.kcal} kcal, ${n.protein} g eiwit, ${n.carbs} g koolh., ${n.fat} g vet` : ''}; app-oordeel: ${VERDICT_NL[ev.verdict]} (${ev.score}/100)`; };
+  const store = storeById(S.profile.store);
+  const prompt = `Je helpt iemand die in Groningen goedkoop boodschappen doet met afgeprijsde "laatste kans"-producten bij Albert Heijn${store ? ` (${store.name})` : ''}. Vandaag is ${new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}.
+
+Dieet:
+${profileText()}
+
+In het mandje:
+${S.session.basket.map(fmtIt).join('\n') || '(leeg)'}
+
+Ook gezien, nog niet gekocht:
+${S.session.candidates.slice(0, 25).map(fmtIt).join('\n') || '(niets)'}
+
+Schrijf in het Nederlands, kort en concreet, met kopjes (##) en opsommingen:
+## Kopen of laten
+Welke van de geziene producten nog meenemen en welke laten liggen, met een reden in een paar woorden.
+## Vandaag en morgen
+Wat vandaag op moet, wat de vriezer in moet (alleen als dat veilig kan), met hoeveelheden.
+## Maaltijden
+3 tot 5 maaltijden voor de komende dagen die deze producten gebruiken en passen bij het dieet, met per maaltijd geschatte kcal en eiwit per persoon.
+## Aanvullen
+Maximaal 5 goedkope basisproducten (geen afprijsproducten) die het plan compleet maken, binnen het weekbudget.
+Gebruik geen em-dashes. Maximaal 350 woorden.`;
+  try {
+    const { text, truncated } = await S.sample(prompt, { signal: ctl.signal, cache: false, onText: ({ text }) => renderAdvice(text) });
+    renderAdvice(text + (truncated ? '\n\n(Ingekort. Vraag opnieuw met minder producten.)' : ''));
+  } catch (err) {
+    if (err && err.text) renderAdvice(err.text + '\n\n' + (err.code === 'cancelled' ? '(gestopt)' : '(onderbroken)'));
+    else $('#adviceOut').replaceChildren(h('p', null, sampleErrorText(err)));
+    disableSample(err && err.code);
+  } finally { btn.disabled = false; stop.hidden = true; S.adviceCtl = null; }
+}
+
+/* ============================================================
+   Routing and boot
+   ============================================================ */
+const TABS = ['winkel', 'koken', 'logboek', 'dieet', 'info'];
+function route() {
+  const t = (location.hash || '').replace('#', '');
+  S.tab = TABS.includes(t) ? t : 'winkel';
+  for (const k of TABS) $('#view-' + k).hidden = k !== S.tab;
+  $$('.tabbar a').forEach(a => { if (a.dataset.tab === S.tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  if (S.tab === 'koken') renderKoken();
+  if (S.tab === 'dieet') renderDieet();
+  if (S.tab === 'info') renderInfo();
+  if (S.tab === 'logboek') renderLogboek();
+  window.scrollTo(0, 0);
+}
+function renderAll() { renderStoreSelect(); renderWinkel(); renderKoken(); renderLogboek(); if (S.tab === 'dieet') renderDieet(); renderInfo(); }
+
+function bind() {
+  $('#q').addEventListener('input', renderSuggest);
+  $('#q').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const pq = parseQuick($('#q').value);
+      const best = matchFood(pq.name || $('#q').value, 1)[0];
+      if (best && best.s >= 60) openForm({ food: best.f, quick: pq }); else if (pq.name) openForm({ food: null, quick: pq });
+    }
+  });
+  $('#addForm').addEventListener('submit', submitForm);
+  $('#cancelAdd').addEventListener('click', closeForm);
+  $('#fDisc').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.form.disc = +b.dataset.v; setSeg('#fDisc', S.form.disc); $('#fNow').value = ''; });
+  $('#fExp').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.form.exp = b.dataset.v; setSeg('#fExp', S.form.exp); });
+  $('#fNow').addEventListener('input', () => { if ($('#fNow').value.trim()) { S.form.disc = null; setSeg('#fDisc', null); } });
+  $('#estimateBtn').addEventListener('click', estimateNutrition);
+  $('#photoIn').addEventListener('change', onPhoto);
+  $('#finishBtn').addEventListener('click', finishTrip);
+  $('#adviceBtn').addEventListener('click', askAdvice);
+  $('#adviceStop').addEventListener('click', () => S.adviceCtl && S.adviceCtl.abort());
+  $('#storeSel').addEventListener('change', e => { S.profile.store = e.target.value || null; saveProfile(); renderInfo(); });
+  $('#dietForm').addEventListener('submit', submitDiet);
+  $('#dUltra').addEventListener('change', e => { S.profile.avoidUltra = e.target.checked; });
+  $('#dFreezer').addEventListener('change', e => { S.profile.freezer = e.target.checked; });
+  $('#calcProt').addEventListener('click', () => {
+    const w = parseNum($('#dWeight').value);
+    if (!w) { toast('Vul eerst je gewicht in'); $('#dWeight').focus(); return; }
+    $('#dProt').value = proteinFor(S.profile.goal, w);
+    toast(`Eiwit: ${$('#dProt').value} g per dag`);
+  });
+  window.addEventListener('hashchange', route);
+}
+
+async function boot() {
+  bind();
+  renderStoreSelect(); route(); renderWinkel();
+  const inViewer = !!(window.claude && typeof window.claude.use === 'function');
+  if (inViewer) showLoadBanner('Je gegevens laden…');
+  initSample();
+  await Store.init();
+  let loadErr = null;
+  const loadAll = async () => {
+    const [profile, session, trips] = await Promise.all([Store.load('profile'), Store.load('session'), Store.listTrips()]);
+    return { profile, session, trips };
+  };
+  let timer = setTimeout(() => showLoadBanner('Je opgeslagen gegevens zijn nog niet bereikbaar. Wijzigingen worden bewaard zodra de verbinding er is.'), 10000);
+  let data = null;
+  try { data = await loadAll(); }
+  catch (e) { loadErr = e; }
+  clearTimeout(timer);
+  if (loadErr) {
+    // Fall back to this device and keep working.
+    Store.db = null; Store.mode = 'local';
+    data = { profile: Store.localGet('profile'), session: Store.localGet('session'), trips: Store.localGet('trips') || [] };
+    showLoadBanner('Je account-opslag is niet bereikbaar. Alles wordt nu alleen op dit toestel bewaard.');
+  } else showLoadBanner(null);
+  // Merge anything the user did while loading.
+  const live = S.session;
+  if (data.profile) S.profile = Object.assign(defaultProfile(), data.profile);
+  if (data.session) {
+    S.session = Object.assign({ candidates: [], basket: [], store: null, startedAt: null }, data.session);
+    if (live.candidates.length) S.session.candidates = live.candidates.filter(x => !S.session.candidates.some(y => y.id === x.id)).concat(S.session.candidates);
+    if (live.basket.length) S.session.basket = live.basket.filter(x => !S.session.basket.some(y => y.id === x.id)).concat(S.session.basket);
+  }
+  S.trips = Array.isArray(data.trips) ? data.trips : [];
+  Store.loaded = true;
+  if (live.candidates.length || live.basket.length) saveSession();
+  renderAll(); route();
+}
+
+window.LK = { evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, exclusionsFor, defaultProfile, GOALS, S, Store };
+boot();
+</script>
