@@ -148,12 +148,12 @@ function parseQuick(text) {
     if (u === 'kg' || u === 'kilo' || u === 'l' || u === 'liter') v *= 1000; else if (u === 'cl') v *= 10;
     r.grams = Math.round(v); s = s.replace(w[0], ' ');
   }
-  const prices = [...s.matchAll(/€\s?(\d{1,3}(?:[.,]\d{1,2})?)|(?<![\d.,])(\d{1,3}[.,]\d{1,2})(?![\d%])/g)];
+  const prices = [...s.matchAll(/€\s?(\d{1,3}(?:[.,]\d{1,2})?)|(^|[^\d.,])(\d{1,3}[.,]\d{1,2})(?![\d%])/g)];
   if (prices.length) {
-    const vals = prices.map(m => parseNum(m[1] || m[2])).filter(v => v != null);
+    const vals = prices.map(m => parseNum(m[1] || m[3])).filter(v => v != null);
     if (vals.length >= 2) { r.price = Math.max(vals[0], vals[1]); r.now = Math.min(vals[0], vals[1]); }
     else if (vals.length) r.price = vals[0];
-    for (const m of prices) s = s.replace(m[0], ' ');
+    for (const m of prices) s = s.replace(m[0], (m[2] || '') + ' ');
   }
   r.name = s.replace(/€/g, ' ').replace(/\s+/g, ' ').trim();
   return r;
@@ -492,21 +492,23 @@ function nutritionFromAH(list) {
 }
 function catFromAH(category, title) {
   const t = norm(title), c = norm(category);
-  const both = t + ' | ' + c;
   if (/\bkip|kippen|kalkoen|gevogelte/.test(t)) return 'gevogelte';
   if (/zalm|tonijn|kabeljauw|garnal|sushi|makreel|haring|pangasius|\bvis\b|vissticks|kibbeling/.test(t)) return 'vis';
   if (/vega|vegetarisch|plantaardig|tofu|tempeh|falafel/.test(t)) return 'vega';
-  if (/gehakt|\brund|varken|biefstuk|speklap|hamburger|karbonade|shoarma|gyros|\bworst|riblap|stooflap/.test(t)) return 'vlees';
-  if (/\bham\b|rookvlees|kipfilet beleg|salami|vleeswaren|hummus|salade.*(kip|ei|tonijn)|spread/.test(t)) return 'beleg';
+  if (/gehakt|\brund|varken|biefstuk|speklap|spekreep|\bspek|hamburger|karbonade|shoarma|gyros|\bworst|riblap|stooflap/.test(t)) return 'vlees';
+  if (/\bham\b|rookvlees|salami|vleeswaren|hummus|salade.*(kip|ei|tonijn)|spread/.test(t)) return 'beleg';
   if (/kaas|mozzarella|feta|brie|camembert/.test(t)) return 'kaas';
   if (/eieren|\bei\b/.test(t)) return 'ei';
-  if (/yoghurt|kwark|skyr|melk|vla\b|pudding|toetje|room\b|kefir|zuivel/.test(t)) return 'zuivel';
-  if (/brood|croissant|\bbol|bollen|stokbrood|pistolet|bagel|wrap|pita|tortilla|krentenbol|gebak|taart|koek|muffin|donut/.test(t)) return 'brood';
-  if (/maaltijd|lasagne|nasi|bami|stamppot|soep|pizza|curry|bowl|maaltijdsalade|ovenschotel|wok|quiche/.test(both)) return 'maaltijd';
+  if (/yoghurt|kwark|skyr|melk|\bvla\b|pudding|toetje|\broom\b|kefir|zuivel/.test(t)) return 'zuivel';
+  if (/brood|croissant|\bbol\b|bollen|stokbrood|pistolet|bagel|wrap|pita|tortilla|krentenbol|gebak|taart|koek|muffin|donut|flap|beschuit|cracker/.test(t)) return 'brood';
+  if (/siroop|\bsap\b|sappen|smoothie|drink|limonade|frisdrank|\bshot\b|juice/.test(t)) return 'overig';
+  if (/maaltijd|lasagne|nasi|bami|stamppot|soep|pizza|curry|bowl|maaltijdsalade|ovenschotel|\bwok\b|quiche/.test(t)) return 'maaltijd';
   if (/pasta|tortellini|tagliatelle|gnocchi|noedel|\bmie\b|ravioli/.test(t)) return 'zetmeel';
-  if (/fruit|aardbei|bes|bessen|druif|druiven|banaan|bananen|mango|ananas|appel|peer|meloen|kiwi|framboz|citrus|sinaasappel/.test(both)) return 'fruit';
-  if (/groente|sla\b|slamelange|spinazie|broccoli|bloemkool|paprika|tomaat|tomaten|komkommer|champignon|courgette|wortel|kool|andijvie|rucola|prei|ui\b|uien|kruiden|aardappel|krieltjes/.test(both)) return 'groente';
-  if (/vlees|vis|kip/.test(c)) return 'vlees';
+  if (/groente|\bsla\b|slamelange|spinazie|broccoli|bloemkool|paprika|tomaat|tomaten|komkommer|champignon|courgette|wortel|\bkool\b|spitskool|boerenkool|andijvie|rucola|\bprei\b|\bui\b|uien|kruiden|aardappel|krieltjes|selderij|sperzie|bonen|peen|biet|venkel|aubergine|asperge|pompoen|taug/.test(t)) return 'groente';
+  if (/fruit|aardbei|\bbes\b|bessen|druif|druiven|banaan|bananen|mango|ananas|\bappel|appels|\bpeer|peren|meloen|kiwi|framboz|citroen|sinaasappel|mandarijn|nectarine|perzik|pruim|kers|avocado/.test(t)) return 'fruit';
+  if (/^groente|aardappel.*groente/.test(c)) return 'groente';
+  if (/^fruit/.test(c)) return 'fruit';
+  if (/maaltijd|kant en klaar|soep/.test(c)) return 'maaltijd';
   return 'overig';
 }
 function itemFromAH(x) {
@@ -519,7 +521,7 @@ function itemFromAH(x) {
   const strong = match && match.s >= 70 ? match.f : null;
   const cat = strong ? strong.cat : catFromAH(x.category, title);
   const tags = new Set([...(strong ? strong.tags : []), ...inferTags(raw)]);
-  if (!strong && (cat === 'groente' || cat === 'fruit') && !/gesneden|salade|mix|soep|maaltijd/.test(norm(title))) tags.add('fresh_produce');
+  if (!strong && (cat === 'groente' || cat === 'fruit') && !/gesneden|salade|soep|maaltijd|smoothie|\bsap\b|flap|taart/.test(norm(title))) tags.add('fresh_produce');
   if (tags.has('vegan') && ANIMAL.some(t => tags.has(t))) tags.delete('vegan');
   const label = x.nutrition && (x.nutrition.kcal != null || x.nutrition.protein != null) ? x.nutrition : null;
   const n = label || (strong ? itemFromFood(strong).n : null);
@@ -529,7 +531,7 @@ function itemFromAH(x) {
   const exp = typeof x.expDate === 'string' && /^\d{4}-\d{2}-\d{2}/.test(x.expDate) ? x.expDate.slice(0, 10) : todayISO();
   const freezable = strong ? !!strong.freezable : ['vlees', 'gevogelte', 'brood', 'maaltijd', 'vega'].includes(cat);
   return {
-    id: `ah-${x.productId}-${exp}`, foodId: strong ? strong.id : null, name: title, cat, n, tags: [...tags], freezable,
+    id: `ah-${x.productId}-${exp}-${now != null ? Math.round(now * 100) : 'x'}`, foodId: strong ? strong.id : null, name: title, cat, n, tags: [...tags], freezable,
     grams: parseUnitSize(x.unitSize) ?? (strong ? strong.pack_g : null), unitSize: x.unitSize || null,
     priceNormal: was, priceNow: now, discountPct: pct, expDate: exp,
     qty: 1, source: 'ah', productId: x.productId ?? null, stock: x.stock != null && isFinite(+x.stock) ? +x.stock : null,

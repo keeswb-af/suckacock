@@ -604,12 +604,12 @@ function parseQuick(text) {
     if (u === 'kg' || u === 'kilo' || u === 'l' || u === 'liter') v *= 1000; else if (u === 'cl') v *= 10;
     r.grams = Math.round(v); s = s.replace(w[0], ' ');
   }
-  const prices = [...s.matchAll(/€\s?(\d{1,3}(?:[.,]\d{1,2})?)|(?<![\d.,])(\d{1,3}[.,]\d{1,2})(?![\d%])/g)];
+  const prices = [...s.matchAll(/€\s?(\d{1,3}(?:[.,]\d{1,2})?)|(^|[^\d.,])(\d{1,3}[.,]\d{1,2})(?![\d%])/g)];
   if (prices.length) {
-    const vals = prices.map(m => parseNum(m[1] || m[2])).filter(v => v != null);
+    const vals = prices.map(m => parseNum(m[1] || m[3])).filter(v => v != null);
     if (vals.length >= 2) { r.price = Math.max(vals[0], vals[1]); r.now = Math.min(vals[0], vals[1]); }
     else if (vals.length) r.price = vals[0];
-    for (const m of prices) s = s.replace(m[0], ' ');
+    for (const m of prices) s = s.replace(m[0], (m[2] || '') + ' ');
   }
   r.name = s.replace(/€/g, ' ').replace(/\s+/g, ' ').trim();
   return r;
@@ -948,21 +948,23 @@ function nutritionFromAH(list) {
 }
 function catFromAH(category, title) {
   const t = norm(title), c = norm(category);
-  const both = t + ' | ' + c;
   if (/\bkip|kippen|kalkoen|gevogelte/.test(t)) return 'gevogelte';
   if (/zalm|tonijn|kabeljauw|garnal|sushi|makreel|haring|pangasius|\bvis\b|vissticks|kibbeling/.test(t)) return 'vis';
   if (/vega|vegetarisch|plantaardig|tofu|tempeh|falafel/.test(t)) return 'vega';
-  if (/gehakt|\brund|varken|biefstuk|speklap|hamburger|karbonade|shoarma|gyros|\bworst|riblap|stooflap/.test(t)) return 'vlees';
-  if (/\bham\b|rookvlees|kipfilet beleg|salami|vleeswaren|hummus|salade.*(kip|ei|tonijn)|spread/.test(t)) return 'beleg';
+  if (/gehakt|\brund|varken|biefstuk|speklap|spekreep|\bspek|hamburger|karbonade|shoarma|gyros|\bworst|riblap|stooflap/.test(t)) return 'vlees';
+  if (/\bham\b|rookvlees|salami|vleeswaren|hummus|salade.*(kip|ei|tonijn)|spread/.test(t)) return 'beleg';
   if (/kaas|mozzarella|feta|brie|camembert/.test(t)) return 'kaas';
   if (/eieren|\bei\b/.test(t)) return 'ei';
-  if (/yoghurt|kwark|skyr|melk|vla\b|pudding|toetje|room\b|kefir|zuivel/.test(t)) return 'zuivel';
-  if (/brood|croissant|\bbol|bollen|stokbrood|pistolet|bagel|wrap|pita|tortilla|krentenbol|gebak|taart|koek|muffin|donut/.test(t)) return 'brood';
-  if (/maaltijd|lasagne|nasi|bami|stamppot|soep|pizza|curry|bowl|maaltijdsalade|ovenschotel|wok|quiche/.test(both)) return 'maaltijd';
+  if (/yoghurt|kwark|skyr|melk|\bvla\b|pudding|toetje|\broom\b|kefir|zuivel/.test(t)) return 'zuivel';
+  if (/brood|croissant|\bbol\b|bollen|stokbrood|pistolet|bagel|wrap|pita|tortilla|krentenbol|gebak|taart|koek|muffin|donut|flap|beschuit|cracker/.test(t)) return 'brood';
+  if (/siroop|\bsap\b|sappen|smoothie|drink|limonade|frisdrank|\bshot\b|juice/.test(t)) return 'overig';
+  if (/maaltijd|lasagne|nasi|bami|stamppot|soep|pizza|curry|bowl|maaltijdsalade|ovenschotel|\bwok\b|quiche/.test(t)) return 'maaltijd';
   if (/pasta|tortellini|tagliatelle|gnocchi|noedel|\bmie\b|ravioli/.test(t)) return 'zetmeel';
-  if (/fruit|aardbei|bes|bessen|druif|druiven|banaan|bananen|mango|ananas|appel|peer|meloen|kiwi|framboz|citrus|sinaasappel/.test(both)) return 'fruit';
-  if (/groente|sla\b|slamelange|spinazie|broccoli|bloemkool|paprika|tomaat|tomaten|komkommer|champignon|courgette|wortel|kool|andijvie|rucola|prei|ui\b|uien|kruiden|aardappel|krieltjes/.test(both)) return 'groente';
-  if (/vlees|vis|kip/.test(c)) return 'vlees';
+  if (/groente|\bsla\b|slamelange|spinazie|broccoli|bloemkool|paprika|tomaat|tomaten|komkommer|champignon|courgette|wortel|\bkool\b|spitskool|boerenkool|andijvie|rucola|\bprei\b|\bui\b|uien|kruiden|aardappel|krieltjes|selderij|sperzie|bonen|peen|biet|venkel|aubergine|asperge|pompoen|taug/.test(t)) return 'groente';
+  if (/fruit|aardbei|\bbes\b|bessen|druif|druiven|banaan|bananen|mango|ananas|\bappel|appels|\bpeer|peren|meloen|kiwi|framboz|citroen|sinaasappel|mandarijn|nectarine|perzik|pruim|kers|avocado/.test(t)) return 'fruit';
+  if (/^groente|aardappel.*groente/.test(c)) return 'groente';
+  if (/^fruit/.test(c)) return 'fruit';
+  if (/maaltijd|kant en klaar|soep/.test(c)) return 'maaltijd';
   return 'overig';
 }
 function itemFromAH(x) {
@@ -975,7 +977,7 @@ function itemFromAH(x) {
   const strong = match && match.s >= 70 ? match.f : null;
   const cat = strong ? strong.cat : catFromAH(x.category, title);
   const tags = new Set([...(strong ? strong.tags : []), ...inferTags(raw)]);
-  if (!strong && (cat === 'groente' || cat === 'fruit') && !/gesneden|salade|mix|soep|maaltijd/.test(norm(title))) tags.add('fresh_produce');
+  if (!strong && (cat === 'groente' || cat === 'fruit') && !/gesneden|salade|soep|maaltijd|smoothie|\bsap\b|flap|taart/.test(norm(title))) tags.add('fresh_produce');
   if (tags.has('vegan') && ANIMAL.some(t => tags.has(t))) tags.delete('vegan');
   const label = x.nutrition && (x.nutrition.kcal != null || x.nutrition.protein != null) ? x.nutrition : null;
   const n = label || (strong ? itemFromFood(strong).n : null);
@@ -985,7 +987,7 @@ function itemFromAH(x) {
   const exp = typeof x.expDate === 'string' && /^\d{4}-\d{2}-\d{2}/.test(x.expDate) ? x.expDate.slice(0, 10) : todayISO();
   const freezable = strong ? !!strong.freezable : ['vlees', 'gevogelte', 'brood', 'maaltijd', 'vega'].includes(cat);
   return {
-    id: `ah-${x.productId}-${exp}`, foodId: strong ? strong.id : null, name: title, cat, n, tags: [...tags], freezable,
+    id: `ah-${x.productId}-${exp}-${now != null ? Math.round(now * 100) : 'x'}`, foodId: strong ? strong.id : null, name: title, cat, n, tags: [...tags], freezable,
     grams: parseUnitSize(x.unitSize) ?? (strong ? strong.pack_g : null), unitSize: x.unitSize || null,
     priceNormal: was, priceNow: now, discountPct: pct, expDate: exp,
     qty: 1, source: 'ah', productId: x.productId ?? null, stock: x.stock != null && isFinite(+x.stock) ? +x.stock : null,
@@ -1175,7 +1177,10 @@ function pruneSession() {
   const t = todayISO(), weekAgo = addDays(t, -7);
   const s = S.session;
   const before = s.candidates.length + s.pantry.length;
-  s.candidates = s.candidates.filter(it => !it.expDate || it.expDate >= t).slice(0, 150);
+  const valid = s.candidates.filter(it => !it.expDate || it.expDate >= t);
+  const liveOnes = valid.filter(it => it.source === 'ah' && !it.edited);
+  const drop = new Set(liveOnes.slice(150));
+  s.candidates = valid.filter(it => !drop.has(it));
   s.pantry = s.pantry.filter(it => !it.expDate || it.expDate >= weekAgo);
   return before !== s.candidates.length + s.pantry.length;
 }
@@ -1327,14 +1332,16 @@ function renderLive() {
   if (!store) msg = 'Kies bovenaan je winkel. Daarna haalt de app de Laatste Kans Koopjes van die winkel op.';
   else if (L.status === 'loading') msg = L.message || `Koopjes ophalen bij ${name}…`;
   else if (L.status === 'login') msg = L.message || 'AH vraagt om in te loggen met je AH-account. Dat hoeft maar één keer.';
-  else if (L.status === 'error') msg = L.message || 'Ophalen lukte niet. Probeer het zo nog eens.';
-  else if (meta && meta.storeKey === S.profile.store) msg = `${meta.count} koopje${meta.count === 1 ? '' : 's'} bij ${name}, bijgewerkt om ${fmtTime(meta.fetchedAt)}.`;
+  else if (L.status === 'error') msg = (L.message || 'Ophalen lukte niet. Probeer het zo nog eens.') + (meta && meta.storeKey === S.profile.store ? ` Je ziet de koopjes van ${fmtTime(meta.fetchedAt)}.` : '');
+  else if (L.message) msg = L.message;
+  else if (meta && meta.storeKey === S.profile.store) msg = `${meta.count} koopje${meta.count === 1 ? '' : 's'} bij ${name}, ${meta.stale ? 'opgehaald om ' + fmtTime(meta.fetchedAt) + ' (nog niet ververst)' : 'bijgewerkt om ' + fmtTime(meta.fetchedAt)}.`
+    + (meta.count === 0 && meta.kind === 'anon' ? ' Zie je in de AH-app wel koopjes? Log dan in bij AH.' : '');
   else msg = `Tik op Vernieuw om de koopjes van ${name} op te halen.`;
   $('#liveStatus').textContent = msg;
   const dot = $('#liveDot');
-  dot.className = 'live-dot' + (L.status === 'error' || L.status === 'login' ? ' err' : meta && meta.storeKey === S.profile.store && L.status !== 'loading' ? ' on' : '');
+  dot.className = 'live-dot' + (L.status === 'error' || L.status === 'login' ? ' err' : meta && meta.storeKey === S.profile.store && !meta.stale && L.status !== 'loading' ? ' on' : '');
   $('#liveRefresh').disabled = !store || L.status === 'loading' || !Store.loaded;
-  $('#liveLogin').hidden = L.status !== 'login';
+  $('#liveLogin').hidden = !(L.status === 'login' || (L.status !== 'loading' && meta && meta.storeKey === S.profile.store && meta.count === 0 && meta.kind === 'anon'));
   setSeg('#liveFilter', S.session.liveFilter || 'fit');
 }
 function setLiveFilter(v) { S.session.liveFilter = v === 'all' ? 'all' : 'fit'; saveSession(); renderWinkel(); }
@@ -1346,21 +1353,24 @@ function liveRefresh() {
   hostSend('refresh', { key: s.id, ahId: s.id.replace(/^ah-/, ''), postcode: s.postcode, street: s.street, name: s.short || s.name });
   renderLive();
 }
-function applyLive(p) {
+function applyLive(p, opts) {
   if (!p || !Array.isArray(p.items)) return;
-  if (p.storeKey && S.profile.store && p.storeKey !== S.profile.store) return; // an answer for a store the user has left
+  if (p.storeKey && p.storeKey !== S.profile.store) return; // an answer for a store the user has left
+  const stale = !!(opts && opts.stale);
   const items = p.items.map(itemFromAH);
   const hiddenIds = new Set(S.session.hiddenAH || []);
   const inBasket = new Set(S.session.basket.map(b => b.id));
   const editing = S.editing && S.editing.id;
-  const kept = S.session.candidates.filter(c => c.source !== 'ah' || c.id === editing);
-  const fresh = items.filter(it => !inBasket.has(it.id) && !hiddenIds.has(it.id) && it.id !== editing);
-  S.session.candidates = [...fresh, ...kept].slice(0, 200);
-  S.session.liveMeta = { storeKey: p.storeKey || S.profile.store, storeName: p.storeName || '', fetchedAt: p.fetchedAt || Date.now(), count: items.length };
-  S.live = Object.assign({}, S.live, { status: 'ok', message: null });
+  const kept = S.session.candidates.filter(c => c.source !== 'ah' || c.edited || c.id === editing);
+  const keptIds = new Set(kept.map(c => c.id));
+  const fresh = items.filter(it => !inBasket.has(it.id) && !hiddenIds.has(it.id) && !keptIds.has(it.id));
+  S.session.candidates = [...kept, ...fresh.slice(0, Math.max(0, 200 - kept.length))];
+  S.session.liveMeta = { storeKey: p.storeKey || S.profile.store, storeName: p.storeName || '', fetchedAt: p.fetchedAt || Date.now(), count: items.length, kind: p.kind || null, stale };
+  if (!stale) S.live = Object.assign({}, S.live, { status: 'ok', message: null });
   saveSession(); renderWinkel(); if (S.tab === 'koken') renderKoken();
 }
 window.LK_LIVE = payload => { try { applyLive(typeof payload === 'string' ? JSON.parse(payload) : payload); return 'ok'; } catch (e) { return 'error: ' + e.message; } };
+window.LK_TOAST = m => { toast(String(typeof m === 'string' && m[0] === '"' ? JSON.parse(m) : m)); return 'ok'; };
 window.LK_LIVE_STATUS = st => {
   const o = typeof st === 'string' ? JSON.parse(st) : (st || {});
   S.live = Object.assign({}, S.live, { status: o.status || 'idle', message: o.message || null });
@@ -1488,7 +1498,7 @@ function submitForm(e) {
   if (ed.id) {
     for (const arr of [S.session.candidates, S.session.basket]) {
       const i = arr.findIndex(x => x.id === ed.id);
-      if (i >= 0) { arr[i] = Object.assign(it, { id: ed.id, qty: arr[i].qty || 1 }); placed = true; break; }
+      if (i >= 0) { arr[i] = Object.assign(it, { id: ed.id, qty: arr[i].qty || 1 }, it.source === 'ah' ? { edited: true } : {}); placed = true; break; }
     }
   }
   if (!placed) { it.qty = 1; S.session.candidates.unshift(it); }
@@ -1772,8 +1782,15 @@ function renderInfo() {
 }
 function pickStore(id) {
   if (!Store.loaded) return;
+  const changed = (S.profile.store || null) !== (id || null);
   S.profile.store = id || null;
   if (S.draft) S.draft.store = S.profile.store;
+  if (HOST && changed) {
+    S.session.candidates = S.session.candidates.filter(c => c.source !== 'ah' || c.edited);
+    S.session.liveMeta = null;
+    S.live = { status: 'idle', message: null };
+    saveSession(); renderWinkel();
+  }
   saveProfile(); renderStoreSelect(); renderInfo();
   const s = storeById(id); if (s) toast(`${s.short || s.name} is je winkel`);
   if (HOST) { if (s) liveRefresh(); else renderLive(); }
@@ -2090,8 +2107,9 @@ async function boot() {
   S.draft = null;
   renderAll(); route();
   if (HOST) {
-    if (HOST.live && HOST.live.items) applyLive(HOST.live);
-    else if (HOST.liveError) window.LK_LIVE_STATUS(HOST.liveError);
+    if (HOST.readOnly) showLoadBanner('Je opgeslagen gegevens konden niet worden gelezen (iCloud). Wat je nu doet, wordt niet bewaard. Sluit de app en probeer het later opnieuw.');
+    if (HOST.live && HOST.live.items) applyLive(HOST.live, { stale: !!HOST.liveStale });
+    if (HOST.liveError) window.LK_LIVE_STATUS(HOST.liveError);
     else if (S.profile.store) liveRefresh();
   }
 }

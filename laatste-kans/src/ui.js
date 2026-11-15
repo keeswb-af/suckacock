@@ -178,7 +178,10 @@ function pruneSession() {
   const t = todayISO(), weekAgo = addDays(t, -7);
   const s = S.session;
   const before = s.candidates.length + s.pantry.length;
-  s.candidates = s.candidates.filter(it => !it.expDate || it.expDate >= t).slice(0, 150);
+  const valid = s.candidates.filter(it => !it.expDate || it.expDate >= t);
+  const liveOnes = valid.filter(it => it.source === 'ah' && !it.edited);
+  const drop = new Set(liveOnes.slice(150));
+  s.candidates = valid.filter(it => !drop.has(it));
   s.pantry = s.pantry.filter(it => !it.expDate || it.expDate >= weekAgo);
   return before !== s.candidates.length + s.pantry.length;
 }
@@ -330,14 +333,16 @@ function renderLive() {
   if (!store) msg = 'Kies bovenaan je winkel. Daarna haalt de app de Laatste Kans Koopjes van die winkel op.';
   else if (L.status === 'loading') msg = L.message || `Koopjes ophalen bij ${name}…`;
   else if (L.status === 'login') msg = L.message || 'AH vraagt om in te loggen met je AH-account. Dat hoeft maar één keer.';
-  else if (L.status === 'error') msg = L.message || 'Ophalen lukte niet. Probeer het zo nog eens.';
-  else if (meta && meta.storeKey === S.profile.store) msg = `${meta.count} koopje${meta.count === 1 ? '' : 's'} bij ${name}, bijgewerkt om ${fmtTime(meta.fetchedAt)}.`;
+  else if (L.status === 'error') msg = (L.message || 'Ophalen lukte niet. Probeer het zo nog eens.') + (meta && meta.storeKey === S.profile.store ? ` Je ziet de koopjes van ${fmtTime(meta.fetchedAt)}.` : '');
+  else if (L.message) msg = L.message;
+  else if (meta && meta.storeKey === S.profile.store) msg = `${meta.count} koopje${meta.count === 1 ? '' : 's'} bij ${name}, ${meta.stale ? 'opgehaald om ' + fmtTime(meta.fetchedAt) + ' (nog niet ververst)' : 'bijgewerkt om ' + fmtTime(meta.fetchedAt)}.`
+    + (meta.count === 0 && meta.kind === 'anon' ? ' Zie je in de AH-app wel koopjes? Log dan in bij AH.' : '');
   else msg = `Tik op Vernieuw om de koopjes van ${name} op te halen.`;
   $('#liveStatus').textContent = msg;
   const dot = $('#liveDot');
-  dot.className = 'live-dot' + (L.status === 'error' || L.status === 'login' ? ' err' : meta && meta.storeKey === S.profile.store && L.status !== 'loading' ? ' on' : '');
+  dot.className = 'live-dot' + (L.status === 'error' || L.status === 'login' ? ' err' : meta && meta.storeKey === S.profile.store && !meta.stale && L.status !== 'loading' ? ' on' : '');
   $('#liveRefresh').disabled = !store || L.status === 'loading' || !Store.loaded;
-  $('#liveLogin').hidden = L.status !== 'login';
+  $('#liveLogin').hidden = !(L.status === 'login' || (L.status !== 'loading' && meta && meta.storeKey === S.profile.store && meta.count === 0 && meta.kind === 'anon'));
   setSeg('#liveFilter', S.session.liveFilter || 'fit');
 }
 function setLiveFilter(v) { S.session.liveFilter = v === 'all' ? 'all' : 'fit'; saveSession(); renderWinkel(); }
@@ -349,21 +354,24 @@ function liveRefresh() {
   hostSend('refresh', { key: s.id, ahId: s.id.replace(/^ah-/, ''), postcode: s.postcode, street: s.street, name: s.short || s.name });
   renderLive();
 }
-function applyLive(p) {
+function applyLive(p, opts) {
   if (!p || !Array.isArray(p.items)) return;
-  if (p.storeKey && S.profile.store && p.storeKey !== S.profile.store) return; // an answer for a store the user has left
+  if (p.storeKey && p.storeKey !== S.profile.store) return; // an answer for a store the user has left
+  const stale = !!(opts && opts.stale);
   const items = p.items.map(itemFromAH);
   const hiddenIds = new Set(S.session.hiddenAH || []);
   const inBasket = new Set(S.session.basket.map(b => b.id));
   const editing = S.editing && S.editing.id;
-  const kept = S.session.candidates.filter(c => c.source !== 'ah' || c.id === editing);
-  const fresh = items.filter(it => !inBasket.has(it.id) && !hiddenIds.has(it.id) && it.id !== editing);
-  S.session.candidates = [...fresh, ...kept].slice(0, 200);
-  S.session.liveMeta = { storeKey: p.storeKey || S.profile.store, storeName: p.storeName || '', fetchedAt: p.fetchedAt || Date.now(), count: items.length };
-  S.live = Object.assign({}, S.live, { status: 'ok', message: null });
+  const kept = S.session.candidates.filter(c => c.source !== 'ah' || c.edited || c.id === editing);
+  const keptIds = new Set(kept.map(c => c.id));
+  const fresh = items.filter(it => !inBasket.has(it.id) && !hiddenIds.has(it.id) && !keptIds.has(it.id));
+  S.session.candidates = [...kept, ...fresh.slice(0, Math.max(0, 200 - kept.length))];
+  S.session.liveMeta = { storeKey: p.storeKey || S.profile.store, storeName: p.storeName || '', fetchedAt: p.fetchedAt || Date.now(), count: items.length, kind: p.kind || null, stale };
+  if (!stale) S.live = Object.assign({}, S.live, { status: 'ok', message: null });
   saveSession(); renderWinkel(); if (S.tab === 'koken') renderKoken();
 }
 window.LK_LIVE = payload => { try { applyLive(typeof payload === 'string' ? JSON.parse(payload) : payload); return 'ok'; } catch (e) { return 'error: ' + e.message; } };
+window.LK_TOAST = m => { toast(String(typeof m === 'string' && m[0] === '"' ? JSON.parse(m) : m)); return 'ok'; };
 window.LK_LIVE_STATUS = st => {
   const o = typeof st === 'string' ? JSON.parse(st) : (st || {});
   S.live = Object.assign({}, S.live, { status: o.status || 'idle', message: o.message || null });
@@ -491,7 +499,7 @@ function submitForm(e) {
   if (ed.id) {
     for (const arr of [S.session.candidates, S.session.basket]) {
       const i = arr.findIndex(x => x.id === ed.id);
-      if (i >= 0) { arr[i] = Object.assign(it, { id: ed.id, qty: arr[i].qty || 1 }); placed = true; break; }
+      if (i >= 0) { arr[i] = Object.assign(it, { id: ed.id, qty: arr[i].qty || 1 }, it.source === 'ah' ? { edited: true } : {}); placed = true; break; }
     }
   }
   if (!placed) { it.qty = 1; S.session.candidates.unshift(it); }
@@ -775,8 +783,15 @@ function renderInfo() {
 }
 function pickStore(id) {
   if (!Store.loaded) return;
+  const changed = (S.profile.store || null) !== (id || null);
   S.profile.store = id || null;
   if (S.draft) S.draft.store = S.profile.store;
+  if (HOST && changed) {
+    S.session.candidates = S.session.candidates.filter(c => c.source !== 'ah' || c.edited);
+    S.session.liveMeta = null;
+    S.live = { status: 'idle', message: null };
+    saveSession(); renderWinkel();
+  }
   saveProfile(); renderStoreSelect(); renderInfo();
   const s = storeById(id); if (s) toast(`${s.short || s.name} is je winkel`);
   if (HOST) { if (s) liveRefresh(); else renderLive(); }
@@ -1093,8 +1108,9 @@ async function boot() {
   S.draft = null;
   renderAll(); route();
   if (HOST) {
-    if (HOST.live && HOST.live.items) applyLive(HOST.live);
-    else if (HOST.liveError) window.LK_LIVE_STATUS(HOST.liveError);
+    if (HOST.readOnly) showLoadBanner('Je opgeslagen gegevens konden niet worden gelezen (iCloud). Wat je nu doet, wordt niet bewaard. Sluit de app en probeer het later opnieuw.');
+    if (HOST.live && HOST.live.items) applyLive(HOST.live, { stale: !!HOST.liveStale });
+    if (HOST.liveError) window.LK_LIVE_STATUS(HOST.liveError);
     else if (S.profile.store) liveRefresh();
   }
 }

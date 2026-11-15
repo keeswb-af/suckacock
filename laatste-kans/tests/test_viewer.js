@@ -17,7 +17,7 @@ const pngPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'lk-')), 'screen
 fs.writeFileSync(pngPath, PNG);
 
 const MOCK = () => {
-  const opts = JSON.parse(localStorage.getItem('__mockopts') || '{}');
+  const optsOf = () => window.__opts || {};
   const load = () => JSON.parse(localStorage.getItem('__mockdb') || '{}');
   const store = d => localStorage.setItem('__mockdb', JSON.stringify(d));
   window.__writes = [];
@@ -28,6 +28,7 @@ const MOCK = () => {
   const snap = (p, d) => ({ id: p.split('/').pop(), exists: d != null, data: () => d == null ? undefined : JSON.parse(JSON.stringify(d)), metadata: { fromCache: false, hasPendingWrites: false } });
   const failGet = async () => {
     getCount++;
+    const opts = optsOf();
     if (opts.alwaysFailGet) throw { code: 'unavailable', message: 'down' };
     if (opts.failFirstGet && getCount === 1) { window.__getFails = 1; throw { code: 'unavailable', message: 'blip' }; }
   };
@@ -36,7 +37,7 @@ const MOCK = () => {
     return {
       id: p.split('/').pop(), path: p,
       async get() { await failGet(); return snap(p, load()[p]); },
-      async set(d) { if (opts.failSet) throw { code: 'unavailable' }; const db = load(); db[p] = JSON.parse(JSON.stringify(d)); store(db); window.__writes.push(p); },
+      async set(d) { if (optsOf().failSet) throw { code: 'unavailable' }; const db = load(); db[p] = JSON.parse(JSON.stringify(d)); store(db); window.__writes.push(p); },
       async update(d) { const db = load(); db[p] = Object.assign(db[p] || {}, d); store(db); window.__writes.push(p); },
       async delete() { const db = load(); delete db[p]; store(db); window.__writes.push('DEL ' + p); },
       onSnapshot(next) { (listeners[p] = listeners[p] || []).push(next); setTimeout(() => next(snap(p, load()[p])), 5); return () => { listeners[p] = listeners[p].filter(f => f !== next); }; },
@@ -80,15 +81,9 @@ const MOCK = () => {
   window.claude = { use: async name => ({ db, user, sample })[name] || null };
 };
 
-async function setOpts(ctx, o) {
-  const p = await ctx.newPage();
-  await p.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
-  await p.goto(FILE);
-  await p.evaluate(v => localStorage.setItem('__mockopts', v), JSON.stringify(o));
-  await p.close();
-}
-async function open(ctx, hash = '') {
+async function open(ctx, hash = '', opts = {}) {
   const page = await ctx.newPage();
+  await page.addInitScript(o => { window.__opts = o; }, opts);
   page.on('pageerror', e => ok(false, 'page error: ' + e));
   await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
   await page.goto(FILE + hash);
@@ -151,14 +146,12 @@ async function open(ctx, hash = '') {
   await page.close();
 
   console.log('\n[viewer: transient error]');
-  await setOpts(ctx, { failFirstGet: true });
-  page = await open(ctx);
+  page = await open(ctx, '', { failFirstGet: true });
   ok(await page.evaluate(() => window.LK.Store.mode === 'db' && window.LK.S.trips.length === 1 && window.__getFails === 1), 'one failed read is retried, account storage kept');
   await page.close();
 
   console.log('\n[viewer: storage down, then back]');
-  await setOpts(ctx, { alwaysFailGet: true });
-  page = await open(ctx);
+  page = await open(ctx, '', { alwaysFailGet: true });
   ok(await page.evaluate(() => window.LK.Store.mode === 'local'), 'falls back to this device');
   ok(/niet bereikbaar/.test(await page.textContent('#loadBanner')), 'tells the user');
   ok(await page.evaluate(() => window.LK.S.trips.length === 1), 'cached trips still visible offline');
@@ -172,8 +165,7 @@ async function open(ctx, hash = '') {
   await page.waitForTimeout(200);
   ok(await page.evaluate(() => (JSON.parse(localStorage.getItem('lk:u_test:unsyncedTrips')) || []).length === 1), 'offline trip queued for sync');
   await page.close();
-  await setOpts(ctx, {});
-  page = await open(ctx);
+  page = await open(ctx, '', {});
   const st = await page.evaluate(() => ({ trips: window.LK.S.trips.length, mode: window.LK.Store.mode, q: (JSON.parse(localStorage.getItem('lk:u_test:unsyncedTrips')) || []).length, pantry: window.LK.S.session.pantry.map(x => x.name) }));
   ok(st.mode === 'db' && st.trips === 2 && st.q === 0, 'offline trip synced on next visit: ' + JSON.stringify(st));
   ok(st.pantry.includes('Broccoli'), 'newer offline session wins over older account copy');
