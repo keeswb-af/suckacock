@@ -1,15 +1,25 @@
 #!/usr/bin/env python3
-"""Build the app from src/app.html and data/*.json.
+"""Build the app from src/ and data/*.json.
+
+Sources
+  src/page.html       markup and style, with slots for the scripts
+  src/engine.js       pure logic: diet scoring, food matching, AH item conversion
+  src/ui.js           screens, storage, Claude features, host bridge
+  src/scriptable.js   the Scriptable (iPhone) wrapper that fetches AH bargains live
 
 Outputs
-  dist/artifact.html  page fragment for publishing as a claude.ai Artifact
-  dist/index.html     standalone page for any static host (GitHub Pages, Netlify)
+  dist/artifact.html    page fragment for publishing as a claude.ai Artifact
+  dist/index.html       standalone page for any static host
+  dist/LaatsteKans.js   Scriptable script (embeds dist/index.html)
+  dist/installer.js     the few lines a user pastes into Scriptable once
 """
+import hashlib
 import json
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parent
-SRC = ROOT / "src" / "app.html"
+SRC = ROOT / "src"
+SCRIPT_URL = "https://raw.githubusercontent.com/keeswb-af/suckacock/claude/optimistic-babbage-atkmd2/laatste-kans/dist/LaatsteKans.js"
 DATA = ROOT / "data"
 DIST = ROOT / "dist"
 
@@ -60,10 +70,12 @@ def main():
         "const TIPS = " + json.dumps(tips, ensure_ascii=False, separators=(",", ":")) + ";",
         "const SAFETY = " + json.dumps(safety, ensure_ascii=False, separators=(",", ":")) + ";",
     ])
-    src = SRC.read_text(encoding="utf-8")
-    assert "/*@@DATA@@*/" in src
-    page = src.replace("/*@@DATA@@*/", data_js)
-    assert "—" not in page, "em dash found"
+    engine = (SRC / "engine.js").read_text(encoding="utf-8")
+    ui = (SRC / "ui.js").read_text(encoding="utf-8").replace("@@SCRIPT_URL@@", SCRIPT_URL)
+    tpl = (SRC / "page.html").read_text(encoding="utf-8")
+    for slot in ("/*@@DATA@@*/", "/*@@ENGINE@@*/", "/*@@UI@@*/"):
+        assert tpl.count(slot) == 1, slot
+    page = tpl.replace("/*@@DATA@@*/", data_js).replace("/*@@ENGINE@@*/", engine).replace("/*@@UI@@*/", ui)
     DIST.mkdir(exist_ok=True)
     (DIST / "artifact.html").write_text(page, encoding="utf-8")
     standalone = (
@@ -79,7 +91,22 @@ def main():
         "</head>\n<body>\n" + page + "\n</body>\n</html>\n"
     )
     (DIST / "index.html").write_text(standalone, encoding="utf-8")
-    print(f"built: {len(food)} foods, {len(stores)} stores, {len(page)//1024} KB")
+    version = "v" + hashlib.sha1((standalone + (SRC / "scriptable.js").read_text(encoding="utf-8")).encode()).hexdigest()[:8]
+    app_html = json.dumps(standalone, ensure_ascii=False).replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+    sc = (SRC / "scriptable.js").read_text(encoding="utf-8")
+    for slot in ("/*@@DATA@@*/", "/*@@ENGINE@@*/", "/*@@APP_HTML@@*/''"):
+        assert sc.count(slot) == 1, slot
+    sc = sc.replace("/*@@DATA@@*/", data_js).replace("/*@@ENGINE@@*/", engine).replace("/*@@APP_HTML@@*/''", app_html)
+    sc = sc.replace("@@VERSION@@", version).replace("@@SCRIPT_URL@@", SCRIPT_URL)
+    (DIST / "LaatsteKans.js").write_text(sc, encoding="utf-8")
+    start = ui.index("const INSTALLER = `") + len("const INSTALLER = `")
+    installer = ui[start:ui.index("`;", start)].replace("${SCRIPT_URL}", SCRIPT_URL)
+    (DIST / "installer.js").write_text(installer + "\n", encoding="utf-8")
+    for name in ("artifact.html", "index.html", "LaatsteKans.js", "installer.js"):
+        text = (DIST / name).read_text(encoding="utf-8")
+        assert "\u2014" not in text, f"em dash in {name}"
+        assert "@@" not in text.replace("@@DATA@@", ""), f"unfilled slot in {name}"
+    print(f"built {version}: {len(food)} foods, {len(stores)} stores, page {len(page)//1024} KB, Scriptable {len(sc)//1024} KB")
 
 
 if __name__ == "__main__":

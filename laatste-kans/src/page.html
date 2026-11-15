@@ -1,0 +1,458 @@
+<title>Laatste Kans Groningen</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Vind afgeprijsde producten bij Albert Heijn in Groningen die passen bij je dieet.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one phone column; sticky top bar with the store, fixed bottom tab bar; discounts drawn as round price stickers */
+:root {
+  --bg: #F2F4F0;
+  --surface: #FFFFFF;
+  --surface-2: #E7ECE5;
+  --ink: #15211B;
+  --muted: #56655C;
+  --line: #D3DBD1;
+  --brand: #1F5C45;
+  --brand-ink: #FFFFFF;
+  --sticker: #F2541B;
+  --sticker-ink: #FFFFFF;
+  --good: #19724A;
+  --good-bg: #DDF1E5;
+  --warn: #8A5A00;
+  --warn-bg: #F8EDD3;
+  --bad: #A8261E;
+  --bad-bg: #F9E1DE;
+  --focus: #2F7DE1;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r: 14px;
+  --r-sm: 9px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1411; --surface: #17201B; --surface-2: #202B25; --ink: #E5EDE8; --muted: #9AABA1; --line: #2B3832;
+    --brand: #6CC79C; --brand-ink: #08130D; --sticker: #FF7543; --sticker-ink: #1A0700;
+    --good: #66D6A0; --good-bg: #123022; --warn: #F0B94E; --warn-bg: #33260C; --bad: #FF8F85; --bad-bg: #3B1613; --focus: #7DB3FF;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1411; --surface: #17201B; --surface-2: #202B25; --ink: #E5EDE8; --muted: #9AABA1; --line: #2B3832;
+  --brand: #6CC79C; --brand-ink: #08130D; --sticker: #FF7543; --sticker-ink: #1A0700;
+  --good: #66D6A0; --good-bg: #123022; --warn: #F0B94E; --warn-bg: #33260C; --bad: #FF8F85; --bad-bg: #3B1613; --focus: #7DB3FF;
+  color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--ink); }
+body { font-family: var(--font-body); font-size: 15px; line-height: 1.45; -webkit-text-size-adjust: 100%; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+* { box-sizing: border-box; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 1.2rem; font-weight: 800; }
+h3 { font-size: 1rem; font-weight: 600; }
+p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.small { font-size: 0.82rem; }
+
+.wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* Top bar */
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: var(--bg); border-bottom: 1px solid var(--line); }
+.topbar .wrap { display: flex; align-items: center; gap: 12px; padding-block: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+.brand-mark { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--sticker); color: var(--sticker-ink); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 1rem; transform: rotate(-12deg); }
+.brand h1 { font-size: 1.12rem; font-weight: 800; line-height: 1.1; }
+.brand p { font-size: 0.76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.store-pick select { max-width: 46vw; min-height: 38px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 10px; font-size: 16px; font-weight: 600; }
+
+main { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+.view { display: flex; flex-direction: column; gap: 18px; padding-block: 16px 8px; }
+.section { display: flex; flex-direction: column; gap: 10px; }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.count { font-family: var(--font-num); font-size: 0.85rem; color: var(--muted); font-weight: 500; }
+
+/* Cards and controls */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; cursor: pointer; text-decoration: none; color: var(--ink); }
+.btn:active { transform: translateY(1px); }
+.btn[disabled] { opacity: 0.5; cursor: default; }
+.btn-primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.btn-sticker { background: var(--sticker); border-color: var(--sticker); color: var(--sticker-ink); }
+.btn-ghost { background: transparent; }
+.btn-sm { min-height: 36px; padding: 6px 12px; font-size: 0.86rem; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-block { width: 100%; }
+.icon-btn { min-width: 40px; min-height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: inline-grid; place-items: center; cursor: pointer; font-weight: 700; }
+
+label.field { display: flex; flex-direction: column; gap: 4px; font-size: 0.84rem; font-weight: 600; color: var(--muted); min-width: 0; }
+input[type="text"], input[type="search"], input[type="number"], input[type="date"], select, textarea {
+  width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); padding: 9px 12px; font-size: 16px; color: var(--ink);
+}
+textarea { min-height: 84px; resize: vertical; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 360px) { .grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { min-height: 38px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; font-size: 0.88rem; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+.check { display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: 0.92rem; }
+.check input { width: 20px; height: 20px; accent-color: var(--brand); flex: none; }
+.checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 10px; }
+
+/* Summary */
+.summary { background: var(--ink); color: var(--bg); border-radius: var(--r); padding: 14px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.summary .k { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.72; }
+.summary .v { font-family: var(--font-num); font-weight: 600; font-size: 1.02rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 380px) { .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.budget-bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--bg) 22%, transparent); overflow: hidden; }
+.budget-bar i { display: block; height: 100%; background: var(--sticker); border-radius: 3px; }
+.summary .note { grid-column: 1 / -1; font-size: 0.78rem; opacity: 0.8; }
+
+/* Banner */
+.banner { border-radius: var(--r); padding: 12px 14px; background: var(--warn-bg); color: var(--warn); display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-weight: 500; }
+.banner.info { background: var(--surface-2); color: var(--ink); }
+
+/* Add panel */
+.search-box { position: relative; }
+.suggest { list-style: none; margin: 4px 0 0; padding: 4px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); display: flex; flex-direction: column; }
+.suggest li button { width: 100%; text-align: left; background: none; border: 0; padding: 10px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; min-height: 44px; align-items: center; }
+.suggest li button:hover, .suggest li button:focus-visible { background: var(--surface-2); }
+.suggest .cat { font-size: 0.76rem; color: var(--muted); white-space: nowrap; }
+.match-note { font-size: 0.82rem; color: var(--muted); }
+#addForm, #addCard { scroll-margin-top: calc(76px + env(safe-area-inset-top, 0px)); }
+.nutri-in { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.photo-status { font-size: 0.9rem; }
+
+/* Item cards */
+.list { display: flex; flex-direction: column; gap: 10px; }
+.item { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; position: relative; min-width: 0; }
+.item.v-ja { border-left: 5px solid var(--good); }
+.item.v-twijfel { border-left: 5px solid var(--warn); }
+.item.v-laten, .item.v-nee { border-left: 5px solid var(--bad); }
+.item-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.item-name { font-weight: 700; font-size: 1rem; line-height: 1.25; min-width: 0; overflow-wrap: anywhere; }
+.item-meta { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
+.price { display: flex; align-items: center; gap: 8px; flex: none; }
+.price s { color: var(--muted); font-family: var(--font-num); font-size: 0.82rem; }
+.price b { font-family: var(--font-num); font-size: 1.05rem; }
+.sticker { width: 46px; height: 46px; border-radius: 50%; background: var(--sticker); color: var(--sticker-ink); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 0.86rem; transform: rotate(-10deg); flex: none; letter-spacing: -0.02em; }
+.verdict-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 10px; font-size: 0.8rem; font-weight: 700; }
+.chip.ja { background: var(--good-bg); color: var(--good); }
+.chip.twijfel { background: var(--warn-bg); color: var(--warn); }
+.chip.laten, .chip.nee { background: var(--bad-bg); color: var(--bad); }
+.chip.ex { background: var(--surface-2); color: var(--muted); }
+.chip.urgent { background: var(--surface-2); color: var(--ink); }
+.scorebar { flex: 1; min-width: 80px; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.scorebar i { display: block; height: 100%; border-radius: 3px; background: var(--muted); }
+.v-ja .scorebar i { background: var(--good); }
+.v-twijfel .scorebar i { background: var(--warn); }
+.v-laten .scorebar i, .v-nee .scorebar i { background: var(--bad); }
+.score { font-family: var(--font-num); font-size: 0.82rem; color: var(--muted); }
+.metrics { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; font-size: 0.82rem; color: var(--muted); }
+.metrics b { color: var(--ink); font-family: var(--font-num); font-weight: 600; }
+.reasons { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; font-size: 0.86rem; }
+.reasons li { display: flex; gap: 8px; align-items: baseline; }
+.reasons li::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; margin-top: 6px; background: var(--muted); transform: translateY(-1px); }
+.reasons li.pos::before { background: var(--good); }
+.reasons li.neg::before { background: var(--bad); }
+.item-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.qty { display: inline-flex; align-items: center; gap: 6px; }
+.qty span { min-width: 24px; text-align: center; font-family: var(--font-num); font-weight: 600; }
+
+.empty { border: 1.5px dashed var(--line); border-radius: var(--r); padding: 18px 16px; display: flex; flex-direction: column; gap: 8px; color: var(--muted); }
+.empty strong { color: var(--ink); font-family: var(--font-display); font-size: 1rem; }
+.live { border-color: color-mix(in srgb, var(--good) 40%, var(--line)); }
+a { color: var(--brand); }
+body.host #addCard { order: 10; }
+.live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
+.live-dot.on { background: var(--good); box-shadow: 0 0 0 4px var(--good-bg); }
+.live-dot.err { background: var(--bad); }
+.chip.live-tag { background: var(--good-bg); color: var(--good); font-size: 0.7rem; padding: 1px 8px; vertical-align: 2px; margin-left: 6px; }
+.codebox { font-family: var(--font-num); font-size: 0.74rem; background: var(--surface-2); border-radius: var(--r-sm); padding: 10px 12px; overflow-x: auto; white-space: pre; max-height: 180px; }
+.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+
+/* Meals and advice */
+.meal { display: flex; flex-direction: column; gap: 6px; }
+.meal .uses { display: flex; flex-wrap: wrap; gap: 6px; }
+.meal .uses span { background: var(--surface-2); border-radius: 999px; padding: 2px 10px; font-size: 0.8rem; font-weight: 600; }
+.meal .uses span.u { background: var(--warn-bg); color: var(--warn); }
+.advice { display: flex; flex-direction: column; gap: 8px; font-size: 0.95rem; }
+.advice ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.advice h4 { margin: 6px 0 0; font-family: var(--font-display); font-size: 1rem; }
+.urg-group h3 { font-size: 0.92rem; margin-bottom: 6px; }
+.urg-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 0.92rem; }
+.urg-row:first-of-type { border-top: 0; }
+
+/* Info */
+.store { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.store:first-child { border-top: 0; }
+.store .nm { font-weight: 700; }
+.store .ad { font-size: 0.86rem; color: var(--muted); }
+.store.on .nm::after { content: "jouw winkel"; margin-left: 8px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; background: var(--brand); color: var(--brand-ink); padding: 2px 6px; border-radius: 6px; vertical-align: 2px; }
+.tips { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+.trip { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.kpi-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; }
+.kpi .k { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.kpi .v { font-family: var(--font-num); font-weight: 600; font-size: 1.05rem; }
+
+/* Tab bar */
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.tabbar .tabs { max-width: 640px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.tabbar a { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px 6px; min-height: 56px; color: var(--muted); text-decoration: none; font-size: 0.7rem; font-weight: 600; position: relative; }
+.tabbar a svg { width: 24px; height: 24px; }
+.tabbar a[aria-current="page"] { color: var(--ink); }
+.tabbar a[aria-current="page"]::before { content: ""; position: absolute; top: 0; left: 28%; right: 28%; height: 3px; border-radius: 0 0 3px 3px; background: var(--sticker); }
+.tabbar .badge { position: absolute; top: 4px; right: calc(50% - 22px); min-width: 18px; height: 18px; border-radius: 9px; background: var(--sticker); color: var(--sticker-ink); font-size: 0.68rem; display: grid; place-items: center; padding: 0 4px; font-family: var(--font-num); }
+
+.toast { position: fixed; left: 50%; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: 0.9rem; z-index: 20; max-width: calc(100vw - 32px); text-align: center; }
+@media (prefers-reduced-motion: no-preference) {
+  .item { animation: pop 0.18s ease-out; }
+  @keyframes pop { from { transform: translateY(4px); } to { transform: none; } }
+}
+</style>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">%</div>
+      <div style="min-width:0">
+        <h1>Laatste Kans</h1>
+        <p id="subline">Laatste Kans Koopjes bij AH Groningen, gekeurd op jouw dieet</p>
+      </div>
+    </div>
+    <label class="store-pick"><span class="sr">Jouw winkel</span><select id="storeSel"></select></label>
+  </div>
+</header>
+
+<main>
+  <!-- WINKEL -->
+  <section class="view wrap" id="view-winkel" aria-labelledby="h-winkel">
+    <h2 class="sr" id="h-winkel">In de winkel</h2>
+    <div id="loadBanner" class="banner info" hidden></div>
+    <div id="dietBanner" class="banner" hidden>
+      <span>Stel eerst je dieet in, dan kloppen de adviezen.</span>
+      <a class="btn btn-sm" href="#dieet">Dieet instellen</a>
+    </div>
+    <div class="summary" id="summary" aria-live="polite"></div>
+
+    <div class="card live" id="liveCard" hidden>
+      <div class="section-head">
+        <h2>Live bij je AH</h2>
+        <span class="live-dot" id="liveDot" aria-hidden="true"></span>
+      </div>
+      <p class="small" id="liveStatus" aria-live="polite"></p>
+      <div class="btn-row">
+        <button class="btn btn-primary" type="button" id="liveRefresh">Vernieuw koopjes</button>
+        <button class="btn" type="button" id="liveLogin" hidden>Inloggen bij AH</button>
+      </div>
+      <div class="seg" id="liveFilter" role="group" aria-label="Toon">
+        <button type="button" data-v="fit">Past bij mij</button>
+        <button type="button" data-v="all">Alles</button>
+      </div>
+    </div>
+    <div class="banner info" id="liveHint" hidden>
+      <span>Wil je de Laatste Kans Koopjes van je winkel live zien? Dat kan via de gratis iPhone-app Scriptable.</span>
+      <a class="btn btn-sm" href="#info">Zo werkt het</a>
+    </div>
+
+    <div class="card" id="addCard">
+      <div class="section-head"><h2>Wat ligt er met korting?</h2></div>
+      <div id="photoRow" class="section" hidden>
+        <div class="grid2">
+          <label class="btn btn-sticker" for="shotIn">Screenshot AH-app</label>
+          <label class="btn" for="photoIn">Foto in de winkel</label>
+        </div>
+        <input type="file" id="shotIn" class="sr" accept="image/*" multiple>
+        <input type="file" id="photoIn" class="sr" accept="image/*" capture="environment">
+        <p class="small muted">Open in de AH-app Laatste Kans Koopjes van je winkel en maak screenshots. Of fotografeer producten met een kortingssticker. Claude leest naam, prijs, korting en datum en de app beoordeelt elk product.</p>
+        <div id="photoStatus" class="photo-status" aria-live="polite"></div>
+      </div>
+      <div class="search-box">
+        <label class="field" for="q">Typ wat je ziet
+          <input id="q" type="search" placeholder="bv. kipfilet 500g 6,49 35%" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go">
+        </label>
+        <ul id="suggest" class="suggest" hidden></ul>
+      </div>
+      <form id="addForm" class="section" hidden novalidate>
+        <p class="match-note" id="matchNote"></p>
+        <label class="field" for="fName">Product
+          <input id="fName" type="text" autocomplete="off">
+        </label>
+        <div class="grid3">
+          <label class="field" for="fGrams">Gewicht (g)
+            <input id="fGrams" type="number" inputmode="decimal" min="0" step="any">
+          </label>
+          <label class="field" for="fPrice">Normale prijs
+            <input id="fPrice" type="text" inputmode="decimal" placeholder="€">
+          </label>
+          <label class="field" for="fNow">Nu (sticker)
+            <input id="fNow" type="text" inputmode="decimal" placeholder="€">
+          </label>
+        </div>
+        <div class="field">Korting
+          <div class="seg" id="fDisc" role="group" aria-label="Korting">
+            <button type="button" data-v="25">25%</button>
+            <button type="button" data-v="35">35%</button>
+            <button type="button" data-v="40">40%</button>
+            <button type="button" data-v="50">50%</button>
+            <button type="button" data-v="70">70%</button>
+            <button type="button" data-v="0">Geen</button>
+          </div>
+        </div>
+        <div class="field">Houdbaar tot
+          <div class="seg" id="fExp" role="group" aria-label="Houdbaar tot">
+            <button type="button" data-v="vandaag">Vandaag</button>
+            <button type="button" data-v="morgen">Morgen</button>
+            <button type="button" data-v="later">Later</button>
+          </div>
+        </div>
+        <details id="nutriBox">
+          <summary>Voedingswaarde per 100 g</summary>
+          <div class="nutri-in" style="margin-top:8px">
+            <label class="field" for="nKcal">kcal<input id="nKcal" type="number" inputmode="decimal" step="any"></label>
+            <label class="field" for="nProt">Eiwit<input id="nProt" type="number" inputmode="decimal" step="any"></label>
+            <label class="field" for="nCarb">Koolh.<input id="nCarb" type="number" inputmode="decimal" step="any"></label>
+            <label class="field" for="nFat">Vet<input id="nFat" type="number" inputmode="decimal" step="any"></label>
+          </div>
+          <div class="btn-row" style="margin-top:8px">
+            <button type="button" class="btn btn-sm" id="estimateBtn" hidden>Laat Claude schatten</button>
+            <span class="small muted" id="estimateStatus" aria-live="polite"></span>
+          </div>
+        </details>
+        <div class="btn-row">
+          <button type="submit" class="btn btn-primary">Beoordeel</button>
+          <button type="button" class="btn btn-ghost" id="cancelAdd">Annuleer</button>
+        </div>
+      </form>
+      <p class="small muted" id="addHint">Kies een product uit de lijst of typ zelf een naam, gewicht, prijs en korting.</p>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>Gevonden</h2><span class="count" id="candCount"></span></div>
+      <div class="list" id="candList"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>In je mandje</h2><span class="count" id="basketCount"></span></div>
+      <div class="list" id="basketList"></div>
+      <div class="btn-row" id="finishRow" hidden>
+        <button class="btn btn-primary" id="finishBtn" type="button">Boodschappen afronden</button>
+      </div>
+      <div id="finishConfirm" class="banner info" hidden></div>
+    </div>
+  </section>
+
+  <!-- KOKEN -->
+  <section class="view wrap" id="view-koken" hidden aria-labelledby="h-koken">
+    <h2 id="h-koken">Koken met je buit</h2>
+    <div class="card" id="urgCard"></div>
+    <div class="section">
+      <div class="section-head"><h2>Maaltijdideeën</h2><span class="count" id="mealCount"></span></div>
+      <div class="list" id="mealList"></div>
+    </div>
+    <div class="card" id="aiCard" hidden>
+      <div class="section-head"><h2>Plan van Claude</h2></div>
+      <p class="small muted">Claude kijkt naar je mandje, wat je nog zag liggen en je dieet, en maakt een plan voor de komende dagen.</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="adviceBtn" type="button">Maak een plan</button>
+        <button class="btn" id="adviceStop" type="button" hidden>Stop</button>
+      </div>
+      <div class="advice" id="adviceOut" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- LOGBOEK -->
+  <section class="view wrap" id="view-logboek" hidden aria-labelledby="h-logboek">
+    <h2 id="h-logboek">Logboek</h2>
+    <div class="kpi-row" id="tripKpis"></div>
+    <div class="list" id="tripList"></div>
+  </section>
+
+  <!-- DIEET -->
+  <section class="view wrap" id="view-dieet" hidden aria-labelledby="h-dieet">
+    <h2 id="h-dieet">Jouw dieet</h2>
+    <form id="dietForm" class="section" novalidate>
+      <div class="card">
+        <h3>Doel</h3>
+        <div class="seg" id="dGoal" role="group" aria-label="Doel"></div>
+        <p class="small muted" id="dGoalDesc"></p>
+      </div>
+      <div class="card">
+        <h3>Wat eet je?</h3>
+        <div class="seg" id="dEat" role="group" aria-label="Eetwijze"></div>
+        <div class="checks" id="dExcl"></div>
+        <label class="check"><input type="checkbox" id="dUltra"> Vermijd ultrabewerkt</label>
+      </div>
+      <div class="card">
+        <h3>Per dag</h3>
+        <div class="grid3">
+          <label class="field" for="dKcal">kcal<input id="dKcal" type="number" inputmode="numeric" min="800" max="6000" step="10"></label>
+          <label class="field" for="dProt">Eiwit (g)<input id="dProt" type="number" inputmode="numeric" min="20" max="400" step="1"></label>
+          <label class="field" for="dCarb">Max. koolh. (g)<input id="dCarb" type="number" inputmode="numeric" min="0" max="800" step="1" placeholder="geen"></label>
+        </div>
+        <div class="grid2">
+          <label class="field" for="dWeight">Lichaamsgewicht (kg)<input id="dWeight" type="number" inputmode="decimal" min="30" max="250" step="0.1" placeholder="optioneel"></label>
+          <div class="field">Eiwit berekenen<button type="button" class="btn btn-sm" id="calcProt">Op basis van gewicht</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Huishouden en budget</h3>
+        <div class="grid2">
+          <label class="field" for="dPersons">Personen<input id="dPersons" type="number" inputmode="numeric" min="1" max="10" step="1"></label>
+          <label class="field" for="dBudget">Budget per week (€)<input id="dBudget" type="number" inputmode="decimal" min="0" step="1"></label>
+        </div>
+        <label class="check"><input type="checkbox" id="dFreezer"> Ik heb ruimte in de vriezer</label>
+      </div>
+      <div class="card">
+        <h3>In je eigen woorden</h3>
+        <label class="field" for="dNotes">Wat Claude moet weten (allergieën, wat je lekker vindt, kookgerei)
+          <textarea id="dNotes" placeholder="bv. Ik lust geen champignons, ik heb een airfryer, ik train 4x per week."></textarea>
+        </label>
+      </div>
+      <div class="btn-row"><button class="btn btn-primary" type="submit" id="dietSubmit">Opslaan</button><span class="small muted" id="dietSaved" aria-live="polite"></span></div>
+    </form>
+  </section>
+
+  <!-- INFO -->
+  <section class="view wrap" id="view-info" hidden aria-labelledby="h-info">
+    <h2 id="h-info">Slim afprijs-jagen</h2>
+    <div class="card" id="liveInfoCard"></div>
+    <div class="card" id="tipCard"></div>
+    <div class="card" id="storeCard"></div>
+    <div class="card" id="safetyCard"></div>
+    <div class="card" id="aboutCard"></div>
+  </section>
+</main>
+
+<nav class="tabbar" aria-label="Hoofdmenu">
+  <div class="tabs">
+    <a href="#winkel" data-tab="winkel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h2l2.2 10.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"/><circle cx="9.5" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg>Winkel<span class="badge" id="badgeBasket" hidden></span></a>
+    <a href="#koken" data-tab="koken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11h16v2a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7z"/><path d="M9 7c0-1.5 1-2 1-3M13 7c0-1.5 1-2 1-3"/></svg>Koken</a>
+    <a href="#logboek" data-tab="logboek"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5M4 19h16"/><path d="M8 15l3-4 3 2 4-6"/></svg>Logboek</a>
+    <a href="#dieet" data-tab="dieet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21c-4.5 0-7-3-7-7 0-4.5 3-8 7-8s7 3.5 7 8c0 4-2.5 7-7 7z"/><path d="M12 6c0-1.5.8-3 2.5-3.5"/></svg>Dieet</a>
+    <a href="#info" data-tab="info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>Info</a>
+  </div>
+</nav>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+/*@@DATA@@*/
+</script>
+<script>
+/*@@ENGINE@@*/
+</script>
+<script>
+/*@@UI@@*/
+</script>

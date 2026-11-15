@@ -167,6 +167,15 @@ textarea { min-height: 84px; resize: vertical; }
 
 .empty { border: 1.5px dashed var(--line); border-radius: var(--r); padding: 18px 16px; display: flex; flex-direction: column; gap: 8px; color: var(--muted); }
 .empty strong { color: var(--ink); font-family: var(--font-display); font-size: 1rem; }
+.live { border-color: color-mix(in srgb, var(--good) 40%, var(--line)); }
+a { color: var(--brand); }
+body.host #addCard { order: 10; }
+.live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
+.live-dot.on { background: var(--good); box-shadow: 0 0 0 4px var(--good-bg); }
+.live-dot.err { background: var(--bad); }
+.chip.live-tag { background: var(--good-bg); color: var(--good); font-size: 0.7rem; padding: 1px 8px; vertical-align: 2px; margin-left: 6px; }
+.codebox { font-family: var(--font-num); font-size: 0.74rem; background: var(--surface-2); border-radius: var(--r-sm); padding: 10px 12px; overflow-x: auto; white-space: pre; max-height: 180px; }
+.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 
 /* Meals and advice */
 .meal { display: flex; flex-direction: column; gap: 6px; }
@@ -237,6 +246,26 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
       <a class="btn btn-sm" href="#dieet">Dieet instellen</a>
     </div>
     <div class="summary" id="summary" aria-live="polite"></div>
+
+    <div class="card live" id="liveCard" hidden>
+      <div class="section-head">
+        <h2>Live bij je AH</h2>
+        <span class="live-dot" id="liveDot" aria-hidden="true"></span>
+      </div>
+      <p class="small" id="liveStatus" aria-live="polite"></p>
+      <div class="btn-row">
+        <button class="btn btn-primary" type="button" id="liveRefresh">Vernieuw koopjes</button>
+        <button class="btn" type="button" id="liveLogin" hidden>Inloggen bij AH</button>
+      </div>
+      <div class="seg" id="liveFilter" role="group" aria-label="Toon">
+        <button type="button" data-v="fit">Past bij mij</button>
+        <button type="button" data-v="all">Alles</button>
+      </div>
+    </div>
+    <div class="banner info" id="liveHint" hidden>
+      <span>Wil je de Laatste Kans Koopjes van je winkel live zien? Dat kan via de gratis iPhone-app Scriptable.</span>
+      <a class="btn btn-sm" href="#info">Zo werkt het</a>
+    </div>
 
     <div class="card" id="addCard">
       <div class="section-head"><h2>Wat ligt er met korting?</h2></div>
@@ -399,6 +428,7 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
   <!-- INFO -->
   <section class="view wrap" id="view-info" hidden aria-labelledby="h-info">
     <h2 id="h-info">Slim afprijs-jagen</h2>
+    <div class="card" id="liveInfoCard"></div>
     <div class="card" id="tipCard"></div>
     <div class="card" id="storeCard"></div>
     <div class="card" id="safetyCard"></div>
@@ -428,31 +458,12 @@ const SAFETY = {"rules":["Te gebruiken tot (TGT) is een veiligheidsdatum: vers v
 /* ============================================================
    Basics
    ============================================================ */
-const $ = (s, el = document) => el.querySelector(s);
-const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
-function h(tag, attrs, ...kids) {
-  const el = document.createElement(tag);
-  if (attrs) for (const [k, v] of Object.entries(attrs)) {
-    if (v == null || v === false) continue;
-    if (k === 'class') el.className = v;
-    else if (k === 'text') el.textContent = v;
-    else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
-    else el.setAttribute(k, v === true ? '' : String(v));
-  }
-  for (const kid of kids.flat(Infinity)) {
-    if (kid == null || kid === false) continue;
-    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
-  }
-  return el;
-}
-function fill(el, ...kids) { el.replaceChildren(...kids.flat(Infinity).filter(k => k != null && k !== false)); }
 const EUR = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' });
 const fmtEur = v => (v == null || !isFinite(v)) ? '-' : EUR.format(v);
 const fmtNum = (v, d = 0) => (v == null || !isFinite(v)) ? '-' : new Intl.NumberFormat('nl-NL', { maximumFractionDigits: d, minimumFractionDigits: d }).format(v);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const round2 = v => Math.round(v * 100) / 100;
 const clone = o => JSON.parse(JSON.stringify(o));
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 function parseNum(s) {
   if (s == null) return null;
   if (typeof s === 'number') return isFinite(s) ? s : null;
@@ -475,8 +486,6 @@ function lerp(x, pts) {
   return pts[pts.length - 1][1];
 }
 function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9% ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
-let toastTimer;
-function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2400); }
 
 /* ============================================================
    Diet model
@@ -737,8 +746,9 @@ function evaluate(it, P) {
   if (P.eat === 'flexi' && (tags.has('meat') || tags.has('beef') || tags.has('pork'))) fit -= 5;
   // Halal: regular AH meat is not halal certified, so meat can at most be "twijfel" and the warning always shows.
   if (P.excl && P.excl.halal && !hits.length && (tags.has('meat') || tags.has('poultry') || tags.has('beef'))) { pins.push('Alleen kopen met halal-keurmerk'); capTwijfel = true; }
-  // Typed-in products: the app only knows what the name says, so never give "Kopen" to someone who avoids things.
-  if (!it.foodId && it.source === 'manual' && ex.size && !hits.length) { pins.push('Samenstelling onbekend: check het etiket op wat je niet eet'); capTwijfel = true; }
+  // Products not in the table (typed in, or live from AH): the app only knows what the name says,
+  // so never give "Kopen" to someone who avoids things.
+  if (!it.foodId && (it.source === 'manual' || it.source === 'ah') && ex.size && !hits.length) { pins.push('Check het etiket op wat je niet eet'); capTwijfel = true; }
   fit = clamp(fit, 0, 100);
 
   /* --- value for money --- */
@@ -895,14 +905,149 @@ function mealIdeas(items, P) {
 function urgencyRank(it) { const s = expState(it); return s === 'vandaag' ? 0 : s === 'morgen' ? 1 : 2; }
 
 /* ============================================================
+   Live Laatste Kans Koopjes from the AH app API (used by the
+   Scriptable host): turn one bargain into an item the engine scores
+   ============================================================ */
+function parseUnitSize(s) {
+  if (!s) return null;
+  const t = String(s).toLowerCase().replace(/(\d),(\d)/g, '$1.$2');
+  const unit = (v, u) => { v = +v; return u === 'kg' || u === 'kilo' || u === 'l' || u === 'liter' ? v * 1000 : u === 'cl' ? v * 10 : v; };
+  const multi = t.match(/(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*(kg|kilo|gram|gr|g|ml|liter|cl|l)\b/);
+  if (multi) return Math.round(+multi[1] * unit(multi[2], multi[3]));
+  const one = t.match(/(\d+(?:\.\d+)?)\s*(kg|kilo|gram|gr|g|ml|liter|cl|l)\b/);
+  return one ? Math.round(unit(one[1], one[2])) : null;
+}
+// AH returns nutrients as [{type, name, value: "15.5 g" | "1046 kJ (250 kcal)"}], per 100 g first.
+function nutritionFromAH(list) {
+  if (!Array.isArray(list) || !list.length) return null;
+  const n = {};
+  const set = (k, v) => { if (n[k] == null && isFinite(v)) n[k] = v; };
+  for (const x of list) {
+    if (!x) continue;
+    const key = (String(x.type || '') + ' ' + String(x.name || '')).toLowerCase();
+    const val = String(x.value || '').toLowerCase().replace(/(\d),(\d)/g, '$1.$2');
+    const first = val.match(/-?\d+(?:\.\d+)?/);
+    if (!first) continue;
+    const num = parseFloat(first[0]);
+    if (/onverzadig|unsatur|enkelvoudig|meervoudig|mono|poly|transvet|trans fat/.test(key)) continue;
+    if (/energ/.test(key)) {
+      const kc = val.match(/(\d+(?:\.\d+)?)\s*kcal/);
+      const kj = val.match(/(\d+(?:\.\d+)?)\s*kj/);
+      if (kc) set('kcal', parseFloat(kc[1])); else if (kj) set('kcal', Math.round(parseFloat(kj[1]) / 4.184)); else if (/kcal/.test(key)) set('kcal', num);
+    }
+    else if (/satur|verzadig/.test(key)) set('satfat', num);
+    else if (/sugar|suiker/.test(key)) set('sugar', num);
+    else if (/fib|vezel/.test(key)) set('fiber', num);
+    else if (/salt|zout/.test(key)) set('salt', num);
+    else if (/sodium|natrium/.test(key)) { if (n.salt == null) n.salt = round2(num * 2.5 / (/mg/.test(val) ? 1000 : 1)); }
+    else if (/prot|eiwit/.test(key)) set('protein', num);
+    else if (/carbo|koolhydr/.test(key)) set('carbs', num);
+    else if (/\bfat\b|vet\b|vetten/.test(key)) set('fat', num);
+  }
+  return n.kcal != null || n.protein != null ? n : null;
+}
+function catFromAH(category, title) {
+  const t = norm(title), c = norm(category);
+  const both = t + ' | ' + c;
+  if (/\bkip|kippen|kalkoen|gevogelte/.test(t)) return 'gevogelte';
+  if (/zalm|tonijn|kabeljauw|garnal|sushi|makreel|haring|pangasius|\bvis\b|vissticks|kibbeling/.test(t)) return 'vis';
+  if (/vega|vegetarisch|plantaardig|tofu|tempeh|falafel/.test(t)) return 'vega';
+  if (/gehakt|\brund|varken|biefstuk|speklap|hamburger|karbonade|shoarma|gyros|\bworst|riblap|stooflap/.test(t)) return 'vlees';
+  if (/\bham\b|rookvlees|kipfilet beleg|salami|vleeswaren|hummus|salade.*(kip|ei|tonijn)|spread/.test(t)) return 'beleg';
+  if (/kaas|mozzarella|feta|brie|camembert/.test(t)) return 'kaas';
+  if (/eieren|\bei\b/.test(t)) return 'ei';
+  if (/yoghurt|kwark|skyr|melk|vla\b|pudding|toetje|room\b|kefir|zuivel/.test(t)) return 'zuivel';
+  if (/brood|croissant|\bbol|bollen|stokbrood|pistolet|bagel|wrap|pita|tortilla|krentenbol|gebak|taart|koek|muffin|donut/.test(t)) return 'brood';
+  if (/maaltijd|lasagne|nasi|bami|stamppot|soep|pizza|curry|bowl|maaltijdsalade|ovenschotel|wok|quiche/.test(both)) return 'maaltijd';
+  if (/pasta|tortellini|tagliatelle|gnocchi|noedel|\bmie\b|ravioli/.test(t)) return 'zetmeel';
+  if (/fruit|aardbei|bes|bessen|druif|druiven|banaan|bananen|mango|ananas|appel|peer|meloen|kiwi|framboz|citrus|sinaasappel/.test(both)) return 'fruit';
+  if (/groente|sla\b|slamelange|spinazie|broccoli|bloemkool|paprika|tomaat|tomaten|komkommer|champignon|courgette|wortel|kool|andijvie|rucola|prei|ui\b|uien|kruiden|aardappel|krieltjes/.test(both)) return 'groente';
+  if (/vlees|vis|kip/.test(c)) return 'vlees';
+  return 'overig';
+}
+function itemFromAH(x) {
+  const raw = String(x.title || 'Product').trim();
+  const title = raw.replace(/^AH\s+(Excellent\s+|Terra\s+|Biologisch\s+|Basic\s+)?/i, '').trim() || raw;
+  let core = title;
+  const brand = String(x.brand || '').trim();
+  if (brand && !/^ah$/i.test(brand) && core.toLowerCase().startsWith(brand.toLowerCase() + ' ')) core = core.slice(brand.length).trim();
+  const match = matchFood(core, 1)[0];
+  const strong = match && match.s >= 70 ? match.f : null;
+  const cat = strong ? strong.cat : catFromAH(x.category, title);
+  const tags = new Set([...(strong ? strong.tags : []), ...inferTags(raw)]);
+  if (!strong && (cat === 'groente' || cat === 'fruit') && !/gesneden|salade|mix|soep|maaltijd/.test(norm(title))) tags.add('fresh_produce');
+  if (tags.has('vegan') && ANIMAL.some(t => tags.has(t))) tags.delete('vegan');
+  const label = x.nutrition && (x.nutrition.kcal != null || x.nutrition.protein != null) ? x.nutrition : null;
+  const n = label || (strong ? itemFromFood(strong).n : null);
+  const was = parseNum(x.priceWas), now = parseNum(x.priceNow);
+  const pctIn = x.pct != null && isFinite(+x.pct) ? Math.round(+x.pct) : null;
+  const pct = pctIn != null ? pctIn : (was > 0 && now != null ? Math.round((1 - now / was) * 100) : null);
+  const exp = typeof x.expDate === 'string' && /^\d{4}-\d{2}-\d{2}/.test(x.expDate) ? x.expDate.slice(0, 10) : todayISO();
+  const freezable = strong ? !!strong.freezable : ['vlees', 'gevogelte', 'brood', 'maaltijd', 'vega'].includes(cat);
+  return {
+    id: `ah-${x.productId}-${exp}`, foodId: strong ? strong.id : null, name: title, cat, n, tags: [...tags], freezable,
+    grams: parseUnitSize(x.unitSize) ?? (strong ? strong.pack_g : null), unitSize: x.unitSize || null,
+    priceNormal: was, priceNow: now, discountPct: pct, expDate: exp,
+    qty: 1, source: 'ah', productId: x.productId ?? null, stock: x.stock != null && isFinite(+x.stock) ? +x.stock : null,
+    nutriSource: label ? 'etiket' : strong ? 'tabel' : null, addedAt: Date.now(),
+  };
+}
+
+</script>
+<script>
+'use strict';
+/* ============================================================
+   DOM helpers
+   ============================================================ */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'text') el.textContent = v;
+    else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? '' : String(v));
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid == null || kid === false) continue;
+    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+function fill(el, ...kids) { el.replaceChildren(...kids.flat(Infinity).filter(k => k != null && k !== false)); }
+let toastTimer;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2400); }
+
+/* ============================================================
    Storage: the viewer's private space in the artifact database when
    available, else this browser. A local mirror keeps every change, so
    a visit that could not reach the database is synced on the next one.
    ============================================================ */
+/* ============================================================
+   Host bridge. Inside the Scriptable app on the iPhone, the native
+   script injects window.LK_HOST = {kind, state, live} before this page
+   runs. The page never calls the native side directly: it puts
+   messages in an outbox that the native script polls (LK_TAKE), and the
+   native script pushes live AH data in with LK_LIVE / LK_LIVE_STATUS.
+   ============================================================ */
+const HOST = (window.LK_HOST && window.LK_HOST.kind) ? window.LK_HOST : null;
+const OUTBOX = [];
+function hostSend(cmd, arg) {
+  if (!HOST) return;
+  if (cmd === 'save' && OUTBOX.some(m => m.cmd === 'save')) return;
+  OUTBOX.push({ cmd, arg: arg == null ? null : arg });
+}
+window.LK_TAKE = () => JSON.stringify(OUTBOX.splice(0));
+window.LK_EXPORT = () => JSON.stringify({ profile: S.profile, session: S.session, trips: S.trips });
+
 const Store = {
   db: null, uid: null, mode: 'local', inViewer: false, loaded: false,
   pending: {}, timers: {}, chains: {}, failed: false, unsub: [],
   async init() {
+    if (HOST) { this.mode = 'host'; return; }
     this.inViewer = !!(window.claude && typeof window.claude.use === 'function');
     if (!this.inViewer) return;
     let db = null, user = null;
@@ -915,7 +1060,7 @@ const Store = {
   },
   lk(key) { return 'lk:' + (this.uid ? this.uid + ':' : '') + key; },
   localGet(key) { try { const s = localStorage.getItem(this.lk(key)); return s ? JSON.parse(s) : null; } catch (e) { return null; } },
-  localSet(key, v) { try { localStorage.setItem(this.lk(key), JSON.stringify(v)); } catch (e) { /* storage may be blocked */ } },
+  localSet(key, v) { if (this.mode === 'host') return; try { localStorage.setItem(this.lk(key), JSON.stringify(v)); } catch (e) { /* storage may be blocked */ } },
   ref(key) { return this.db.doc(`data/users/${this.uid}/${key}`); },
   tripsCol() { return this.db.doc(`data/users/${this.uid}/log`).collection('trips'); },
   async retry(fn) {
@@ -928,12 +1073,14 @@ const Store = {
     }
   },
   async load(key) {
+    if (this.mode === 'host') return HOST.state && HOST.state[key] != null ? clone(HOST.state[key]) : null;
     if (!this.db) return this.localGet(key);
     const snap = await this.retry(() => this.ref(key).get());
     return snap && snap.exists ? clone(snap.data()) : null;
   },
   save(key, value) {
     value.savedAt = Date.now();
+    if (this.mode === 'host') { if (this.loaded) hostSend('save'); return; }
     this.localSet(key, value);
     if (!this.db || !this.loaded) return;
     this.pending[key] = clone(value);
@@ -971,11 +1118,13 @@ const Store = {
   },
   unsynced() { return this.localGet('unsyncedTrips') || []; },
   async listTrips() {
+    if (this.mode === 'host') return HOST.state && Array.isArray(HOST.state.trips) ? clone(HOST.state.trips) : [];
     if (!this.db) return this.localGet('trips') || [];
     const qs = await this.retry(() => this.tripsCol().orderBy('ts', 'desc').limit(300).get());
     return qs.docs.map(d => Object.assign({ id: d.id }, clone(d.data())));
   },
   async addTrip(trip) {
+    if (this.mode === 'host') { hostSend('save'); return 'host'; }
     const all = [trip, ...(this.localGet('trips') || []).filter(t => t.id !== trip.id)].slice(0, 300);
     this.localSet('trips', all);
     if (!this.db) { if (this.inViewer) this.localSet('unsyncedTrips', [...this.unsynced().filter(t => t.id !== trip.id), trip]); return 'local'; }
@@ -983,6 +1132,7 @@ const Store = {
     catch (e) { this.localSet('unsyncedTrips', [...this.unsynced().filter(t => t.id !== trip.id), trip]); return 'local'; }
   },
   async deleteTrip(id) {
+    if (this.mode === 'host') { setTimeout(() => hostSend('save'), 0); return; }
     this.localSet('trips', (this.localGet('trips') || []).filter(t => t.id !== id));
     this.localSet('unsyncedTrips', this.unsynced().filter(t => t.id !== id));
     if (this.db) await this.retry(() => this.tripsCol().doc(id).delete());
@@ -1013,8 +1163,9 @@ const S = {
   sample: null, sampleImages: false, sampleMax: 3,
   adviceCtl: null, photoCtl: null, estCtl: null,
   finishing: false, pendingTripId: null,
+  live: { status: 'idle', message: null },
 };
-function emptySession() { return { candidates: [], basket: [], pantry: [], startedAt: null, savedAt: 0 }; }
+function emptySession() { return { candidates: [], basket: [], pantry: [], startedAt: null, savedAt: 0, hiddenAH: [], liveFilter: 'fit', liveMeta: null }; }
 function normalizeSession(d) {
   const s = Object.assign(emptySession(), d || {});
   for (const k of ['candidates', 'basket', 'pantry']) s[k] = (Array.isArray(s[k]) ? s[k] : []).map(migrateItem).filter(Boolean);
@@ -1060,7 +1211,10 @@ const EXP_NL = { vandaag: 'tot vandaag', morgen: 'tot morgen', verlopen: 'datum 
 function itemCard(it, where) {
   const ev = evaluate(it, S.profile);
   const price = itemPriceNow(it);
-  const meta = [it.grams ? `${fmtNum(it.grams)} g` : null, EXP_NL[ev.exp], CATS[it.cat] || null, it.source === 'claude' ? 'gelezen door Claude' : null].filter(Boolean).join(' · ');
+  const meta = [it.grams ? `${fmtNum(it.grams)} g` : (it.unitSize || null), EXP_NL[ev.exp], CATS[it.cat] || null,
+    it.source === 'claude' ? 'gelezen door Claude' : null,
+    it.source === 'ah' && it.stock != null ? `nog ${it.stock} in de winkel` : null,
+    it.source === 'ah' ? (it.nutriSource === 'etiket' ? 'voeding van etiket' : it.nutriSource === 'tabel' ? 'voeding: richtwaarde' : 'voeding onbekend') : null].filter(Boolean).join(' · ');
   const metrics = [];
   const kcal100 = it.n && it.n.kcal != null ? +it.n.kcal : 0;
   if (ev.m.eurPerProt != null) {
@@ -1086,7 +1240,7 @@ function itemCard(it, where) {
   return h('article', { class: `item v-${ev.verdict}` },
     h('div', { class: 'item-top' },
       h('div', { style: 'min-width:0' },
-        h('div', { class: 'item-name' }, it.name, it.example ? h('span', { class: 'chip ex', style: 'margin-left:6px;vertical-align:2px' }, 'Voorbeeld') : null),
+        h('div', { class: 'item-name' }, it.name, it.example ? h('span', { class: 'chip ex', style: 'margin-left:6px;vertical-align:2px' }, 'Voorbeeld') : null, it.source === 'ah' ? h('span', { class: 'chip live-tag' }, 'live') : null),
         h('div', { class: 'item-meta' }, meta)),
       h('div', { class: 'price' },
         it.priceNormal > 0 && price != null && price < it.priceNormal ? h('s', null, fmtEur(it.priceNormal)) : null,
@@ -1117,9 +1271,18 @@ function renderSummary() {
   fill($('#summary'), ...kids);
 }
 function renderCandidates() {
-  const scored = S.session.candidates.map(it => ({ it, s: evaluate(it, S.profile).score }));
-  const list = scored.sort((a, b) => b.s - a.s).map(x => x.it);
+  const scored = S.session.candidates.map(it => { const ev = evaluate(it, S.profile); return { it, s: ev.score, v: ev.verdict }; });
+  const onlyFit = HOST && (S.session.liveFilter || 'fit') === 'fit';
+  const hidden = onlyFit ? scored.filter(x => x.it.source === 'ah' && (x.v === 'laten' || x.v === 'nee')) : [];
+  const list = scored.filter(x => !hidden.includes(x)).sort((a, b) => b.s - a.s).map(x => x.it);
   $('#candCount').textContent = list.length ? `${list.length} product${list.length === 1 ? '' : 'en'}` : '';
+  const hiddenNote = hidden.length ? h('div', { class: 'banner info' }, h('span', null, `${hidden.length} koopje${hidden.length === 1 ? '' : 's'} verborgen dat niet bij je dieet past.`), h('button', { class: 'btn btn-sm', type: 'button', onclick: () => setLiveFilter('all') }, 'Toon alles')) : null;
+  if (!list.length && HOST) {
+    fill($('#candList'), hiddenNote, h('div', { class: 'empty' },
+      h('strong', null, S.profile.store ? 'Geen passende koopjes gevonden' : 'Kies je winkel'),
+      h('span', null, S.profile.store ? 'Vernieuw later nog eens: AH zet de hele dag nieuwe Laatste Kans Koopjes klaar, en de korting loopt op richting de avond. Je kunt ook zelf iets toevoegen.' : 'Kies bovenaan je AH. Dan haalt de app de Laatste Kans Koopjes van die winkel op.')));
+    return;
+  }
   if (!list.length) {
     fill($('#candList'), h('div', { class: 'empty' },
       h('strong', null, 'Nog niks gevonden'),
@@ -1129,7 +1292,7 @@ function renderCandidates() {
       h('div', { class: 'btn-row' }, h('button', { class: 'btn btn-sm', type: 'button', onclick: addExamples }, 'Laat voorbeelden zien'))));
     return;
   }
-  const kids = list.map(it => itemCard(it, 'cand'));
+  const kids = [hiddenNote, ...list.map(it => itemCard(it, 'cand'))];
   if (list.some(it => it.example)) kids.push(h('div', { class: 'btn-row' }, h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: clearExamples }, 'Wis voorbeelden')));
   fill($('#candList'), ...kids);
 }
@@ -1148,8 +1311,61 @@ function renderBasket() {
 }
 function renderWinkel() {
   $('#dietBanner').hidden = !!S.profile.setAt || !Store.loaded;
-  renderSummary(); renderCandidates(); renderBasket();
+  renderLive(); renderSummary(); renderCandidates(); renderBasket();
 }
+
+/* --- live AH data (Scriptable host only) --- */
+function fmtTime(ts) { return new Date(ts).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }); }
+function renderLive() {
+  $('#liveHint').hidden = !!HOST || !Store.loaded;
+  const card = $('#liveCard');
+  if (!HOST) { card.hidden = true; return; }
+  card.hidden = false;
+  const L = S.live, store = storeById(S.profile.store), meta = S.session.liveMeta;
+  const name = store ? (store.short || store.name) : '';
+  let msg;
+  if (!store) msg = 'Kies bovenaan je winkel. Daarna haalt de app de Laatste Kans Koopjes van die winkel op.';
+  else if (L.status === 'loading') msg = L.message || `Koopjes ophalen bij ${name}…`;
+  else if (L.status === 'login') msg = L.message || 'AH vraagt om in te loggen met je AH-account. Dat hoeft maar één keer.';
+  else if (L.status === 'error') msg = L.message || 'Ophalen lukte niet. Probeer het zo nog eens.';
+  else if (meta && meta.storeKey === S.profile.store) msg = `${meta.count} koopje${meta.count === 1 ? '' : 's'} bij ${name}, bijgewerkt om ${fmtTime(meta.fetchedAt)}.`;
+  else msg = `Tik op Vernieuw om de koopjes van ${name} op te halen.`;
+  $('#liveStatus').textContent = msg;
+  const dot = $('#liveDot');
+  dot.className = 'live-dot' + (L.status === 'error' || L.status === 'login' ? ' err' : meta && meta.storeKey === S.profile.store && L.status !== 'loading' ? ' on' : '');
+  $('#liveRefresh').disabled = !store || L.status === 'loading' || !Store.loaded;
+  $('#liveLogin').hidden = L.status !== 'login';
+  setSeg('#liveFilter', S.session.liveFilter || 'fit');
+}
+function setLiveFilter(v) { S.session.liveFilter = v === 'all' ? 'all' : 'fit'; saveSession(); renderWinkel(); }
+function liveRefresh() {
+  if (!HOST) return;
+  const s = storeById(S.profile.store);
+  if (!s) { toast('Kies eerst je winkel'); $('#storeSel').focus(); return; }
+  S.live = Object.assign({}, S.live, { status: 'loading', message: null });
+  hostSend('refresh', { key: s.id, ahId: s.id.replace(/^ah-/, ''), postcode: s.postcode, street: s.street, name: s.short || s.name });
+  renderLive();
+}
+function applyLive(p) {
+  if (!p || !Array.isArray(p.items)) return;
+  if (p.storeKey && S.profile.store && p.storeKey !== S.profile.store) return; // an answer for a store the user has left
+  const items = p.items.map(itemFromAH);
+  const hiddenIds = new Set(S.session.hiddenAH || []);
+  const inBasket = new Set(S.session.basket.map(b => b.id));
+  const editing = S.editing && S.editing.id;
+  const kept = S.session.candidates.filter(c => c.source !== 'ah' || c.id === editing);
+  const fresh = items.filter(it => !inBasket.has(it.id) && !hiddenIds.has(it.id) && it.id !== editing);
+  S.session.candidates = [...fresh, ...kept].slice(0, 200);
+  S.session.liveMeta = { storeKey: p.storeKey || S.profile.store, storeName: p.storeName || '', fetchedAt: p.fetchedAt || Date.now(), count: items.length };
+  S.live = Object.assign({}, S.live, { status: 'ok', message: null });
+  saveSession(); renderWinkel(); if (S.tab === 'koken') renderKoken();
+}
+window.LK_LIVE = payload => { try { applyLive(typeof payload === 'string' ? JSON.parse(payload) : payload); return 'ok'; } catch (e) { return 'error: ' + e.message; } };
+window.LK_LIVE_STATUS = st => {
+  const o = typeof st === 'string' ? JSON.parse(st) : (st || {});
+  S.live = Object.assign({}, S.live, { status: o.status || 'idle', message: o.message || null });
+  renderLive(); return 'ok';
+};
 function closeFormIf(id) { if (S.editing && S.editing.id === id) closeForm(); }
 function moveToBasket(id) {
   const i = S.session.candidates.findIndex(x => x.id === id); if (i < 0) return;
@@ -1174,6 +1390,8 @@ function changeQty(id, d) {
 }
 function removeItem(id) {
   closeFormIf(id);
+  const it = S.session.candidates.find(x => x.id === id);
+  if (it && it.source === 'ah') S.session.hiddenAH = [id, ...(S.session.hiddenAH || []).filter(x => x !== id)].slice(0, 300);
   S.session.candidates = S.session.candidates.filter(x => x.id !== id);
   saveSession(); renderWinkel();
 }
@@ -1478,7 +1696,49 @@ function submitDiet(e) {
 /* ============================================================
    Info view
    ============================================================ */
+const SCRIPT_URL = 'https://raw.githubusercontent.com/keeswb-af/suckacock/claude/optimistic-babbage-atkmd2/laatste-kans/dist/LaatsteKans.js';
+const INSTALLER = `// Installeert of werkt "Laatste Kans" bij
+const url = '${SCRIPT_URL}';
+const req = new Request(url);
+const code = await req.loadString();
+if (!/Laatste Kans/.test(code)) throw new Error('Download mislukt');
+let fm; try { fm = FileManager.iCloud(); fm.documentsDirectory(); } catch (e) { fm = FileManager.local(); }
+fm.writeString(fm.joinPath(fm.documentsDirectory(), 'Laatste Kans.js'), code);
+const a = new Alert();
+a.title = 'Geïnstalleerd';
+a.message = 'Open nu het script "Laatste Kans" in Scriptable.';
+await a.present();`;
+function renderLiveInfo() {
+  const card = $('#liveInfoCard');
+  if (HOST) {
+    fill(card, h('h3', null, 'Live via Scriptable'),
+      h('p', { class: 'small' }, 'Deze app haalt de Laatste Kans Koopjes rechtstreeks bij AH op, via dezelfde koppeling als de AH-app. Je gegevens staan in iCloud Drive in de map Scriptable.'),
+      h('div', { class: 'btn-row' },
+        h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { hostSend('update'); toast('Nieuwste versie ophalen…'); } }, 'Script bijwerken'),
+        h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => { hostSend('logout'); toast('Uitgelogd bij AH'); } }, 'Uitloggen bij AH')),
+      h('p', { class: 'small muted' }, 'Tip: zet in Scriptable een widget op je beginscherm. Die laat zien hoeveel koopjes bij je dieet passen.'));
+    return;
+  }
+  const copy = h('button', { class: 'btn btn-sm btn-primary', type: 'button' }, 'Kopieer installatiecode');
+  const box = h('pre', { class: 'codebox', id: 'installerCode', tabindex: '0' }, INSTALLER);
+  copy.addEventListener('click', () => {
+    const done = () => toast('Gekopieerd');
+    try { navigator.clipboard.writeText(INSTALLER).then(done, () => selectBox(box)); } catch (e) { selectBox(box); }
+  });
+  fill(card, h('h3', null, 'Live koopjes op je iPhone'),
+    h('p', { class: 'small' }, 'Een webpagina mag de AH-servers niet zelf aanroepen. De gratis app Scriptable mag dat wel. Daarin draait deze zelfde app, maar dan met de Laatste Kans Koopjes van je winkel live erin.'),
+    h('ol', { class: 'steps small' },
+      h('li', null, 'Installeer ', h('a', { href: 'https://apps.apple.com/nl/app/scriptable/id1405459188', target: '_blank', rel: 'noopener' }, 'Scriptable'), ' uit de App Store.'),
+      h('li', null, 'Kopieer de code hieronder. Open Scriptable, tik op + en plak de code. Tik op het afspeelknopje.'),
+      h('li', null, 'Er staat nu een script "Laatste Kans". Open het, kies je winkel en stel je dieet in. De koopjes komen er live in.'),
+      h('li', null, 'Lang drukken op je beginscherm, + en Scriptable kiezen geeft een widget met je koopjes van vandaag.')),
+    h('div', { class: 'btn-row' }, copy),
+    box,
+    h('p', { class: 'small muted' }, 'De koppeling is niet officieel. AH kan haar veranderen en dan werkt live ophalen even niet, tot het script is bijgewerkt. Je dieet en logboek in Scriptable staan los van deze pagina.'));
+}
+function selectBox(el) { const r = document.createRange(); r.selectNodeContents(el); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); toast('Selecteer en kopieer de code'); }
 function renderInfo() {
+  renderLiveInfo();
   const T = typeof TIPS !== 'undefined' ? TIPS : { when: [], stickers: [], sources: [] };
   fill($('#tipCard'), h('h3', null, 'Zo werkt afprijzen bij AH'),
     h('ul', { class: 'tips' }, (T.stickers || []).map(s => h('li', null, s))),
@@ -1516,6 +1776,7 @@ function pickStore(id) {
   if (S.draft) S.draft.store = S.profile.store;
   saveProfile(); renderStoreSelect(); renderInfo();
   const s = storeById(id); if (s) toast(`${s.short || s.name} is je winkel`);
+  if (HOST) { if (s) liveRefresh(); else renderLive(); }
 }
 function mapsUrl(s) { return `https://maps.apple.com/?q=${encodeURIComponent(`Albert Heijn ${s.street}, ${s.postcode} ${s.city || 'Groningen'}`)}`; }
 
@@ -1773,6 +2034,9 @@ function bind() {
     toast(`Eiwit: ${$('#dProt').value} g per dag`);
   });
   window.addEventListener('hashchange', route);
+  $('#liveRefresh').addEventListener('click', liveRefresh);
+  $('#liveLogin').addEventListener('click', () => { S.live = Object.assign({}, S.live, { status: 'loading', message: 'Inlogscherm van AH openen…' }); hostSend('login'); renderLive(); });
+  $('#liveFilter').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setLiveFilter(b.dataset.v); });
 }
 
 function newerOf(remote, local) {
@@ -1780,6 +2044,7 @@ function newerOf(remote, local) {
   return { v: remote, push: false };
 }
 async function boot() {
+  document.body.classList.toggle('host', !!HOST);
   bind();
   renderStoreSelect(); route();
   const viewer = !!(window.claude && typeof window.claude.use === 'function');
@@ -1788,7 +2053,9 @@ async function boot() {
   await Store.init();
   const timer = setTimeout(() => { if (!Store.loaded) showLoadBanner('Je opgeslagen gegevens zijn nog niet bereikbaar. Wat je in de winkel toevoegt, wordt bewaard zodra de verbinding er is.'); }, 10000);
   let data = null, push = { profile: false, session: false }, note = null;
-  if (Store.db) {
+  if (Store.mode === 'host') {
+    data = { profile: await Store.load('profile'), session: await Store.load('session'), trips: await Store.listTrips() };
+  } else if (Store.db) {
     try {
       const [p, s, t] = await Promise.all([Store.load('profile'), Store.load('session'), Store.listTrips()]);
       const np = newerOf(p, Store.localGet('profile')), ns = newerOf(s, Store.localGet('session'));
@@ -1822,8 +2089,14 @@ async function boot() {
   Store.watch('session', () => S.session, d => { S.session = normalizeSession(d); renderWinkel(); if (S.tab === 'koken') renderKoken(); });
   S.draft = null;
   renderAll(); route();
+  if (HOST) {
+    if (HOST.live && HOST.live.items) applyLive(HOST.live);
+    else if (HOST.liveError) window.LK_LIVE_STATUS(HOST.liveError);
+    else if (S.profile.store) liveRefresh();
+  }
 }
 
-window.LK = { evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, inferTags, exclusionsFor, defaultProfile, expState, GOALS, S, Store };
+window.LK = { evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, itemFromAH, nutritionFromAH, parseUnitSize, inferTags, exclusionsFor, defaultProfile, expState, GOALS, S, Store };
 boot();
+
 </script>
