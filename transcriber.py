@@ -125,6 +125,9 @@ def cmd_record(args) -> int:
     how = (f"stops after {args.seconds:g} s, Ctrl+C to stop early" if args.seconds
            else "press Enter to stop")
     print(f"● Recording ({how})", flush=True)
+    if sys.platform == "darwin":
+        print("  Keep the lid open: MacBooks switch the microphone off when it closes. "
+              "Dimming the screen is fine.", flush=True)
     stop = threading.Event()
     meter = threading.Thread(target=show_meter, args=(rec, stop), daemon=True)
     if sys.stdout.isatty():

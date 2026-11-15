@@ -97,6 +97,11 @@ Files go to `~/OfflineTranscriber`, named by date and time, for example
 
 Tips:
 
+- **MacBook: keep the lid open while recording.** MacBooks switch the built-in
+  microphone off in hardware when the lid closes (and the Mac goes to sleep).
+  Turn the screen brightness all the way down instead; the app keeps the Mac
+  awake while it records. Recording with the lid closed needs an external
+  screen, power and an external microphone.
 - Language detection listens to the first 30 seconds. For short or mixed-language
   recordings, choose the language.
 - `--prompt "Kees, Rijksmuseum"` helps with the spelling of names and jargon.

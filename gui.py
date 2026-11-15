@@ -27,6 +27,8 @@ from engine import SetupError
 AUDIO_TYPES = ("*.wav *.mp3 *.m4a *.mp4 *.aac *.flac *.ogg *.opus *.oga *.webm "
                "*.mov *.mkv *.avi *.wma *.aif *.aiff *.caf *.amr *.3gp")
 GREEN, ORANGE, RED, GRAY = "#1b7f3b", "#b35c00", "#c62828", "#777777"
+MAC = sys.platform == "darwin"
+SHORTCUT = "⌘R" if MAC else "Ctrl+R"
 
 
 @dataclass
@@ -178,7 +180,10 @@ class App:
                 pass  # <Command-...> only exists on macOS
 
         self._write(f"Recordings and transcripts are saved in {self.out_dir}\n", "note")
-        self._write("Press Record (or Ctrl+R) to start.\n", "note")
+        self._write(f"Press Record (or {SHORTCUT}) to start.\n", "note")
+        if MAC:
+            self._write("Keep the lid open while recording: MacBooks switch the microphone off "
+                        "when the lid closes. Dimming the screen all the way is fine.\n", "note")
 
     def _list_mics(self) -> list[tuple[str, object]]:
         try:
@@ -311,7 +316,8 @@ class App:
         if not self.recording_live:
             if rec.flowing.is_set():
                 self.recording_live = True
-                self._status("Recording... (press Stop or Ctrl+R)")
+                self._status("Recording... (keep the lid open)" if MAC
+                             else f"Recording... (press Stop or {SHORTCUT})")
                 self._update_controls()
             elif time.monotonic() - self.rec_started > 6:
                 self.recorder = None

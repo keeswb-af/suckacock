@@ -178,24 +178,24 @@ class ModelTests(unittest.TestCase):
 
 
 class RecorderTests(unittest.TestCase):
-    def test_audio_survives_driver_errors_on_stop(self):
-        import wave
-        from unittest import mock
+    """Recorder logic with a fake audio driver, so no microphone is needed."""
 
+    def fake_audio(self, failing=False):
         import numpy as np
 
         class Status:
             input_overflow = False
 
-        class FailingStream:  # an audio driver whose stop and close both fail
+        class Stream:
             def __init__(self, callback, **kwargs):
                 self.callback = callback
 
-            def start(self):
+            def start(self):  # delivers 0.1 s of sound at once
                 self.callback(np.full((1600, 1), 1000, dtype=np.int16), 1600, None, Status())
 
             def stop(self):
-                raise RuntimeError("driver error")
+                if failing:  # an audio driver whose stop and close both fail
+                    raise RuntimeError("driver error")
 
             close = stop
 
@@ -203,7 +203,7 @@ class RecorderTests(unittest.TestCase):
                 pass
 
         class FakeSoundDevice:
-            InputStream = FailingStream
+            InputStream = Stream
 
             @staticmethod
             def query_devices(device=None, kind=None):
@@ -213,9 +213,17 @@ class RecorderTests(unittest.TestCase):
             def check_input_settings(**kwargs):
                 pass
 
-        with tempfile.TemporaryDirectory() as d, \
-                mock.patch.object(engine, "import_sounddevice", lambda: FakeSoundDevice), \
-                mock.patch.object(engine, "_require_guard", lambda: None):
+        from unittest import mock
+        return [mock.patch.object(engine, "import_sounddevice", lambda: FakeSoundDevice),
+                mock.patch.object(engine, "_require_guard", lambda: None)]
+
+    def test_audio_survives_driver_errors_on_stop(self):
+        import contextlib
+        import wave
+
+        with tempfile.TemporaryDirectory() as d, contextlib.ExitStack() as stack:
+            for patch in self.fake_audio(failing=True):
+                stack.enter_context(patch)
             rec = engine.Recorder(None, Path(d, "r.wav"))
             rec.start()
             samples = rec.stop()
@@ -223,6 +231,36 @@ class RecorderTests(unittest.TestCase):
             self.assertFalse(rec._writer.is_alive())
             with wave.open(str(Path(d, "r.wav"))) as w:
                 self.assertEqual(w.getnframes(), 1600)
+
+    def test_mac_is_kept_awake_while_recording(self):
+        import contextlib
+        from unittest import mock
+
+        calls = []
+
+        class FakeCaffeinate:
+            def __init__(self, args, **kwargs):
+                calls.append(("start", args))
+
+            def terminate(self):
+                calls.append(("terminate",))
+
+            def wait(self, timeout=None):
+                calls.append(("wait",))
+
+        real_exists = os.path.exists
+        with contextlib.ExitStack() as stack:
+            for patch in self.fake_audio():
+                stack.enter_context(patch)
+            stack.enter_context(mock.patch.object(engine.sys, "platform", "darwin"))
+            stack.enter_context(mock.patch.object(
+                engine.os.path, "exists", lambda p: p == "/usr/bin/caffeinate" or real_exists(p)))
+            stack.enter_context(mock.patch.object(engine.subprocess, "Popen", FakeCaffeinate))
+            rec = engine.Recorder(None, None)
+            rec.start()
+            self.assertEqual(calls, [("start", ["/usr/bin/caffeinate", "-i", "-w", str(os.getpid())])])
+            rec.stop()
+        self.assertEqual(calls[1:], [("terminate",), ("wait",)])
 
 
 class HelperTests(unittest.TestCase):

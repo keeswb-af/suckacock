@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 import os
 import queue
+import subprocess
 import sys
 import threading
 import wave
@@ -277,6 +278,21 @@ def input_devices() -> list[dict]:
     ]
 
 
+def _keep_awake():
+    """On a Mac, stop it from falling asleep by itself while recording (the
+    screen can still go dark). Closing the lid still sends it to sleep, and
+    MacBooks switch the built-in microphone off in hardware when the lid closes."""
+    if sys.platform != "darwin" or not os.path.exists("/usr/bin/caffeinate"):
+        return None
+    try:
+        # -i: no idle sleep. -w: ends by itself if this app quits.
+        return subprocess.Popen(["/usr/bin/caffeinate", "-i", "-w", str(os.getpid())],
+                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL)
+    except OSError:
+        return None
+
+
 def _parse_device(device):
     if device is None or device == "":
         return None
@@ -311,6 +327,7 @@ class Recorder:
         self._stream = None
         self._wav = None
         self._writer = None
+        self._awake = None  # keeps a Mac awake while recording
 
     @property
     def seconds(self) -> float:
@@ -352,6 +369,7 @@ class Recorder:
                 device=self.device, samplerate=self.samplerate, channels=self.channels,
                 dtype="int16", latency=0.25, callback=self._callback)
             self._stream.start()
+            self._awake = _keep_awake()
         except Exception as exc:
             self._stream = None
             self._finish()
@@ -412,6 +430,13 @@ class Recorder:
         """Stop recording and return all samples (int16 mono at self.samplerate)."""
         import numpy as np
 
+        awake, self._awake = self._awake, None
+        if awake is not None:
+            try:
+                awake.terminate()
+                awake.wait(timeout=2)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
         stream, self._stream = self._stream, None
         if stream is not None:
             # Whatever the audio driver does here, the audio already captured
