@@ -53,7 +53,15 @@ const ALLOWED_TAGS = ['meat', 'poultry', 'pork', 'beef', 'fish', 'shellfish', 'd
 const CATS = { vlees: 'Vlees', gevogelte: 'Gevogelte', vis: 'Vis', vega: 'Vega', zuivel: 'Zuivel', kaas: 'Kaas', ei: 'Eieren', beleg: 'Beleg', brood: 'Brood', groente: 'Groente', fruit: 'Fruit', maaltijd: 'Maaltijd', salade: 'Salade', zetmeel: 'Pasta en co', overig: 'Overig' };
 
 function defaultProfile() {
-  return { goal: 'balanced', eat: 'alles', kcal: 2000, protein: 90, carbsMax: null, excl: {}, avoidUltra: false, freezer: true, persons: 1, budget: 40, notes: '', weight: null, store: null, setAt: null, savedAt: 0 };
+  return { goal: 'balanced', eat: 'alles', kcal: 2000, protein: 90, carbsMax: null, excl: {}, avoidUltra: false, freezer: true, persons: 1, budget: 40, notes: '', weight: null, stores: [], setAt: null, savedAt: 0 };
+}
+// The stores a profile follows (older profiles had a single "store").
+const MAX_STORES = 6;
+function profileStores(P) {
+  const known = id => typeof STORES === 'undefined' || STORES.some(s => s.id === id);
+  // A non-empty list wins; otherwise fall back to the single store of older versions.
+  const ids = P && Array.isArray(P.stores) && P.stores.length ? P.stores : P && P.store ? [P.store] : [];
+  return [...new Set(ids)].filter(known).slice(0, MAX_STORES);
 }
 function exclusionsFor(P) {
   const ex = new Set();
@@ -531,7 +539,8 @@ function itemFromAH(x) {
   const exp = typeof x.expDate === 'string' && /^\d{4}-\d{2}-\d{2}/.test(x.expDate) ? x.expDate.slice(0, 10) : todayISO();
   const freezable = strong ? !!strong.freezable : ['vlees', 'gevogelte', 'brood', 'maaltijd', 'vega'].includes(cat);
   return {
-    id: `ah-${x.productId}-${exp}-${now != null ? Math.round(now * 100) : 'x'}`, foodId: strong ? strong.id : null, name: title, cat, n, tags: [...tags], freezable,
+    id: `ah-${x.storeKey ? x.storeKey.replace(/^ah-/, '') + '-' : ''}${x.productId}-${exp}-${now != null ? Math.round(now * 100) : 'x'}`,
+    storeKey: x.storeKey || null, storeName: x.storeName || null, foodId: strong ? strong.id : null, name: title, cat, n, tags: [...tags], freezable,
     grams: parseUnitSize(x.unitSize) ?? (strong ? strong.pack_g : null), unitSize: x.unitSize || null,
     priceNormal: was, priceNow: now, discountPct: pct, expDate: exp,
     qty: 1, source: 'ah', productId: x.productId ?? null, stock: x.stock != null && isFinite(+x.stock) ? +x.stock : null,

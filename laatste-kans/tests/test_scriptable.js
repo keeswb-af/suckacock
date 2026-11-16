@@ -21,7 +21,10 @@ async function until(fn, ms = 8000, label = 'condition') {
 const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
 
 /* ---------- fake AH API ---------- */
-const AH = { requireLogin: false, partialAuth: false, refresh503: false, nutriError: false, calls: [], badHeaders: 0, scriptText: null };
+const AH = { failStore: null, requireLogin: false, partialAuth: false, refresh503: false, nutriError: false, calls: [], badHeaders: 0, scriptText: null };
+const BARGAINS_1093 = [
+  { product: { id: 201, title: 'AH Broccoli', brand: 'AH', salesUnitSize: '500 g' }, categoryTitle: 'Groente, aardappelen', markdown: { markdownType: 'DYNAMIC', markdownExpirationDate: today, markdownPercentage: 40 }, stock: 4, bargainPrice: { priceWas: '1.79', priceNow: '1.07' } },
+];
 const BARGAINS = [
   { product: { id: 101, title: 'AH Kipdijfilet', brand: 'AH', salesUnitSize: '400 g' }, categoryTitle: 'Vlees, kip, vis', markdown: { markdownType: 'DYNAMIC', markdownExpirationDate: today, markdownPercentage: 40 }, stock: 3, bargainPrice: { priceWas: '4.99', priceNow: '2.99' } },
   { product: { id: 102, title: 'AH Roomboter croissants', brand: 'AH', salesUnitSize: '6 stuks' }, categoryTitle: 'Brood, bakkerij', markdown: { markdownType: 'DYNAMIC', markdownExpirationDate: today, markdownPercentage: 70 }, stock: 2, bargainPrice: { priceWas: '2.49', priceNow: '0.75' } },
@@ -53,7 +56,9 @@ function ahRespond(req) {
       { id: 1829, name: 'AH Dierenriemstraat', storeType: 'REGULAR', address: { street: 'Dierenriemstraat', houseNumber: '122', postalCode: '9742AK', city: 'Groningen' } }] } } }) };
     if (/bargainItems/.test(q) && AH.partialAuth) return { status: 200, body: JSON.stringify({ data: { bargainItems: null }, errors: [{ message: 'Unauthorized', path: ['bargainItems'] }] }) };
     if (/bargainItems/.test(q)) {
-      if (AH.requireLogin && h.Authorization !== 'Bearer member-token') return { status: 200, body: JSON.stringify({ data: null, errors: [{ message: 'Unauthorized: member login required' }] }) };
+      // Real AH hides the reason: an anonymous token gets "Subgraph errors redacted".
+      if (AH.requireLogin && h.Authorization !== 'Bearer member-token') return { status: 200, body: JSON.stringify({ data: null, errors: [{ message: 'Subgraph errors redacted' }] }) };
+      if (body.variables.storeId === '1093') return AH.failStore === '1093' ? { status: 500, body: 'oops' } : { status: 200, body: JSON.stringify({ data: { bargainItems: BARGAINS_1093 } }) };
       if (body.variables.storeId !== '1829') return { status: 200, body: JSON.stringify({ data: { bargainItems: [] } }) };
       return { status: 200, body: JSON.stringify({ data: { bargainItems: BARGAINS } }) };
     }
@@ -129,6 +134,12 @@ function makeEnv(browserCtx, docs, keychain, opts) {
   env.globals = { Request, FileManager, Keychain, Timer, WebView, ListWidget, Color, Font, config, Script, module, Safari };
   return env;
 }
+async function pickStores(page, ids) {
+  await page.click('#storeBtn');
+  await page.waitForSelector('#storeSheet:not([hidden])');
+  await page.evaluate(want => { for (const i of document.querySelectorAll('#storeSheetList input')) { if (i.checked !== want.includes(i.dataset.id)) i.click(); } }, ids);
+  await page.click('#storeSheetDone');
+}
 function run(env) {
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
   const names = Object.keys(env.globals);
@@ -150,8 +161,8 @@ function run(env) {
   let wv = env.webviews[0], page = wv.page;
   await until(() => page.evaluate(() => window.LK && window.LK.Store.loaded), 8000, 'page boot');
   ok(await page.evaluate(() => window.LK.Store.mode === 'host'), 'page runs in host mode');
-  ok(await page.isVisible('#liveCard') && /Kies bovenaan je winkel/.test(await page.textContent('#liveStatus')), 'asks to pick a store');
-  await page.selectOption('#storeSel', 'ah-1829');
+  ok(await page.isVisible('#liveCard') && /Kies je AH/.test(await page.textContent('#liveStatus')), 'asks to pick a store');
+  await pickStores(page, ['ah-1829']);
   await until(() => page.evaluate(() => window.LK.S.session.candidates.some(c => c.source === 'ah')), 10000, 'live items');
   const live = await page.evaluate(() => window.LK.S.session.candidates.filter(c => c.source === 'ah').map(c => ({ name: c.name, n: c.n, ns: c.nutriSource, pct: c.discountPct, grams: c.grams, tags: c.tags })));
   ok(live.length >= 3, 'live items in Gevonden: ' + live.map(x => x.name).join(', '));
@@ -159,10 +170,10 @@ function run(env) {
   ok(kd && kd.ns === 'etiket' && kd.n.protein === 19 && kd.n.kcal === 147 && kd.grams === 400, 'Kipdijfilet uses label nutrition from AH');
   ok(AH.calls.some(c => c.query === 'StoresSearch') && AH.calls.some(c => c.query === 'BargainItems' && c.vars.storeId === '1829'), 'store id resolved by address (1829, not the first result)');
   ok(AH.badHeaders === 0, 'every AH call carries the app headers');
-  ok(/koopje/.test(await page.textContent('#liveStatus')) && await page.evaluate(() => document.querySelector('#liveDot').classList.contains('on')), 'live card shows count and time');
+  ok(/Paddepoel.*koopje.*bijgewerkt/.test(await page.textContent('#liveLines')) && await page.evaluate(() => document.querySelector('#liveDot').classList.contains('on')), 'live card shows count and time');
   const shown = await page.$$eval('#candList .item .item-name', els => els.map(e => e.textContent));
   ok(shown.some(t => /Kipdijfilet/.test(t)) && shown.every(t => /live/.test(t) || true), 'live cards rendered with the live tag');
-  await until(() => fs.existsSync(path.join(docs, 'Laatste Kans data', 'state.json')) && JSON.parse(fs.readFileSync(path.join(docs, 'Laatste Kans data', 'state.json'), 'utf8')).profile?.store === 'ah-1829', 6000, 'state saved');
+  await until(() => fs.existsSync(path.join(docs, 'Laatste Kans data', 'state.json')) && JSON.parse(fs.readFileSync(path.join(docs, 'Laatste Kans data', 'state.json'), 'utf8')).profile?.stores?.[0] === 'ah-1829', 6000, 'state saved');
   ok(true, 'profile with the store saved to iCloud Drive file');
   ok(fs.existsSync(path.join(docs, 'Laatste Kans data', 'voeding-cache.json')), 'nutrition cached per product');
 
@@ -180,7 +191,7 @@ function run(env) {
   env = run(makeEnv(ctx, docs, keychain, {}));
   await until(() => env.webviews[0] && env.webviews[0].page, 8000, 'webview');
   wv = env.webviews[0]; page = wv.page;
-  await until(() => page.evaluate(() => window.LK && window.LK.Store.loaded && window.LK.S.session.liveMeta), 8000, 'boot with live data');
+  await until(() => page.evaluate(() => window.LK && window.LK.Store.loaded && window.LK.S.session.liveMeta['ah-1829']), 8000, 'boot with live data');
   ok(!AH.calls.slice(callsBefore).some(c => c.query === 'StoresSearch'), 'store id remembered, no second lookup');
   ok(!AH.calls.slice(callsBefore).some(c => c.query === 'FetchNutrition'), 'nutrition served from cache');
   const names = await page.$$eval('#candList .item .item-name', els => els.map(e => e.textContent));
@@ -204,14 +215,14 @@ function run(env) {
   wv = env.webviews[0]; page = wv.page;
   await until(() => page.evaluate(() => window.LK && window.LK.Store.loaded), 8000, 'boot');
   await until(() => page.isVisible('#liveLogin'), 6000, 'login button');
-  ok(/in te loggen/i.test(await page.textContent("#liveStatus")), "explains that AH wants a login");
+  ok(/ingelogd|in te loggen/i.test(await page.textContent("#liveStatus")), "hidden AH error with an anonymous token asks for a login");
   await page.click('#liveLogin');
   await until(() => wv.loadedURL, 6000, 'login page');
   ok(/^https:\/\/login\.ah\.nl\/login\?client_id=appie-ios&response_type=code&redirect_uri=appie:\/\/login-exit$/.test(wv.loadedURL), 'opens the AH login page');
   const allowed = wv.shouldAllowRequest({ url: 'appie://login-exit?code=good-code' });
   ok(allowed === false, 'catches the appie:// redirect');
   await until(() => AH.calls.some(c => c.query === 'BargainItems' && c.auth === 'Bearer member-token'), 10000, 'member fetch');
-  await until(() => wv.page.evaluate(() => window.LK && window.LK.Store.loaded && window.LK.S.session.liveMeta && !window.LK.S.session.liveMeta.stale && window.LK.S.session.candidates.some(c => c.source === 'ah')), 10000, 'bargains after login');
+  await until(() => wv.page.evaluate(() => window.LK && window.LK.Store.loaded && (m => m && !m.stale)(window.LK.S.session.liveMeta['ah-1829']) && window.LK.S.session.candidates.some(c => c.source === 'ah')), 10000, 'bargains after login');
   page = wv.page;
   ok(JSON.parse(keychain.get('laatste-kans.ah-tokens')).kind === 'member', 'member token kept in the Keychain');
   ok(AH.calls.filter(c => c.query === 'BargainItems').pop().auth === 'Bearer member-token', 'bargains fetched with the member token');
@@ -253,7 +264,7 @@ function run(env) {
   await until(() => env.webviews[0] && env.webviews[0].page && env.presentedAt != null, 8000, 'present');
   ok(!AH.calls.slice(before, env.presentedAt).some(c => c.query === 'BargainItems'), 'app is shown before the bargains are fetched');
   wv = env.webviews[0];
-  await until(() => wv.page.evaluate(() => window.LK && window.LK.S.session.liveMeta && !window.LK.S.session.liveMeta.stale), 10000, 'fresh live');
+  await until(() => wv.page.evaluate(() => window.LK && (m => m && !m.stale)(window.LK.S.session.liveMeta['ah-1829'])), 10000, 'fresh live');
   page = wv.page;
   // Links leave the app through Safari.
   ok(wv.shouldAllowRequest({ url: 'https://maps.apple.com/?q=Albert+Heijn' }) === false && env.opened.length === 1, 'web links open in Safari, the app stays');
@@ -267,12 +278,31 @@ function run(env) {
   await until(() => page.evaluate(() => window.LK.S.live.status === 'ok'), 8000, 'refresh done');
   const yog = await page.evaluate(() => window.LK.S.session.candidates.filter(c => /Volle yoghurt/.test(c.name)).map(c => c.n && c.n.kcal));
   ok(yog.length === 1 && yog[0] === 70, 'edited live item kept after refresh: ' + JSON.stringify(yog));
-  // Switching store removes the previous store's live items at once.
-  await page.selectOption('#storeSel', 'ah-1093');
-  const left = await page.evaluate(() => window.LK.S.session.candidates.filter(c => c.source === 'ah' && !c.edited).length);
-  ok(left === 0, 'old store live items cleared on store switch');
-  await page.selectOption('#storeSel', 'ah-1829');
-  await until(() => page.evaluate(() => window.LK.S.session.liveMeta && window.LK.S.session.liveMeta.storeKey === 'ah-1829' && !window.LK.S.session.liveMeta.stale), 8000, 'back');
+  // Following a second store adds its bargains, each card says where; the filter narrows to one store.
+  await pickStores(page, ['ah-1829', 'ah-1093']);
+  await until(() => page.evaluate(() => (m => m && !m.stale)(window.LK.S.session.liveMeta['ah-1093'])), 8000, 'second store');
+  const both = await page.evaluate(() => [...new Set(window.LK.S.session.candidates.filter(c => c.source === 'ah').map(c => c.storeKey))].sort());
+  ok(both.join() === 'ah-1093,ah-1829', 'bargains from both stores: ' + both);
+  ok(/bij Selwerd/.test(await page.textContent('#candList')), 'cards say which store');
+  ok(/2 winkels/.test(await page.textContent('#storeBtn')), 'header shows 2 winkels');
+  ok(await page.isVisible('#liveStoreFilter') && (await page.$$('#liveStoreFilter button')).length === 3, 'store filter chips');
+  ok((await page.$$('#liveLines li')).length === 2, 'one status line per store');
+  await page.click('#liveStoreFilter button[data-v="ah-1093"]');
+  const only = await page.$$eval('#candList .item', els => els.map(e => e.textContent));
+  ok(only.length >= 1 && only.every(t => /Broccoli/.test(t) || !/live/.test(t)), 'store filter shows only that store');
+  await page.click('#liveStoreFilter button[data-v="all"]');
+  // One store failing does not hide the other.
+  AH.failStore = '1093';
+  await page.click('#liveRefresh');
+  await until(() => page.evaluate(() => (window.LK.S.live.per['ah-1093'] || {}).status === 'error' && (window.LK.S.live.per['ah-1829'] || {}).status === 'ok'), 8000, 'per-store error');
+  const lines = await page.textContent('#liveLines');
+  ok(/Selwerd[^]*fout|Selwerd[^]*lukte/i.test(lines) && /Paddepoel[^]*bijgewerkt/.test(lines), 'error shown for one store, the other still fine: ' + lines.replace(/\s+/g, ' '));
+  AH.failStore = null;
+  // Dropping a store removes its bargains at once.
+  await pickStores(page, ['ah-1829']);
+  const left = await page.evaluate(() => window.LK.S.session.candidates.filter(c => c.source === 'ah' && c.storeKey === 'ah-1093').length);
+  ok(left === 0, 'unfollowed store items cleared');
+  ok(await page.isHidden('#liveStoreFilter'), 'store filter hidden with one store');
   await page.click('#candList .item:has-text("Kipdijfilet") button:has-text("Weg")');
   await wait(800);
   wv.dismiss();
@@ -286,6 +316,15 @@ function run(env) {
   env = run(makeEnv(ctx, docs2, kc2, { widget: true, family: 'accessoryInline', accessory: true }));
   await env.done;
   ok(env.widget.texts.length === 1 && /koopjes voor jou/.test(env.widget.texts[0].text), 'Lock Screen inline widget: ' + env.widget.texts.map(t => t.text).join(' | '));
+  const stw = JSON.parse(fs.readFileSync(stFile, 'utf8'));
+  stw.profile.stores = ['ah-1829', 'ah-1093'];
+  fs.writeFileSync(stFile, JSON.stringify(stw));
+  env = run(makeEnv(ctx, docs2, kc2, { widget: true }));
+  await env.done;
+  const mt = env.widget.texts.map(t => t.text);
+  ok(mt.some(t => /2 winkels/.test(t)) && mt.some(t => /Broccoli.*Selwerd/.test(t)), 'widget combines stores: ' + mt.join(' | '));
+  stw.profile.stores = ['ah-1829'];
+  fs.writeFileSync(stFile, JSON.stringify(stw));
 
   // A GraphQL field error (data.bargainItems null) asks for a login instead of showing 0 bargains.
   AH.partialAuth = true; kc2.clear();
@@ -293,7 +332,7 @@ function run(env) {
   await until(() => env.webviews[0] && env.webviews[0].page, 8000, 'webview');
   wv = env.webviews[0];
   await until(() => wv.page.isVisible('#liveLogin'), 8000, 'login prompt');
-  ok(/in te loggen/.test(await wv.page.textContent('#liveStatus')), 'field-level auth error leads to the login prompt');
+  ok(/ingelogd|in te loggen/.test(await wv.page.textContent('#liveStatus')), 'field-level auth error leads to the login prompt');
   wv.dismiss();
   await until(() => Promise.race([env.done.then(() => true), wait(50).then(() => false)]), 8000, 'end');
   AH.partialAuth = false;

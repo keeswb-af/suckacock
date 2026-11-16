@@ -15,9 +15,9 @@ Er zijn twee versies, met dezelfde schermen en dezelfde beoordeling:
 
 1. Installeer Scriptable uit de App Store.
 2. Open in Scriptable een nieuw script (+), plak de inhoud van [`dist/installer.js`](dist/installer.js) en tik op afspelen. De claude.ai-versie heeft onder Info een knop die deze code kopieert.
-3. Open het script **Laatste Kans**. Kies bovenaan je winkel en stel bij **Dieet** je doel in, wat je niet eet en je kcal en eiwit per dag.
-4. De koopjes van die winkel verschijnen meteen. **Past bij mij** verbergt wat niet bij je dieet past. **Vernieuw koopjes** haalt de lijst opnieuw op; AH zet de hele dag nieuwe koopjes klaar en de korting loopt op richting de avond.
-5. Vraagt AH om in te loggen, tik dan op **Inloggen bij AH** en log in met je AH-account. Dat hoeft één keer; de sleutel staat in de iOS-sleutelhanger.
+3. Open het script **Laatste Kans**. Tik bovenaan op **Kies je AH** en vink een of meer winkels aan (tot 6). Stel bij **Dieet** je doel in, wat je niet eet en je kcal en eiwit per dag.
+4. De koopjes van al je winkels komen in één lijst; elke kaart zegt bij welke winkel. Met de knoppen per winkel zie je er één tegelijk. **Past bij mij** verbergt wat niet bij je dieet past. **Vernieuw koopjes** haalt alles opnieuw op; AH zet de hele dag nieuwe koopjes klaar en de korting loopt op richting de avond.
+5. Tik op **Inloggen bij AH** en log in met je AH-account. AH geeft de koopjes alleen aan ingelogde gebruikers (zonder login antwoordt AH met "Subgraph errors redacted"). Dat hoeft één keer; de sleutel staat in de iOS-sleutelhanger.
 6. Widget: lang drukken op je beginscherm, +, Scriptable, en kies het script Laatste Kans. De widget toont hoeveel koopjes bij je dieet passen en de beste paar.
 7. Bijwerken: **Info** en dan **Script bijwerken**.
 
@@ -46,7 +46,6 @@ Het live ophalen gebruikt dezelfde, niet-officiële koppeling als de AH-app (`ap
 ## Beperkingen
 
 - De koppeling met AH is niet officieel. Als AH haar verandert, werkt live ophalen niet meer tot het script is aangepast. Het script is getest tegen een nagebootste AH en een nagebootst Scriptable, nog niet tegen de echte.
-- Of AH voor de koopjes een login eist, is niet bekend; het script werkt in beide gevallen.
 - Producten die niet in de tabel staan, krijgen hun voedingswaarden van het AH-etiket. Allergenen haalt het script niet bij AH op; die leidt de app af uit de productnaam. Heb je een allergie, check dan het etiket. Voor wie iets niet eet, geeft de app zulke producten daarom hooguit **Twijfel**.
 - De voedingswaarden in de tabel zijn richtwaarden en niet regel voor regel gecontroleerd in NEVO.
 - De winkellijst en openingstijden komen uit zoekresultaten van november 2026 en zijn niet op ah.nl zelf gecontroleerd.

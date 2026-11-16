@@ -166,14 +166,26 @@ const S = {
   sample: null, sampleImages: false, sampleMax: 3,
   adviceCtl: null, photoCtl: null, estCtl: null,
   finishing: false, pendingTripId: null,
-  live: { status: 'idle', message: null },
+  live: { status: 'idle', message: null, per: {} },
 };
-function emptySession() { return { candidates: [], basket: [], pantry: [], startedAt: null, savedAt: 0, hiddenAH: [], liveFilter: 'fit', liveMeta: null }; }
+function emptySession() { return { candidates: [], basket: [], pantry: [], startedAt: null, savedAt: 0, hiddenAH: [], liveFilter: 'fit', storeFilter: 'all', liveMeta: {} }; }
 function normalizeSession(d) {
   const s = Object.assign(emptySession(), d || {});
   for (const k of ['candidates', 'basket', 'pantry']) s[k] = (Array.isArray(s[k]) ? s[k] : []).map(migrateItem).filter(Boolean);
+  // Live items from before multi-store support have no store: drop them, the next refresh brings them back.
+  s.candidates = s.candidates.filter(c => c.source !== 'ah' || c.storeKey || c.edited);
+  const m = s.liveMeta;
+  s.liveMeta = !m || typeof m !== 'object' ? {} : m.storeKey ? {} : m;
   return s;
 }
+function normalizeProfile(d) {
+  const p = Object.assign(defaultProfile(), d || {});
+  p.stores = profileStores(p);
+  delete p.store;
+  return p;
+}
+function myStores() { return profileStores(S.profile).map(storeById).filter(Boolean); }
+function storeShort(s) { return s ? (s.short || s.name) : ''; }
 function pruneSession() {
   const t = todayISO(), weekAgo = addDays(t, -7);
   const s = S.session;
@@ -193,10 +205,53 @@ function saveSession() { Store.save('session', S.session); }
    ============================================================ */
 function storeById(id) { return (typeof STORES !== 'undefined' ? STORES : []).find(s => s.id === id) || null; }
 function renderStoreSelect() {
-  const sel = $('#storeSel');
-  sel.replaceChildren(h('option', { value: '' }, 'Kies je AH'), ...STORES.map(s => h('option', { value: s.id }, s.short || s.name)));
-  sel.value = S.profile.store || '';
-  sel.disabled = !Store.loaded;
+  const ss = myStores();
+  $('#storeBtnLabel').textContent = !ss.length ? 'Kies je AH' : ss.length === 1 ? storeShort(ss[0]) : `${ss.length} winkels`;
+  $('#storeBtn').disabled = !Store.loaded;
+}
+function openStoreSheet() {
+  if (!Store.loaded) return;
+  S.sheetSel = profileStores(S.profile);
+  const list = $('#storeSheetList');
+  fill(list, ...STORES.map(st => h('label', { class: 'check store-check' },
+    h('input', { type: 'checkbox', id: 'st-' + st.id, 'data-id': st.id, checked: S.sheetSel.includes(st.id) }),
+    h('span', null, h('b', null, st.name), h('span', { class: 'sub' }, `${st.street}${st.area ? ' · ' + st.area : ''}${st.note ? ' · ' + st.note : ''}`)))));
+  syncSheet();
+  $('#storeSheet').hidden = false;
+}
+function syncSheet() {
+  const sel = new Set(S.sheetSel || []);
+  $$('#storeSheetList input').forEach(i => { i.checked = sel.has(i.dataset.id); i.disabled = !i.checked && sel.size >= MAX_STORES; });
+  $('#storeSheetCount').textContent = sel.size ? `${sel.size} gekozen.` : '';
+}
+function closeStoreSheet() {
+  if ($('#storeSheet').hidden) return;
+  $('#storeSheet').hidden = true;
+  setStores(S.sheetSel || profileStores(S.profile));
+}
+function setStores(ids) {
+  if (!Store.loaded) return;
+  const next = [...new Set(ids)].filter(id => storeById(id)).slice(0, MAX_STORES);
+  const prev = profileStores(S.profile);
+  if (next.join('|') === prev.join('|')) return;
+  const removed = prev.filter(id => !next.includes(id)), added = next.filter(id => !prev.includes(id));
+  S.profile.stores = next; delete S.profile.store;
+  if (S.draft) S.draft.stores = next.slice();
+  if (removed.length) {
+    S.session.candidates = S.session.candidates.filter(c => c.source !== 'ah' || c.edited || !removed.includes(c.storeKey));
+    for (const k of removed) { delete S.session.liveMeta[k]; if (S.live.per) delete S.live.per[k]; }
+    if (removed.includes(S.session.storeFilter)) S.session.storeFilter = 'all';
+    saveSession();
+  }
+  saveProfile(); renderStoreSelect(); renderInfo(); renderWinkel();
+  toast(!next.length ? 'Geen winkel gekozen' : next.length === 1 ? `${storeShort(storeById(next[0]))} is je winkel` : `${next.length} winkels gekozen`);
+  if (HOST && added.length) liveRefresh(added);
+}
+function toggleStore(id) {
+  const cur = profileStores(S.profile);
+  if (cur.includes(id)) setStores(cur.filter(x => x !== id));
+  else if (cur.length >= MAX_STORES) toast(`Maximaal ${MAX_STORES} winkels`);
+  else setStores([...cur, id]);
 }
 function showLoadBanner(msg, action) {
   const b = $('#loadBanner');
@@ -219,6 +274,7 @@ function itemCard(it, where) {
   const price = itemPriceNow(it);
   const meta = [it.grams ? `${fmtNum(it.grams)} g` : (it.unitSize || null), EXP_NL[ev.exp], CATS[it.cat] || null,
     it.source === 'claude' ? 'gelezen door Claude' : null,
+    it.source === 'ah' && it.storeName && profileStores(S.profile).length > 1 ? `bij ${it.storeName}` : null,
     it.source === 'ah' && it.stock != null ? `nog ${it.stock} in de winkel` : null,
     it.source === 'ah' ? (it.nutriSource === 'etiket' ? 'voeding van etiket' : it.nutriSource === 'tabel' ? 'voeding: richtwaarde' : 'voeding onbekend') : null].filter(Boolean).join(' · ');
   const metrics = [];
@@ -279,14 +335,16 @@ function renderSummary() {
 function renderCandidates() {
   const scored = S.session.candidates.map(it => { const ev = evaluate(it, S.profile); return { it, s: ev.score, v: ev.verdict }; });
   const onlyFit = HOST && (S.session.liveFilter || 'fit') === 'fit';
-  const hidden = onlyFit ? scored.filter(x => x.it.source === 'ah' && (x.v === 'laten' || x.v === 'nee')) : [];
-  const list = scored.filter(x => !hidden.includes(x)).sort((a, b) => b.s - a.s).map(x => x.it);
+  const sf = S.session.storeFilter && S.session.storeFilter !== 'all' && profileStores(S.profile).includes(S.session.storeFilter) ? S.session.storeFilter : null;
+  const inStore = sf ? scored.filter(x => x.it.source !== 'ah' || x.it.storeKey === sf) : scored;
+  const hidden = onlyFit ? inStore.filter(x => x.it.source === 'ah' && (x.v === 'laten' || x.v === 'nee')) : [];
+  const list = inStore.filter(x => !hidden.includes(x)).sort((a, b) => b.s - a.s).map(x => x.it);
   $('#candCount').textContent = list.length ? `${list.length} product${list.length === 1 ? '' : 'en'}` : '';
   const hiddenNote = hidden.length ? h('div', { class: 'banner info' }, h('span', null, `${hidden.length} koopje${hidden.length === 1 ? '' : 's'} verborgen dat niet bij je dieet past.`), h('button', { class: 'btn btn-sm', type: 'button', onclick: () => setLiveFilter('all') }, 'Toon alles')) : null;
   if (!list.length && HOST) {
     fill($('#candList'), hiddenNote, h('div', { class: 'empty' },
-      h('strong', null, S.profile.store ? 'Geen passende koopjes gevonden' : 'Kies je winkel'),
-      h('span', null, S.profile.store ? 'Vernieuw later nog eens: AH zet de hele dag nieuwe Laatste Kans Koopjes klaar, en de korting loopt op richting de avond. Je kunt ook zelf iets toevoegen.' : 'Kies bovenaan je AH. Dan haalt de app de Laatste Kans Koopjes van die winkel op.')));
+      h('strong', null, myStores().length ? 'Geen passende koopjes gevonden' : 'Kies je winkels'),
+      h('span', null, myStores().length ? 'Vernieuw later nog eens: AH zet de hele dag nieuwe Laatste Kans Koopjes klaar, en de korting loopt op richting de avond. Je kunt ook zelf iets toevoegen.' : 'Tik bovenaan op Kies je AH en kies een of meer winkels. Dan haalt de app hun Laatste Kans Koopjes op.')));
     return;
   }
   if (!list.length) {
@@ -327,54 +385,93 @@ function renderLive() {
   const card = $('#liveCard');
   if (!HOST) { card.hidden = true; return; }
   card.hidden = false;
-  const L = S.live, store = storeById(S.profile.store), meta = S.session.liveMeta;
-  const name = store ? (store.short || store.name) : '';
-  let msg;
-  if (!store) msg = 'Kies bovenaan je winkel. Daarna haalt de app de Laatste Kans Koopjes van die winkel op.';
-  else if (L.status === 'loading') msg = L.message || `Koopjes ophalen bij ${name}…`;
-  else if (L.status === 'login') msg = L.message || 'AH vraagt om in te loggen met je AH-account. Dat hoeft maar één keer.';
-  else if (L.status === 'error') msg = (L.message || 'Ophalen lukte niet. Probeer het zo nog eens.') + (meta && meta.storeKey === S.profile.store ? ` Je ziet de koopjes van ${fmtTime(meta.fetchedAt)}.` : '');
+  const L = S.live, ss = myStores(), meta = S.session.liveMeta || {}, per = L.per || {};
+  let msg = '';
+  if (!ss.length) msg = 'Tik bovenaan op Kies je AH en kies een of meer winkels. Daarna haalt de app hun Laatste Kans Koopjes op.';
+  else if (L.status === 'login') msg = L.message || 'AH laat de koopjes alleen zien als je bent ingelogd met je AH-account. Dat hoeft maar één keer.';
   else if (L.message) msg = L.message;
-  else if (meta && meta.storeKey === S.profile.store) msg = `${meta.count} koopje${meta.count === 1 ? '' : 's'} bij ${name}, ${meta.stale ? 'opgehaald om ' + fmtTime(meta.fetchedAt) + ' (nog niet ververst)' : 'bijgewerkt om ' + fmtTime(meta.fetchedAt)}.`
-    + (meta.count === 0 && meta.kind === 'anon' ? ' Zie je in de AH-app wel koopjes? Log dan in bij AH.' : '');
-  else msg = `Tik op Vernieuw om de koopjes van ${name} op te halen.`;
   $('#liveStatus').textContent = msg;
+  $('#liveStatus').hidden = !msg;
+  fill($('#liveLines'), ...ss.map(st => {
+    const m = meta[st.id], ps = per[st.id] || {}, nm = storeShort(st);
+    let cls = '', txt;
+    if (ps.status === 'loading') { cls = 'wait'; txt = `${nm}: ophalen…`; }
+    else if (ps.status === 'login') { cls = 'err'; txt = `${nm}: inloggen bij AH nodig`; }
+    else if (ps.status === 'error') { cls = 'err'; txt = `${nm}: ${ps.message || 'ophalen lukte niet'}${m ? ` Je ziet de koopjes van ${fmtTime(m.fetchedAt)}.` : ''}`; }
+    else if (m) { cls = m.stale ? 'wait' : 'ok'; txt = `${nm}: ${m.count} koopje${m.count === 1 ? '' : 's'}, ${m.stale ? 'van ' + fmtTime(m.fetchedAt) + ' (wordt ververst)' : 'bijgewerkt om ' + fmtTime(m.fetchedAt)}`; }
+    else txt = `${nm}: nog niet opgehaald`;
+    return h('li', { class: cls }, txt);
+  }));
+  const metas = ss.map(st => meta[st.id]).filter(Boolean);
+  const anyLoading = ss.some(st => (per[st.id] || {}).status === 'loading');
   const dot = $('#liveDot');
-  dot.className = 'live-dot' + (L.status === 'error' || L.status === 'login' ? ' err' : meta && meta.storeKey === S.profile.store && !meta.stale && L.status !== 'loading' ? ' on' : '');
-  $('#liveRefresh').disabled = !store || L.status === 'loading' || !Store.loaded;
-  $('#liveLogin').hidden = !(L.status === 'login' || (L.status !== 'loading' && meta && meta.storeKey === S.profile.store && meta.count === 0 && meta.kind === 'anon'));
+  dot.className = 'live-dot' + (L.status === 'error' || L.status === 'login' ? ' err' : metas.length && !anyLoading && metas.every(m => !m.stale) ? ' on' : '');
+  $('#liveRefresh').disabled = !ss.length || anyLoading || !Store.loaded;
+  const anonEmpty = !anyLoading && metas.length && metas.every(m => m.count === 0 && m.kind === 'anon');
+  $('#liveLogin').hidden = !(L.status === 'login' || anonEmpty);
   setSeg('#liveFilter', S.session.liveFilter || 'fit');
+  const sf = $('#liveStoreFilter');
+  sf.hidden = ss.length < 2;
+  if (ss.length >= 2) {
+    const cur = ss.some(st => st.id === S.session.storeFilter) ? S.session.storeFilter : 'all';
+    fill(sf, h('button', { type: 'button', 'data-v': 'all', 'aria-pressed': String(cur === 'all') }, 'Alle winkels'),
+      ...ss.map(st => h('button', { type: 'button', 'data-v': st.id, 'aria-pressed': String(cur === st.id) }, storeShort(st))));
+  }
 }
 function setLiveFilter(v) { S.session.liveFilter = v === 'all' ? 'all' : 'fit'; saveSession(); renderWinkel(); }
-function liveRefresh() {
+function setStoreFilter(v) { S.session.storeFilter = v || 'all'; saveSession(); renderWinkel(); }
+function storeArgOf(st) { return { key: st.id, ahId: st.id.replace(/^ah-/, ''), postcode: st.postcode, street: st.street, name: storeShort(st) }; }
+function settleLive() {
+  const per = S.live.per || {};
+  const st = profileStores(S.profile).map(k => (per[k] || {}).status);
+  S.live.status = st.includes('loading') ? 'loading' : st.includes('login') ? 'login' : st.includes('error') ? 'error' : 'ok';
+}
+function liveRefresh(keys) {
   if (!HOST) return;
-  const s = storeById(S.profile.store);
-  if (!s) { toast('Kies eerst je winkel'); $('#storeSel').focus(); return; }
-  S.live = Object.assign({}, S.live, { status: 'loading', message: null });
-  hostSend('refresh', { key: s.id, ahId: s.id.replace(/^ah-/, ''), postcode: s.postcode, street: s.street, name: s.short || s.name });
+  const all = myStores();
+  if (!all.length) { toast('Kies eerst je winkels'); openStoreSheet(); return; }
+  const list = keys && keys.length ? all.filter(st => keys.includes(st.id)) : all;
+  S.live.per = Object.assign({}, S.live.per);
+  for (const st of list) S.live.per[st.id] = { status: 'loading' };
+  S.live.status = 'loading'; S.live.message = null;
+  hostSend('refresh', { stores: list.map(storeArgOf) });
   renderLive();
 }
 function applyLive(p, opts) {
-  if (!p || !Array.isArray(p.items)) return;
-  if (p.storeKey && p.storeKey !== S.profile.store) return; // an answer for a store the user has left
+  if (!p || !Array.isArray(p.items) || !p.storeKey) return;
+  if (!profileStores(S.profile).includes(p.storeKey)) return; // an answer for a store the user no longer follows
   const stale = !!(opts && opts.stale);
-  const items = p.items.map(itemFromAH);
+  const items = p.items.map(x => itemFromAH(Object.assign({}, x, { storeKey: p.storeKey, storeName: p.storeName || storeShort(storeById(p.storeKey)) })));
   const hiddenIds = new Set(S.session.hiddenAH || []);
   const inBasket = new Set(S.session.basket.map(b => b.id));
   const editing = S.editing && S.editing.id;
-  const kept = S.session.candidates.filter(c => c.source !== 'ah' || c.edited || c.id === editing);
+  const kept = S.session.candidates.filter(c => c.source !== 'ah' || c.edited || c.id === editing || c.storeKey !== p.storeKey);
   const keptIds = new Set(kept.map(c => c.id));
-  const fresh = items.filter(it => !inBasket.has(it.id) && !hiddenIds.has(it.id) && !keptIds.has(it.id));
-  S.session.candidates = [...kept, ...fresh.slice(0, Math.max(0, 200 - kept.length))];
-  S.session.liveMeta = { storeKey: p.storeKey || S.profile.store, storeName: p.storeName || '', fetchedAt: p.fetchedAt || Date.now(), count: items.length, kind: p.kind || null, stale };
-  if (!stale) S.live = Object.assign({}, S.live, { status: 'ok', message: null });
+  const fresh = items.filter(it => !inBasket.has(it.id) && !hiddenIds.has(it.id) && !keptIds.has(it.id)).slice(0, 150);
+  S.session.candidates = [...kept, ...fresh];
+  S.session.liveMeta = Object.assign({}, S.session.liveMeta, { [p.storeKey]: { fetchedAt: p.fetchedAt || Date.now(), count: items.length, kind: p.kind || null, stale } });
+  if (!stale) {
+    S.live.per = Object.assign({}, S.live.per, { [p.storeKey]: { status: 'ok' } });
+    S.live.message = null;
+    settleLive();
+  }
   saveSession(); renderWinkel(); if (S.tab === 'koken') renderKoken();
 }
 window.LK_LIVE = payload => { try { applyLive(typeof payload === 'string' ? JSON.parse(payload) : payload); return 'ok'; } catch (e) { return 'error: ' + e.message; } };
 window.LK_TOAST = m => { toast(String(typeof m === 'string' && m[0] === '"' ? JSON.parse(m) : m)); return 'ok'; };
 window.LK_LIVE_STATUS = st => {
   const o = typeof st === 'string' ? JSON.parse(st) : (st || {});
-  S.live = Object.assign({}, S.live, { status: o.status || 'idle', message: o.message || null });
+  if (o.storeKey) {
+    S.live.per = Object.assign({}, S.live.per, { [o.storeKey]: { status: o.status || 'idle', message: o.message || null } });
+    settleLive();
+  } else if (o.all) {
+    S.live.per = {};
+    for (const k of profileStores(S.profile)) S.live.per[k] = { status: o.status, message: o.message || null };
+    S.live.status = o.status; S.live.message = o.message || null;
+  } else {
+    S.live.status = o.status || 'idle'; S.live.message = o.message || null;
+    if (S.live.status !== 'loading') { const per = S.live.per || {}; for (const k of Object.keys(per)) if (per[k].status === 'loading') per[k] = { status: 'idle' }; }
+  }
   renderLive(); return 'ok';
 };
 function closeFormIf(id) { if (S.editing && S.editing.id === id) closeForm(); }
@@ -382,7 +479,7 @@ function moveToBasket(id) {
   const i = S.session.candidates.findIndex(x => x.id === id); if (i < 0) return;
   closeFormIf(id);
   const [it] = S.session.candidates.splice(i, 1);
-  const same = S.session.basket.find(b => b.foodId && b.foodId === it.foodId && !!b.example === !!it.example && b.name === it.name && itemPriceNow(b) === itemPriceNow(it) && b.grams === it.grams && b.expDate === it.expDate);
+  const same = S.session.basket.find(b => b.foodId && b.foodId === it.foodId && !!b.example === !!it.example && (b.storeKey || null) === (it.storeKey || null) && b.name === it.name && itemPriceNow(b) === itemPriceNow(it) && b.grams === it.grams && b.expDate === it.expDate);
   if (same) same.qty = (same.qty || 1) + (it.qty || 1); else S.session.basket.push(it);
   if (!S.session.startedAt) S.session.startedAt = Date.now();
   saveSession(); renderWinkel(); toast(`${it.name} in je mandje`);
@@ -534,9 +631,10 @@ async function confirmFinish() {
   const btn = $('#confirmFinishBtn'); if (btn) btn.disabled = true;
   try {
     const t = basketTotals(real, S.profile);
-    const store = storeById(S.profile.store);
+    const names = [...new Set(real.map(it => it.storeName).filter(Boolean))];
+    const storeLabel = names.length ? names.join(', ') : myStores().map(storeShort).join(', ');
     const trip = {
-      id: S.pendingTripId || ('t' + uid()), date: todayISO(), ts: Date.now(), store: store ? (store.short || store.name) : '', storeId: S.profile.store || null,
+      id: S.pendingTripId || ('t' + uid()), date: todayISO(), ts: Date.now(), store: storeLabel, stores: profileStores(S.profile),
       spent: t.spent, saved: t.saved, prot: Math.round(t.prot), kcal: Math.round(t.kcal),
       items: real.map(it => ({ name: it.name, qty: it.qty || 1, price: itemPriceNow(it), normal: it.priceNormal ?? null, grams: it.grams ?? null })),
     };
@@ -697,7 +795,8 @@ function submitDiet(e) {
   const b = num('#dBudget'); d.budget = b == null ? null : Math.max(0, b);
   d.avoidUltra = $('#dUltra').checked; d.freezer = $('#dFreezer').checked;
   d.notes = $('#dNotes').value.slice(0, 2000);
-  S.profile = Object.assign({}, d, { store: S.profile.store, setAt: Date.now() });
+  S.profile = Object.assign({}, d, { stores: profileStores(S.profile), setAt: Date.now() });
+  delete S.profile.store;
   S.draft = clone(S.profile);
   saveProfile(); renderAll();
   $('#dietSaved').textContent = 'Opgeslagen. Alle producten zijn opnieuw beoordeeld.';
@@ -757,15 +856,16 @@ function renderInfo() {
     h('ul', { class: 'tips' }, (T.when || []).map(s => h('li', null, s))),
     T.digital && T.digital.length ? h('h3', null, 'Digitaal') : null,
     T.digital && T.digital.length ? h('ul', { class: 'tips' }, T.digital.map(s => h('li', null, s))) : null);
-  const cur = S.profile.store;
+  const mine = new Set(profileStores(S.profile));
   fill($('#storeCard'), h('h3', null, `Albert Heijn in Groningen (${STORES.length})`),
-    h('div', null, STORES.map(s => h('div', { class: 'store' + (s.id === cur ? ' on' : '') },
+    h('p', { class: 'small muted' }, `Je volgt ${mine.size} winkel${mine.size === 1 ? '' : 's'} (maximaal ${MAX_STORES}).`),
+    h('div', null, STORES.map(s => h('div', { class: 'store' + (mine.has(s.id) ? ' on' : '') },
       h('div', { style: 'min-width:0' }, h('div', { class: 'nm' }, s.name), h('div', { class: 'ad' }, `${s.street}, ${s.postcode} ${s.city || 'Groningen'}${s.area ? ` · ${s.area}` : ''}`),
         s.hours ? h('div', { class: 'ad' }, `Open: ${s.hours}`) : null,
         s.note ? h('div', { class: 'ad' }, s.note) : null,
         s.url ? h('a', { class: 'ad', href: s.url, target: '_blank', rel: 'noopener' }, 'Actuele tijden op ah.nl') : null),
       h('div', { class: 'btn-row', style: 'flex:none' },
-        h('button', { class: 'btn btn-sm', type: 'button', disabled: !Store.loaded, onclick: () => pickStore(s.id) }, s.id === cur ? 'Gekozen' : 'Kies'),
+        h('button', { class: 'btn btn-sm' + (mine.has(s.id) ? ' btn-primary' : ''), type: 'button', disabled: !Store.loaded, 'aria-pressed': String(mine.has(s.id)), onclick: () => toggleStore(s.id) }, mine.has(s.id) ? 'Gevolgd' : 'Volg'),
         h('a', { class: 'btn btn-sm btn-ghost', href: mapsUrl(s), target: '_blank', rel: 'noopener' }, 'Route'))))),
     h('p', { class: 'small muted' }, 'Openingstijden zijn een indicatie en wijken af op feestdagen. Check de winkelpagina op ah.nl.'));
   const SF = typeof SAFETY !== 'undefined' ? SAFETY : { rules: [], freeze: [] };
@@ -780,21 +880,6 @@ function renderInfo() {
     h('p', { class: 'small muted' }, `Opslag: ${Store.mode === 'db' ? 'privé in je Claude-account (ook anderen met de link zien jouw gegevens niet)' : 'alleen in deze browser'}. Claude: ${S.sample ? 'beschikbaar voor screenshots, foto’s en plannen' : 'niet beschikbaar in deze weergave'}.`),
     h('p', { class: 'small muted' }, 'Geen officiële app van Albert Heijn.'),
     (T.sources || []).length ? h('details', null, h('summary', null, 'Bronnen'), h('ul', { class: 'tips small' }, T.sources.map(u => h('li', null, h('a', { href: u, target: '_blank', rel: 'noopener' }, u.replace(/^https?:\/\//, '')))))) : null);
-}
-function pickStore(id) {
-  if (!Store.loaded) return;
-  const changed = (S.profile.store || null) !== (id || null);
-  S.profile.store = id || null;
-  if (S.draft) S.draft.store = S.profile.store;
-  if (HOST && changed) {
-    S.session.candidates = S.session.candidates.filter(c => c.source !== 'ah' || c.edited);
-    S.session.liveMeta = null;
-    S.live = { status: 'idle', message: null };
-    saveSession(); renderWinkel();
-  }
-  saveProfile(); renderStoreSelect(); renderInfo();
-  const s = storeById(id); if (s) toast(`${s.short || s.name} is je winkel`);
-  if (HOST) { if (s) liveRefresh(); else renderLive(); }
 }
 function mapsUrl(s) { return `https://maps.apple.com/?q=${encodeURIComponent(`Albert Heijn ${s.street}, ${s.postcode} ${s.city || 'Groningen'}`)}`; }
 
@@ -965,9 +1050,9 @@ async function askAdvice() {
   const ctl = new AbortController(); S.adviceCtl = ctl;
   btn.disabled = true; stop.hidden = false;
   fill($('#adviceOut'), h('p', { class: 'muted' }, 'Claude denkt na…'));
-  const fmtIt = it => { const ev = evaluate(it, S.profile); const n = it.n; return `- ${it.name}${(it.qty || 1) > 1 ? ' x' + it.qty : ''}, ${it.grams || '?'} g, ${fmtEur(itemPriceNow(it))}${it.priceNormal ? ` (normaal ${fmtEur(it.priceNormal)})` : ''}, houdbaar: ${expState(it)}, invriesbaar: ${it.freezable ? 'ja' : 'nee'}${n ? `, per 100 g: ${n.kcal ?? '?'} kcal, ${n.protein ?? '?'} g eiwit, ${n.carbs ?? '?'} g koolh., ${n.fat ?? '?'} g vet` : ''}; app-oordeel: ${VERDICT_NL[ev.verdict]} (${ev.score}/100)`; };
-  const store = storeById(S.profile.store);
-  const prompt = `Je helpt iemand die in Groningen goedkoop boodschappen doet met Laatste Kans Koopjes (afgeprijsde producten) bij Albert Heijn${store ? ` (${store.name})` : ''}. Vandaag is ${new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}.
+  const fmtIt = it => { const ev = evaluate(it, S.profile); const n = it.n; return `- ${it.name}${it.storeName ? ' (' + it.storeName + ')' : ''}${(it.qty || 1) > 1 ? ' x' + it.qty : ''}, ${it.grams || '?'} g, ${fmtEur(itemPriceNow(it))}${it.priceNormal ? ` (normaal ${fmtEur(it.priceNormal)})` : ''}, houdbaar: ${expState(it)}, invriesbaar: ${it.freezable ? 'ja' : 'nee'}${n ? `, per 100 g: ${n.kcal ?? '?'} kcal, ${n.protein ?? '?'} g eiwit, ${n.carbs ?? '?'} g koolh., ${n.fat ?? '?'} g vet` : ''}; app-oordeel: ${VERDICT_NL[ev.verdict]} (${ev.score}/100)`; };
+  const sts = myStores();
+  const prompt = `Je helpt iemand die in Groningen goedkoop boodschappen doet met Laatste Kans Koopjes (afgeprijsde producten) bij Albert Heijn${sts.length ? ` (${sts.map(x => x.name).join(', ')})` : ''}. Vandaag is ${new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}.
 
 Dieet:
 ${profileText()}
@@ -1041,7 +1126,17 @@ function bind() {
   $('#finishBtn').addEventListener('click', finishTrip);
   $('#adviceBtn').addEventListener('click', askAdvice);
   $('#adviceStop').addEventListener('click', () => S.adviceCtl && S.adviceCtl.abort());
-  $('#storeSel').addEventListener('change', e => pickStore(e.target.value));
+  $('#storeBtn').addEventListener('click', openStoreSheet);
+  $('#storeSheetDone').addEventListener('click', closeStoreSheet);
+  $('#storeSheet').addEventListener('click', e => { if (e.target.id === 'storeSheet') closeStoreSheet(); });
+  $('#storeSheetList').addEventListener('change', e => {
+    const id = e.target && e.target.dataset && e.target.dataset.id; if (!id) return;
+    const cur = (S.sheetSel || []).filter(x => x !== id);
+    S.sheetSel = e.target.checked ? [...cur, id].slice(0, MAX_STORES) : cur;
+    syncSheet();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeStoreSheet(); });
+  $('#liveStoreFilter').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setStoreFilter(b.dataset.v); });
   $('#dietForm').addEventListener('submit', submitDiet);
   $('#dUltra').addEventListener('change', e => { if (S.draft) S.draft.avoidUltra = e.target.checked; });
   $('#dFreezer').addEventListener('change', e => { if (S.draft) S.draft.freezer = e.target.checked; });
@@ -1093,7 +1188,7 @@ async function boot() {
   showLoadBanner(note);
   // Keep anything added to Gevonden or the basket while loading.
   const live = S.session;
-  if (data.profile) S.profile = Object.assign(defaultProfile(), data.profile);
+  S.profile = normalizeProfile(data.profile);
   S.session = normalizeSession(data.session);
   if (live.candidates.length) S.session.candidates = live.candidates.filter(x => !S.session.candidates.some(y => y.id === x.id)).concat(S.session.candidates);
   if (live.basket.length) S.session.basket = live.basket.filter(x => !S.session.basket.some(y => y.id === x.id)).concat(S.session.basket);
@@ -1103,17 +1198,17 @@ async function boot() {
   const pruned = pruneSession();
   if (push.profile) saveProfile();
   if (push.session || pruned || live.candidates.length || live.basket.length) saveSession();
-  Store.watch('profile', () => S.profile, d => { S.profile = Object.assign(defaultProfile(), d); if (S.tab !== 'dieet') S.draft = null; renderAll(); });
+  Store.watch('profile', () => S.profile, d => { S.profile = normalizeProfile(d); if (S.tab !== 'dieet') S.draft = null; renderAll(); });
   Store.watch('session', () => S.session, d => { S.session = normalizeSession(d); renderWinkel(); if (S.tab === 'koken') renderKoken(); });
   S.draft = null;
   renderAll(); route();
   if (HOST) {
     if (HOST.readOnly) showLoadBanner('Je opgeslagen gegevens konden niet worden gelezen (iCloud). Wat je nu doet, wordt niet bewaard. Sluit de app en probeer het later opnieuw.');
-    if (HOST.live && HOST.live.items) applyLive(HOST.live, { stale: !!HOST.liveStale });
+    for (const p of [].concat(HOST.live || [])) if (p && p.items) applyLive(p, { stale: !!HOST.liveStale });
     if (HOST.liveError) window.LK_LIVE_STATUS(HOST.liveError);
-    else if (S.profile.store) liveRefresh();
+    else if (myStores().length) liveRefresh();
   }
 }
 
-window.LK = { evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, itemFromAH, nutritionFromAH, parseUnitSize, inferTags, exclusionsFor, defaultProfile, expState, GOALS, S, Store };
+window.LK = { profileStores, setStores, evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, itemFromAH, nutritionFromAH, parseUnitSize, inferTags, exclusionsFor, defaultProfile, expState, GOALS, S, Store };
 boot();

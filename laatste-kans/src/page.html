@@ -66,7 +66,21 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .brand-mark { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--sticker); color: var(--sticker-ink); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 1rem; transform: rotate(-12deg); }
 .brand h1 { font-size: 1.12rem; font-weight: 800; line-height: 1.1; }
 .brand p { font-size: 0.76rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.store-pick select { max-width: 46vw; min-height: 38px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 10px; font-size: 16px; font-weight: 600; }
+.store-pick { max-width: 46vw; min-height: 38px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 4px 12px; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.store-pick[disabled] { opacity: 0.6; }
+.store-pick::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-3px); }
+.sheet-backdrop { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, #000 45%, transparent); display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--bg); width: 100%; max-width: 640px; max-height: 82vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding-block: 16px calc(16px + env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 10px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; position: sticky; top: -16px; background: var(--bg); padding-block: 4px; }
+.store-check { align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--line); min-height: 48px; }
+.store-check input { margin-top: 3px; }
+.store-check .sub { display: block; font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+.live-lines { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
+.live-lines li { display: flex; gap: 8px; align-items: baseline; }
+.live-lines li::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transform: translateY(-1px); }
+.live-lines li.ok::before { background: var(--good); }
+.live-lines li.err::before { background: var(--bad); }
+.live-lines li.wait::before { background: var(--warn); }
 
 main { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 .view { display: flex; flex-direction: column; gap: 18px; padding-block: 16px 8px; }
@@ -232,7 +246,7 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
         <p id="subline">Laatste Kans Koopjes bij AH Groningen, gekeurd op jouw dieet</p>
       </div>
     </div>
-    <label class="store-pick"><span class="sr">Jouw winkel</span><select id="storeSel"></select></label>
+    <button type="button" class="store-pick" id="storeBtn" aria-haspopup="dialog"><span id="storeBtnLabel">Kies je AH</span></button>
   </div>
 </header>
 
@@ -253,6 +267,7 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
         <span class="live-dot" id="liveDot" aria-hidden="true"></span>
       </div>
       <p class="small" id="liveStatus" aria-live="polite"></p>
+      <ul class="live-lines" id="liveLines"></ul>
       <div class="btn-row">
         <button class="btn btn-primary" type="button" id="liveRefresh">Vernieuw koopjes</button>
         <button class="btn" type="button" id="liveLogin" hidden>Inloggen bij AH</button>
@@ -261,6 +276,7 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
         <button type="button" data-v="fit">Past bij mij</button>
         <button type="button" data-v="all">Alles</button>
       </div>
+      <div class="seg" id="liveStoreFilter" role="group" aria-label="Winkel" hidden></div>
     </div>
     <div class="banner info" id="liveHint" hidden>
       <span>Wil je de Laatste Kans Koopjes van je winkel live zien? Dat kan via de gratis iPhone-app Scriptable.</span>
@@ -446,6 +462,16 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
   </div>
 </nav>
 <div class="toast" id="toast" role="status" hidden></div>
+<div class="sheet-backdrop" id="storeSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="storeSheetTitle">
+    <div class="sheet-head">
+      <h2 id="storeSheetTitle">Jouw winkels</h2>
+      <button class="btn btn-sm btn-primary" id="storeSheetDone" type="button">Klaar</button>
+    </div>
+    <p class="small muted">Kies een of meer AH's, tot 6. Van elke winkel komen de Laatste Kans Koopjes in je lijst. <span id="storeSheetCount"></span></p>
+    <div id="storeSheetList"></div>
+  </div>
+</div>
 
 <script>
 /*@@DATA@@*/

@@ -107,6 +107,20 @@ function ok(cond, msg) { if (cond) console.log('  ok  ' + msg); else { failures+
       ok(r.unknownN === 'twijfel', 'unknown nutrition = twijfel, not laten: ' + r.unknownN);
       ok(!/soja/i.test(r.soyRoerbak), 'soy-free roerbak text: ' + r.soyRoerbak);
 
+      const ms = await page.evaluate(() => ({
+        old: window.LK.profileStores({ store: 'ah-1330', stores: [] }),
+        both: window.LK.profileStores({ stores: ['ah-1330', 'ah-1829', 'nope'] }),
+        cap: window.LK.profileStores({ stores: STORES.map(s => s.id) }).length,
+      }));
+      ok(ms.old.join() === 'ah-1330', 'old single-store profile migrates: ' + ms.old);
+      ok(ms.both.join() === 'ah-1330,ah-1829', 'unknown store ids dropped');
+      ok(ms.cap === 6, 'at most 6 stores');
+      await page.click('#storeBtn');
+      await page.click('#storeSheetList input[data-id="ah-1330"]');
+      await page.click('#storeSheetList input[data-id="ah-1829"]');
+      await page.click('#storeSheetDone');
+      ok(/2 winkels/.test(await page.textContent('#storeBtn')), 'store sheet picks two stores');
+      ok((await page.evaluate(() => window.LK.S.profile.stores)).join() === 'ah-1330,ah-1829', 'stores saved in profile');
       // Full flow: set diet, add product via search, basket, finish, logboek.
       await page.goto(FILE + '#dieet');
       await page.fill('#dNotes', 'Ik lust geen champignons');

@@ -138,7 +138,7 @@ const AH = {
     }
     const errors = r.json && Array.isArray(r.json.errors) ? r.json.errors : [];
     if (a.auth) throw fail('login', t.kind === 'member' ? 'AH accepteert je login niet meer. Log opnieuw in.' : 'AH vraagt om in te loggen met je AH-account. Dat hoeft maar één keer.', { status: r.status, auth: true });
-    if (r.status >= 400 || a.empty) throw fail(r.status >= 500 || r.status === 429 || r.status === 0 ? 'network' : 'api', `AH gaf een fout${a.errs ? ': ' + a.errs : ` (code ${r.status})`}.`, { status: r.status });
+    if (r.status >= 400 || a.empty) throw fail(r.status >= 500 || r.status === 429 || r.status === 0 ? 'network' : 'api', `AH gaf een fout${a.errs ? ': ' + a.errs : ` (code ${r.status})`}.`, { status: r.status, graphql: !!a.errs, kind: t.kind });
     return { data: r.json.data, errors, kind: t.kind };
   },
   async exchange(code) {
@@ -172,7 +172,15 @@ async function resolveStoreId(s, state) {
 }
 async function fetchLive(s, state) {
   const storeId = await resolveStoreId(s, state);
-  const res = await AH.gql(BARGAINS_Q, { storeId });
+  let res;
+  try { res = await AH.gql(BARGAINS_Q, { storeId }); }
+  catch (e) {
+    // AH hides why it refuses (e.g. "Subgraph errors redacted"). Without a login that is almost
+    // always because the koopjes need an AH account, as in the AH app itself.
+    if (e.code === 'api' && e.graphql && e.kind === 'anon') throw fail('login', 'AH laat de koopjes alleen zien als je bent ingelogd met je AH-account. Tik op Inloggen bij AH; dat hoeft maar één keer.');
+    if (e.code === 'api') throw fail('api', `${e.message} (winkelnummer ${storeId})`);
+    throw e;
+  }
   const raw = res.data && Array.isArray(res.data.bargainItems) ? res.data.bargainItems : null;
   if (!raw) throw fail('api', 'AH gaf geen lijst met koopjes terug.' + (res.errors.length ? ' ' + res.errors.map(e => e && e.message).join('; ') : ''));
   const seen = {};
@@ -216,6 +224,11 @@ async function fetchLive(s, state) {
   try { writeJSON(CACHE_FILE, cache); } catch (e) { /* the cache is optional */ }
   return { storeKey: s.key, storeName: s.name, storeId, fetchedAt: Date.now(), kind: res.kind, items };
 }
+function lastLiveMap(state) {
+  const l = state.lastLive;
+  if (!l || typeof l !== 'object') return {};
+  return l.storeKey ? { [l.storeKey]: l } : l;
+}
 function statusFor(e) { return { status: e && e.code === 'login' ? 'login' : 'error', message: (e && e.message) || 'Ophalen lukte niet.' }; }
 
 /* ============================================================
@@ -254,14 +267,20 @@ async function runApp() {
     } catch (e) { /* the page is not loaded (login screen) */ }
   }
   async function refresh(arg) {
-    const s = arg && arg.key ? arg : (state.profile && storeFromKey(state.profile.store) ? storeArg(storeFromKey(state.profile.store)) : null);
-    if (!s) return pageStatus({ status: 'error', message: 'Kies eerst je winkel.' });
-    try {
-      const payload = await fetchLive(s, state);
-      state.lastLive = payload;
-      save();
-      await call('LK_LIVE', payload);
-    } catch (e) { await pageStatus(statusFor(e)); }
+    let list = arg && Array.isArray(arg.stores) ? arg.stores : arg && arg.key ? [arg] : null;
+    if (!list) list = profileStores(state.profile || {}).map(storeFromKey).filter(Boolean).map(storeArg);
+    if (!list.length) return pageStatus({ status: 'error', message: 'Kies eerst je winkels.' });
+    for (const st of list) {
+      try {
+        const payload = await fetchLive(st, state);
+        state.lastLive = Object.assign(lastLiveMap(state), { [st.key]: payload });
+        save();
+        await call('LK_LIVE', payload);
+      } catch (e) {
+        if (e.code === 'login') { await pageStatus(Object.assign(statusFor(e), { all: true })); return; }
+        await pageStatus(Object.assign(statusFor(e), { storeKey: st.key }));
+      }
+    }
   }
   function startRefresh(arg) {
     if (refreshing) { queued = arg; return; }
@@ -313,9 +332,9 @@ async function runApp() {
     if (m.cmd === 'update') return update();
   }
   // Show the app at once with the last known bargains; the page then asks for fresh ones.
-  const store0 = storeFromKey(state.profile && state.profile.store);
-  const last = state.lastLive && store0 && state.lastLive.storeKey === store0.id ? state.lastLive : null;
-  await reloadApp({ live: last, stale: !!last });
+  const lastMap = lastLiveMap(state);
+  const last = profileStores(state.profile || {}).map(k => lastMap[k]).filter(Boolean);
+  await reloadApp({ live: last, stale: last.length > 0 });
   wv.present(true).then(() => { open = false; }, () => { open = false; });
   let busy = false;
   while (open) {
@@ -339,7 +358,7 @@ async function runApp() {
 async function runWidget() {
   const state = await readJSON(STATE_FILE, {});
   const P = Object.assign(defaultProfile(), state.profile || {});
-  const s = storeFromKey(P.store);
+  const stores = profileStores(P).map(storeFromKey).filter(Boolean).slice(0, 3);
   const family = config.widgetFamily || 'small';
   const accessory = !!config.runsInAccessoryWidget || /^accessory/.test(family);
   const w = new ListWidget();
@@ -352,46 +371,60 @@ async function runWidget() {
   };
   if (!accessory) { w.backgroundColor = new Color('#15211B'); w.setPadding(12, 14, 12, 14); }
   let result = null, problem = null;
-  if (s) {
-    try {
-      const live = await fetchLive(storeArg(s), state);
+  if (stores.length) {
+    const ses = state.session || {};
+    const gone = new Set([...(ses.hiddenAH || []), ...(ses.basket || []).map(b => b.id)]);
+    const lives = {};
+    let items = [], failed = 0;
+    for (const st of stores) {
+      try {
+        const live = await fetchLive(storeArg(st), state);
+        lives[st.id] = live;
+        items = items.concat(live.items.map(x => itemFromAH(Object.assign({}, x, { storeKey: st.id, storeName: st.short || st.name }))));
+      } catch (e) {
+        failed++;
+        if (e.code === 'login') { problem = 'Log in via de app'; break; }
+      }
+    }
+    if (!problem && failed === stores.length) problem = 'Ophalen lukte niet';
+    if (Object.keys(lives).length) {
       try {
         const fresh = await readJSONStrict(STATE_FILE, {});
         fresh.storeIds = Object.assign({}, fresh.storeIds || {}, state.storeIds || {});
-        fresh.lastLive = live;
+        fresh.lastLive = Object.assign(lastLiveMap(fresh), lives);
         writeJSON(STATE_FILE, fresh);
       } catch (e) { /* the file could not be read: leave it alone */ }
-      const ses = state.session || {};
-      const gone = new Set([...(ses.hiddenAH || []), ...(ses.basket || []).map(b => b.id)]);
-      const items = live.items.map(itemFromAH).filter(it => !gone.has(it.id));
-      const fits = items.map(it => ({ it, ev: evaluate(it, P) })).filter(x => x.ev.verdict === 'ja').sort((a, b) => b.ev.score - a.ev.score);
-      result = { total: items.length, fits };
-    } catch (e) { problem = e.code === 'login' ? 'Log in via de app' : 'Ophalen lukte niet'; }
+    }
+    items = items.filter(it => !gone.has(it.id));
+    const fits = items.map(it => ({ it, ev: evaluate(it, P) })).filter(x => x.ev.verdict === 'ja').sort((a, b) => b.ev.score - a.ev.score);
+    result = { total: items.length, fits };
   }
-  const store = s ? (s.short || s.name) : '';
+  const where = stores.length === 1 ? (stores[0].short || stores[0].name) : `${stores.length} winkels`;
+  const multi = stores.length > 1;
+  const none = !stores.length;
   if (family === 'accessoryInline') {
-    line(!s ? 'Kies je AH' : problem || `${result.fits.length} koopjes voor jou`, 12, '', false);
+    line(none ? 'Kies je AH' : problem || `${result.fits.length} koopjes voor jou`, 12, '', false);
   } else if (family === 'accessoryCircular') {
     if (w.addAccessoryWidgetBackground !== undefined) w.addAccessoryWidgetBackground = true;
-    line(!s || problem ? '?' : String(result.fits.length), 22, '', true);
+    line(none || problem ? '?' : String(result.fits.length), 22, '', true);
     line('koopjes', 9, '', false);
   } else if (accessory) {
-    line(!s ? 'Kies je AH in de app' : problem || `${result.fits.length} koopjes voor jou`, 14, '', true);
+    line(none ? 'Kies je AH in de app' : problem || `${result.fits.length} koopjes voor jou`, 14, '', true);
     if (result && result.fits[0]) line(`${result.fits[0].it.name} ${fmtEur(itemPriceNow(result.fits[0].it))}`, 12, '', false);
-    if (s) line(store, 11, '', false);
+    if (!none) line(where, 11, '', false);
   } else {
     line('LAATSTE KANS', 11, '#F2541B', true);
     w.addSpacer(4);
-    if (!s) line('Open de app en kies je winkel', 13, '#E5EDE8', false);
+    if (none) line('Open de app en kies je winkels', 13, '#E5EDE8', false);
     else if (problem) line(problem, 13, '#FF8F85', false);
     else {
       line(`${result.fits.length} voor jou`, 24, '#FFFFFF', true);
-      line(`${result.total} koopjes · ${store}`, 11, '#9AABA1', false);
+      line(`${result.total} koopjes · ${where}`, 11, '#9AABA1', false);
       w.addSpacer(6);
       const n = family === 'small' ? 2 : family === 'medium' ? 3 : 8;
       for (const { it } of result.fits.slice(0, n)) {
         const pct = it.discountPct ? `-${it.discountPct}% ` : '';
-        line(`${it.name}  ${pct}${fmtEur(itemPriceNow(it))}`, 12, '#E5EDE8', false);
+        line(`${it.name}  ${pct}${fmtEur(itemPriceNow(it))}${multi && it.storeName ? ' · ' + it.storeName : ''}`, 12, '#E5EDE8', false);
       }
       w.addSpacer();
       line(`bijgewerkt ${new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`, 9, '#9AABA1', false);
