@@ -35,7 +35,7 @@ const CACHE_FILE = FM.joinPath(DIR, 'voeding-cache.json');
 const HISTORY_FILE = FM.joinPath(DIR, 'afprijs-geschiedenis.json');
 // One copy of the nutrition cache and the markdown history per run, written once at the end,
 // so stores fetched side by side do not overwrite each other's additions.
-const RUN = { cache: null, hist: null, histOk: true, dirty: false };
+const RUN = { cache: null, hist: null, histOk: true, dirty: false, seen: new Set() };
 async function runCache() { if (!RUN.cache) RUN.cache = await readJSON(CACHE_FILE, {}); return RUN.cache; }
 async function runHistory() {
   if (!RUN.hist) {
@@ -45,9 +45,27 @@ async function runHistory() {
   return RUN.hist;
 }
 async function record(payload) { recordObservations(await runHistory(), payload, payload.fetchedAt); RUN.dirty = true; }
-function flushRun() {
-  try { if (RUN.cache) writeJSON(CACHE_FILE, RUN.cache); } catch (e) { /* optional */ }
-  try { if (RUN.hist && RUN.histOk && RUN.dirty) { pruneHistory(RUN.hist, Date.now()); writeJSON(HISTORY_FILE, RUN.hist); RUN.dirty = false; } } catch (e) { /* optional */ }
+async function flushRun() {
+  // Nutrition cache: trim once, never the products seen during this run.
+  try {
+    if (RUN.cache) {
+      const c = RUN.cache;
+      const old = Object.keys(c).filter(id => !RUN.seen.has(id)).sort((a, b) => ((c[a] && c[a].t) || 0) - ((c[b] && c[b].t) || 0));
+      const extra = Object.keys(c).length - 3000;
+      if (extra > 0) for (const id of old.slice(0, extra)) delete c[id];
+      writeJSON(CACHE_FILE, c);
+    }
+  } catch (e) { /* optional */ }
+  // History: the app and the widget can both have written it meanwhile, so merge with the file first.
+  try {
+    if (RUN.hist && RUN.histOk && RUN.dirty) {
+      let disk = null;
+      try { disk = await readJSONStrict(HISTORY_FILE, null); } catch (e) { return; } // unreadable now: try again next time
+      RUN.hist = pruneHistory(mergeHistory(disk, RUN.hist), Date.now());
+      writeJSON(HISTORY_FILE, RUN.hist);
+      RUN.dirty = false;
+    }
+  } catch (e) { /* optional */ }
 }
 async function pool(list, n, fn) {
   let i = 0;
@@ -228,6 +246,7 @@ async function fetchLive(s, state) {
   });
   // Label nutrition per product. Cache entries are {n, t}; n null means AH has no label for it.
   const cache = await runCache();
+  for (const x of items) RUN.seen.add(String(x.productId));
   const need = [...new Set(items.map(x => String(x.productId)))].filter(id => !cache[id]).slice(0, 80);
   for (let i = 0; i < need.length; i += 20) {
     const chunk = need.slice(i, i + 20);
@@ -243,10 +262,6 @@ async function fetchLive(s, state) {
     } catch (e) { if (e.code === 'network' || e.code === 'login') break; }
   }
   for (const x of items) x.nutrition = cache[String(x.productId)] ? cache[String(x.productId)].n : null;
-  const current = new Set(items.map(x => String(x.productId)));
-  const ids = Object.keys(cache).filter(id => !current.has(id)).sort((a, b) => ((cache[a] && cache[a].t) || 0) - ((cache[b] && cache[b].t) || 0));
-  const extra = Object.keys(cache).length - 3000;
-  if (extra > 0) for (const id of ids.slice(0, extra)) delete cache[id];
 
   return { storeKey: s.key, storeName: s.name, storeId, fetchedAt: Date.now(), kind: res.kind, items };
 }
@@ -276,7 +291,20 @@ async function runApp() {
   let state = {}, readOnly = false;
   try { state = await readJSONStrict(STATE_FILE, {}) || {}; }
   catch (e) { readOnly = true; state = {}; }
-  const save = () => { if (!readOnly) writeJSON(STATE_FILE, state); };
+  const save = () => {
+    if (readOnly) return;
+    try {
+      if (FM.fileExists(STATE_FILE) && !(FM.isFileStoredIniCloud(STATE_FILE) && !FM.isFileDownloaded(STATE_FILE))) {
+        const disk = JSON.parse(FM.readString(STATE_FILE));
+        state.widgetCursor = disk.widgetCursor;
+        state.storeIds = Object.assign({}, disk.storeIds || {}, state.storeIds || {});
+        const a = lastLiveMap(disk), b = lastLiveMap(state);
+        for (const k in a) if (!b[k] || (a[k].fetchedAt || 0) > (b[k].fetchedAt || 0)) b[k] = a[k];
+        state.lastLive = b;
+      }
+    } catch (e) { /* use what we have */ }
+    writeJSON(STATE_FILE, state);
+  };
   const wv = new WebView();
   let open = true, mode = 'app';
   let refreshing = null, queued;
@@ -296,6 +324,7 @@ async function runApp() {
     let list = arg && Array.isArray(arg.stores) ? arg.stores : arg && arg.key ? [arg] : null;
     if (!list) list = profileStores(state.profile || {}).map(storeFromKey).filter(Boolean).map(storeArg);
     if (!list.length) return pageStatus({ status: 'error', message: 'Kies eerst je winkels.' });
+    if (!RUN.dirty) RUN.hist = null; // read the history again: the widget may have added to it
     try { await AH.token(); } catch (e) { return pageStatus(Object.assign(statusFor(e), { all: true })); }
     let needLogin = false;
     await pool(list, 4, async st => {
@@ -311,11 +340,16 @@ async function runApp() {
       }
     });
     save();
-    flushRun();
+    await flushRun();
     await call('LK_STATS', buildTimingStats(await runHistory()));
   }
   function startRefresh(arg) {
-    if (refreshing) { queued = arg; return; }
+    if (refreshing) {
+      if (queued === undefined) queued = arg;
+      else if (!arg || !arg.stores || !queued || !queued.stores) queued = null; // null: all followed stores
+      else { const m = new Map(); for (const x of [...queued.stores, ...arg.stores]) m.set(x.key, x); queued = { stores: [...m.values()] }; }
+      return;
+    }
     refreshing = refresh(arg).finally(() => {
       refreshing = null;
       if (queued !== undefined) { const a = queued; queued = undefined; startRefresh(a); }
@@ -383,7 +417,7 @@ async function runApp() {
   }
   await saveFromPage();
   if (refreshing) { try { await withTimeout(refreshing, 5000); } catch (e) { /* ignore */ } }
-  flushRun();
+  await flushRun();
 }
 
 /* ============================================================
@@ -421,7 +455,7 @@ async function runWidget() {
     return t;
   };
   if (!accessory) { w.backgroundColor = new Color('#15211B'); w.setPadding(12, 14, 12, 14); }
-  let result = null, problem = null;
+  let result = null, problem = null, used = 0;
   if (stores.length) {
     const ses = state.session || {};
     const gone = new Set([...(ses.hiddenAH || []), ...(ses.basket || []).map(b => b.id)]);
@@ -436,7 +470,7 @@ async function runWidget() {
       catch (e) { failed++; if (e.code === 'login') problem = 'Log in via de app'; }
     });
     if (!problem && failed === turn.length) problem = 'Ophalen lukte niet';
-    flushRun();
+    await flushRun();
     try {
       const fresh = await readJSONStrict(STATE_FILE, {});
       fresh.storeIds = Object.assign({}, fresh.storeIds || {}, state.storeIds || {});
@@ -449,14 +483,15 @@ async function runWidget() {
     let items = [];
     for (const st of stores) {
       const l = known[st.id];
-      if (!l || Date.now() - (l.fetchedAt || 0) > 3 * 3600000) continue;
+      if (!l || Date.now() - (l.fetchedAt || 0) > Math.max(3, Math.ceil(stores.length / 4) * 0.75) * 3600000) continue;
+      used++;
       items = items.concat(l.items.map(x => itemFromAH(Object.assign({}, x, { storeKey: st.id, storeName: st.short || st.name }))));
     }
     items = items.filter(it => !gone.has(it.id));
     const fits = items.map(it => ({ it, ev: evaluate(it, P) })).filter(x => x.ev.verdict === 'ja').sort((a, b) => b.ev.score - a.ev.score);
     result = { total: items.length, fits };
   }
-  const where = stores.length === 1 ? (stores[0].short || stores[0].name) : `${stores.length} winkels`;
+  const where = stores.length === 1 ? (stores[0].short || stores[0].name) : used < stores.length ? `${used} van ${stores.length} winkels` : `${stores.length} winkels`;
   const multi = stores.length > 1;
   const none = !stores.length;
   if (family === 'accessoryInline') {

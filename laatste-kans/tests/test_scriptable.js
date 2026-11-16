@@ -365,7 +365,7 @@ function run(env) {
   await page.click('#liveFilter button[data-v="all"]');
   const kdCard = await page.textContent('#candList .item:has-text("Spekreepjes")');
   ok(/Nu kopen/.test(kdCard) && /op voordat de korting verder zakte/.test(kdCard), 'card advises to buy now from history: ' + (kdCard.match(/Nu kopen[^(]*/) || [''])[0]);
-  ok(await page.evaluate(() => window.LK.S.stats && window.LK.S.stats.offers > 20), 'stats sent to the page after a refresh');
+  ok(await page.evaluate(() => window.LK.S.stats && (window.LK.S.stats.offers + (window.LK.S.stats.folded || 0)) > 20), 'stats sent to the page after a refresh, old offers folded into counters');
   await page.click('a[href="#logboek"]');
   ok(/Hoe AH afprijst bij jou/.test(await page.textContent('#patternCard')) && /Paddepoel/.test(await page.textContent('#patternCard')), 'Logboek shows the markdown pattern per store');
   // All stores at once: no limit, summary line instead of 23 lines.

@@ -323,7 +323,7 @@ function itemCard(it, where, alts) {
       h('span', { class: 'score' }, `${ev.score}/100`)),
     metrics.length ? h('ul', { class: 'metrics' }, metrics) : null,
     ev.reasons.length ? h('ul', { class: 'reasons' }, ev.reasons.map(r => h('li', { class: r.pos ? 'pos' : r.neg ? 'neg' : '' }, r.s))) : null,
-    (() => { const a = where === 'cand' && ev.verdict !== 'nee' ? timingAdvice(it, S.stats, Date.now()) : null; return a ? h('p', { class: 'timing t-' + a.kind }, h('span', { class: 'chip' }, TIMING_NL[a.kind] || ''), ' ', a.text) : null; })(),
+    (() => { const m = it.storeKey && S.session.liveMeta ? S.session.liveMeta[it.storeKey] : null; const a = where === 'cand' && ev.verdict !== 'nee' ? timingAdvice(it, S.stats, Date.now(), m ? m.fetchedAt : null) : null; return a ? h('p', { class: 'timing t-' + a.kind }, h('span', { class: 'chip' }, TIMING_NL[a.kind] || ''), ' ', a.text) : null; })(),
     alts && alts.length ? h('p', { class: 'alts' }, 'Ook bij: ', alts.slice(0, 6).map(a => `${a.storeName || '?'} ${fmtEur(itemPriceNow(a))}${a.discountPct ? ` (-${a.discountPct}%)` : ''}`).join(', '), alts.length > 6 ? ` en ${alts.length - 6} meer` : '') : null,
     h('div', { class: 'item-actions' }, actions));
 }
@@ -373,8 +373,9 @@ function renderCandidates() {
   for (const it of list) {
     if (multi && it.source === 'ah' && it.productId != null) {
       const lead = seenP.get(it.productId);
-      if (lead) { altsOf.get(lead).push(it); continue; }
-      seenP.set(it.productId, it); altsOf.set(it, []);
+      // Only fold offers from other stores; two packs at one store each keep their own card.
+      if (lead && lead.storeKey !== it.storeKey && !altsOf.get(lead).some(a => a.storeKey === it.storeKey)) { altsOf.get(lead).push(it); continue; }
+      if (!lead) { seenP.set(it.productId, it); altsOf.set(it, []); }
     }
     shown.push(it);
   }

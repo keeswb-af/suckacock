@@ -219,14 +219,60 @@ function ok(cond, msg) { if (cond) console.log('  ok  ' + msg); else { failures+
         const today = new Date(); const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
         const at = h => { const x = new Date(); x.setHours(h, 0, 0, 0); return x.getTime(); };
         const mk = (pct, now) => itemFromAH({ productId: 101, title: 'AH Kipdijfilet', unitSize: '400 g', pct, expDate: iso, stock: 3, priceWas: '4.99', priceNow: now, storeKey: 'ah-1829' });
-        return { b25: stats.keys['sp:ah-1829|101'][25], b40: stats.keys['sp:ah-1829|101'][40], w: timingAdvice(mk(25, '3.74'), stats, at(10)), n: timingAdvice(mk(40, '2.99'), stats, at(16)), top: timingAdvice(mk(70, '1.50'), stats, at(20)), none: timingAdvice(mk(25, '3.74'), null, at(10)) };
+        return { b25: stats.keys['sp:ah-1829|101'][25], b40: stats.keys['sp:ah-1829|101'][40], w: timingAdvice(mk(25, '3.74'), stats, at(10)), n: timingAdvice(mk(40, '2.99'), stats, at(16)), top: timingAdvice(mk(70, '1.50'), stats, at(20)), none: timingAdvice(mk(25, '3.74'), { keys: {} }, at(10)) };
       });
-      ok(tim.b25.up === 20 && tim.b25.h === 15 && tim.b25.to === 40, '25% always went to 40% around 15:00: ' + JSON.stringify(tim.b25));
+      ok(tim.b25.up === 20 && Math.round(tim.b25.h) === 15 && tim.b25.to === 40, '25% always went to 40% around 15:00: ' + JSON.stringify(tim.b25));
       ok(tim.b40.n === 20 && tim.b40.up === 6, '40% reached 70% on 6 of 20 days: ' + JSON.stringify(tim.b40));
       ok(tim.w.kind === 'wacht' && /15:00/.test(tim.w.text), 'advice at 25% in the morning: wait');
       ok(tim.n.kind === 'nu', 'advice at 40% in the afternoon: buy now');
       ok(tim.top.kind === 'nu', 'advice at 70%: buy now');
       ok(tim.none && tim.none.kind === 'info', 'no history: general hint only');
+      const hr = await page.evaluate(() => {
+        const { recordObservations, buildTimingStats, timingAdvice, itemFromAH } = window.LK;
+        const T = (d, h, m = 0) => { const x = new Date(); x.setDate(x.getDate() - d); x.setHours(h, m, 0, 0); return x.getTime(); };
+        const iso = d => { const x = new Date(); x.setDate(x.getDate() - d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
+        const it = (pid, pct, e, extra) => Object.assign({ productId: pid, title: 'AH Kipdijfilet', unitSize: '400 g', pct, expDate: e, stock: 2, priceWas: '4.99', priceNow: (4.99 * (1 - pct / 100)).toFixed(2) }, extra || {});
+        const out = {};
+        // Long gap: seen at 40% at 10:00, next look at 18:00 it is gone -> unknown, not "sold out at 40%".
+        let h1 = recordObservations({}, { storeKey: 's1', items: [it(1, 40, iso(1))] }, T(1, 10));
+        h1 = recordObservations(h1, { storeKey: 's1', items: [it(2, 25, iso(1))] }, T(1, 18));
+        out.gap = (buildTimingStats(h1).keys['sp:s1|1'] || {})[40] || null;
+        // Overnight step: 25% at 20:00, 40% next morning -> counted as a step, but no time of day.
+        let h2 = {};
+        for (let d = 1; d <= 3; d++) { h2 = recordObservations(h2, { storeKey: 's1', items: [it(3, 25, iso(d - 1))] }, T(d, 20)); h2 = recordObservations(h2, { storeKey: 's1', items: [it(3, 40, iso(d - 1))] }, T(d - 1, 10)); }
+        out.night = buildTimingStats(h2).keys['sp:s1|3'][25];
+        // The same product listed twice in one answer counts once.
+        const h3 = recordObservations({}, { storeKey: 's1', items: [it(4, 25, iso(0)), it(4, 40, iso(0))] }, T(0, 9));
+        out.dup = Object.values(h3.offers).map(o => o.o.length + ':' + o.o[0][1]);
+        // No expiry date: keyed without a date, so midnight does not split it.
+        const h4 = recordObservations({}, { storeKey: 's1', items: [it(5, 40, null)] }, T(1, 23));
+        out.noDate = Object.keys(h4.offers);
+        // Fractional hour for the late check; small savings say so instead of "gok".
+        const stats = { keys: { 'sp:s1|6': { 40: { n: 10, up: 10, h: 17.75, to: 70, dt: 2 } } } };
+        const today = iso(0);
+        const at = (h, m) => { const x = new Date(); x.setHours(h, m, 0, 0); return x.getTime(); };
+        const kp = Object.assign(itemFromAH(it(6, 40, today, { storeKey: 's1' })), {});
+        out.at1955 = timingAdvice(kp, stats, at(19, 55)).kind;
+        const cheap = itemFromAH({ productId: 6, title: 'AH Kipdijfilet', unitSize: '400 g', pct: 40, expDate: today, stock: 2, priceWas: '0.89', priceNow: '0.53', storeKey: 's1' });
+        out.cheap = timingAdvice(cheap, stats, at(12, 0));
+        // General hint only for live AH items on a dynamic step, not for the fixed 35% sticker or typed items.
+        const live25 = itemFromAH({ productId: 7, title: 'AH Kipdijfilet', pct: 25, expDate: today, priceWas: '4.99', priceNow: '3.74', storeKey: 's1' });
+        const live35 = itemFromAH({ productId: 7, title: 'AH Kipdijfilet', pct: 35, expDate: today, priceWas: '4.99', priceNow: '3.24', storeKey: 's1' });
+        out.hint25 = (timingAdvice(live25, { keys: {} }, at(10, 0)) || {}).kind || null;
+        out.hint35 = timingAdvice(live35, { keys: {} }, at(10, 0));
+        out.hintNoStats = timingAdvice(live25, null, at(10, 0));
+        // Old price: no "the moment passed" claim.
+        out.stale = timingAdvice(kp, stats, at(21, 0), at(11, 0));
+        return out;
+      });
+      ok(hr.gap === null, 'long gap before disappearing is unknown, not sold out: ' + JSON.stringify(hr.gap));
+      ok(hr.night && hr.night.up === 3 && hr.night.h === null, 'overnight step counted without a time of day: ' + JSON.stringify(hr.night));
+      ok(hr.dup.length === 1 && hr.dup[0] === '1:40', 'duplicate listing recorded once at the deepest discount: ' + hr.dup);
+      ok(hr.noDate.length === 1 && /\|$/.test(hr.noDate[0]), 'offer without expiry keyed without a date: ' + hr.noDate);
+      ok(hr.at1955 === 'nu', 'at 19:55 the 17:45 moment counts as passed: ' + hr.at1955);
+      ok(hr.cheap.kind === 'nu' && /scheelt maar/.test(hr.cheap.text), 'small saving: no contradictory gamble text: ' + hr.cheap.text);
+      ok(hr.hint25 === 'info' && hr.hint35 === null && hr.hintNoStats === null, 'general hint only for live dynamic steps');
+      ok(hr.stale && hr.stale.kind !== 'nu' || !/voorbij/.test((hr.stale || {}).text || ''), 'old price does not claim the moment passed: ' + JSON.stringify(hr.stale && hr.stale.text));
       // Full flow: set diet, add product via search, basket, finish, logboek.
       await page.goto(FILE + '#dieet');
       await page.fill('#dNotes', 'Ik lust geen champignons');
