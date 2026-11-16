@@ -81,6 +81,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .live-lines li.ok::before { background: var(--good); }
 .live-lines li.err::before { background: var(--bad); }
 .live-lines li.wait::before { background: var(--warn); }
+.live-lines details summary { min-height: 28px; font-weight: 500; }
+.timing { margin: 0; font-size: 0.86rem; }
+.timing .chip { margin-right: 4px; }
+.t-nu .chip { background: var(--good-bg); color: var(--good); }
+.t-wacht .chip { background: var(--warn-bg); color: var(--warn); }
+.t-gok .chip, .t-info .chip { background: var(--surface-2); color: var(--muted); }
+.t-info { color: var(--muted); }
+.alts { margin: 0; font-size: 0.8rem; color: var(--muted); }
 
 main { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 .view { display: flex; flex-direction: column; gap: 18px; padding-block: 16px 8px; }
@@ -276,7 +284,7 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
         <button type="button" data-v="fit">Past bij mij</button>
         <button type="button" data-v="all">Alles</button>
       </div>
-      <div class="seg" id="liveStoreFilter" role="group" aria-label="Winkel" hidden></div>
+      <label class="field" id="liveStoreWrap" for="liveStoreSel" hidden>Toon<select id="liveStoreSel"></select></label>
     </div>
     <div class="banner info" id="liveHint" hidden>
       <span>Wil je de Laatste Kans Koopjes van je winkel live zien? Dat kan via de gratis iPhone-app Scriptable.</span>
@@ -393,6 +401,7 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
   <section class="view wrap" id="view-logboek" hidden aria-labelledby="h-logboek">
     <h2 id="h-logboek">Logboek</h2>
     <div class="kpi-row" id="tripKpis"></div>
+    <div class="card" id="patternCard" hidden></div>
     <div class="list" id="tripList"></div>
   </section>
 
@@ -468,7 +477,8 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
       <h2 id="storeSheetTitle">Jouw winkels</h2>
       <button class="btn btn-sm btn-primary" id="storeSheetDone" type="button">Klaar</button>
     </div>
-    <p class="small muted">Kies een of meer AH's, tot 6. Van elke winkel komen de Laatste Kans Koopjes in je lijst. <span id="storeSheetCount"></span></p>
+    <p class="small muted">Kies een of meer AH's. Van elke winkel komen de Laatste Kans Koopjes in je lijst; hetzelfde product bij meerdere winkels staat op één kaart. <span id="storeSheetCount"></span></p>
+    <div class="btn-row"><button class="btn btn-sm" type="button" id="storeSheetAll">Alle winkels</button><button class="btn btn-sm btn-ghost" type="button" id="storeSheetNone">Geen</button></div>
     <div id="storeSheetList"></div>
   </div>
 </div>

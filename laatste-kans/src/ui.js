@@ -221,7 +221,7 @@ function openStoreSheet() {
 }
 function syncSheet() {
   const sel = new Set(S.sheetSel || []);
-  $$('#storeSheetList input').forEach(i => { i.checked = sel.has(i.dataset.id); i.disabled = !i.checked && sel.size >= MAX_STORES; });
+  $$('#storeSheetList input').forEach(i => { i.checked = sel.has(i.dataset.id); });
   $('#storeSheetCount').textContent = sel.size ? `${sel.size} gekozen.` : '';
 }
 function closeStoreSheet() {
@@ -250,7 +250,6 @@ function setStores(ids) {
 function toggleStore(id) {
   const cur = profileStores(S.profile);
   if (cur.includes(id)) setStores(cur.filter(x => x !== id));
-  else if (cur.length >= MAX_STORES) toast(`Maximaal ${MAX_STORES} winkels`);
   else setStores([...cur, id]);
 }
 function showLoadBanner(msg, action) {
@@ -269,7 +268,8 @@ function stickerFor(it) {
   return pct > 0 ? h('div', { class: 'sticker', 'aria-label': `${pct} procent korting` }, `-${pct}%`) : null;
 }
 const EXP_NL = { vandaag: 'tot vandaag', morgen: 'tot morgen', verlopen: 'datum verstreken', later: null };
-function itemCard(it, where) {
+const TIMING_NL = { nu: 'Nu kopen', wacht: 'Wachten loont', gok: 'Gok', info: 'Afprijzen' };
+function itemCard(it, where, alts) {
   const ev = evaluate(it, S.profile);
   const price = itemPriceNow(it);
   const meta = [it.grams ? `${fmtNum(it.grams)} g` : (it.unitSize || null), EXP_NL[ev.exp], CATS[it.cat] || null,
@@ -314,6 +314,8 @@ function itemCard(it, where) {
       h('span', { class: 'score' }, `${ev.score}/100`)),
     metrics.length ? h('ul', { class: 'metrics' }, metrics) : null,
     ev.reasons.length ? h('ul', { class: 'reasons' }, ev.reasons.map(r => h('li', { class: r.pos ? 'pos' : r.neg ? 'neg' : '' }, r.s))) : null,
+    (() => { const a = where === 'cand' && ev.verdict !== 'nee' ? timingAdvice(it, S.stats, Date.now()) : null; return a ? h('p', { class: 'timing t-' + a.kind }, h('span', { class: 'chip' }, TIMING_NL[a.kind] || ''), ' ', a.text) : null; })(),
+    alts && alts.length ? h('p', { class: 'alts' }, 'Ook bij: ', alts.slice(0, 6).map(a => `${a.storeName || '?'} ${fmtEur(itemPriceNow(a))}${a.discountPct ? ` (-${a.discountPct}%)` : ''}`).join(', '), alts.length > 6 ? ` en ${alts.length - 6} meer` : '') : null,
     h('div', { class: 'item-actions' }, actions));
 }
 
@@ -356,7 +358,21 @@ function renderCandidates() {
       h('div', { class: 'btn-row' }, h('button', { class: 'btn btn-sm', type: 'button', onclick: addExamples }, 'Laat voorbeelden zien'))));
     return;
   }
-  const kids = [hiddenNote, ...list.map(it => itemCard(it, 'cand'))];
+  // The same product at several stores: show the best offer, list the others on its card.
+  const multi = !sf && profileStores(S.profile).length > 1;
+  const shown = [], altsOf = new Map(), seenP = new Map();
+  for (const it of list) {
+    if (multi && it.source === 'ah' && it.productId != null) {
+      const lead = seenP.get(it.productId);
+      if (lead) { altsOf.get(lead).push(it); continue; }
+      seenP.set(it.productId, it); altsOf.set(it, []);
+    }
+    shown.push(it);
+  }
+  const cap = S.showMax || 60;
+  const more = shown.length > cap ? h('div', { class: 'btn-row' }, h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { S.showMax = cap + 60; renderCandidates(); } }, `Toon meer (${shown.length - cap})`)) : null;
+  $('#candCount').textContent = shown.length ? `${shown.length} product${shown.length === 1 ? '' : 'en'}` : '';
+  const kids = [hiddenNote, ...shown.slice(0, cap).map(it => itemCard(it, 'cand', altsOf.get(it))), more];
   if (list.some(it => it.example)) kids.push(h('div', { class: 'btn-row' }, h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: clearExamples }, 'Wis voorbeelden')));
   fill($('#candList'), ...kids);
 }
@@ -392,7 +408,7 @@ function renderLive() {
   else if (L.message) msg = L.message;
   $('#liveStatus').textContent = msg;
   $('#liveStatus').hidden = !msg;
-  fill($('#liveLines'), ...ss.map(st => {
+  const lineFor = st => {
     const m = meta[st.id], ps = per[st.id] || {}, nm = storeShort(st);
     let cls = '', txt;
     if (ps.status === 'loading') { cls = 'wait'; txt = `${nm}: ophalen…`; }
@@ -400,8 +416,20 @@ function renderLive() {
     else if (ps.status === 'error') { cls = 'err'; txt = `${nm}: ${ps.message || 'ophalen lukte niet'}${m ? ` Je ziet de koopjes van ${fmtTime(m.fetchedAt)}.` : ''}`; }
     else if (m) { cls = m.stale ? 'wait' : 'ok'; txt = `${nm}: ${m.count} koopje${m.count === 1 ? '' : 's'}, ${m.stale ? 'van ' + fmtTime(m.fetchedAt) + ' (wordt ververst)' : 'bijgewerkt om ' + fmtTime(m.fetchedAt)}`; }
     else txt = `${nm}: nog niet opgehaald`;
-    return h('li', { class: cls }, txt);
-  }));
+    return { cls, li: h('li', { class: cls }, txt) };
+  };
+  const all = ss.map(lineFor);
+  if (ss.length <= 4) fill($('#liveLines'), ...all.map(x => x.li));
+  else {
+    // Many stores: one summary line, problems listed, the rest folded away.
+    const ms = ss.map(st => meta[st.id]).filter(Boolean);
+    const total = ms.reduce((a, m) => a + (m.count || 0), 0);
+    const loading = ss.filter(st => (per[st.id] || {}).status === 'loading').length;
+    const newest = ms.length ? Math.max(...ms.map(m => m.fetchedAt || 0)) : null;
+    const sum = h('li', { class: loading ? 'wait' : ms.length ? 'ok' : '' }, `${ss.length} winkels: ${total} koopjes${loading ? `, nog ${loading} aan het ophalen` : newest ? `, bijgewerkt om ${fmtTime(newest)}` : ''}`);
+    const bad = all.filter(x => x.cls === 'err').map(x => x.li);
+    fill($('#liveLines'), sum, ...bad, h('li', null, h('details', null, h('summary', null, 'Per winkel'), h('ul', { class: 'live-lines' }, all.filter(x => x.cls !== 'err').map(x => x.li)))));
+  }
   const metas = ss.map(st => meta[st.id]).filter(Boolean);
   const anyLoading = ss.some(st => (per[st.id] || {}).status === 'loading');
   const dot = $('#liveDot');
@@ -410,12 +438,14 @@ function renderLive() {
   const anonEmpty = !anyLoading && metas.length && metas.every(m => m.count === 0 && m.kind === 'anon');
   $('#liveLogin').hidden = !(L.status === 'login' || anonEmpty);
   setSeg('#liveFilter', S.session.liveFilter || 'fit');
-  const sf = $('#liveStoreFilter');
-  sf.hidden = ss.length < 2;
+  $('#liveStoreWrap').hidden = ss.length < 2;
   if (ss.length >= 2) {
     const cur = ss.some(st => st.id === S.session.storeFilter) ? S.session.storeFilter : 'all';
-    fill(sf, h('button', { type: 'button', 'data-v': 'all', 'aria-pressed': String(cur === 'all') }, 'Alle winkels'),
-      ...ss.map(st => h('button', { type: 'button', 'data-v': st.id, 'aria-pressed': String(cur === st.id) }, storeShort(st))));
+    const counts = {};
+    for (const c of S.session.candidates) if (c.source === 'ah' && c.storeKey) counts[c.storeKey] = (counts[c.storeKey] || 0) + 1;
+    const sel = $('#liveStoreSel');
+    fill(sel, h('option', { value: 'all' }, `Alle winkels (${ss.length})`), ...ss.map(st => h('option', { value: st.id }, `${storeShort(st)}${counts[st.id] ? ` (${counts[st.id]})` : ''}`)));
+    sel.value = cur;
   }
 }
 function setLiveFilter(v) { S.session.liveFilter = v === 'all' ? 'all' : 'fit'; saveSession(); renderWinkel(); }
@@ -458,6 +488,7 @@ function applyLive(p, opts) {
   saveSession(); renderWinkel(); if (S.tab === 'koken') renderKoken();
 }
 window.LK_LIVE = payload => { try { applyLive(typeof payload === 'string' ? JSON.parse(payload) : payload); return 'ok'; } catch (e) { return 'error: ' + e.message; } };
+window.LK_STATS = st => { try { S.stats = typeof st === 'string' ? JSON.parse(st) : st; renderCandidates(); renderPatterns(); return 'ok'; } catch (e) { return 'error: ' + e.message; } };
 window.LK_TOAST = m => { toast(String(typeof m === 'string' && m[0] === '"' ? JSON.parse(m) : m)); return 'ok'; };
 window.LK_LIVE_STATUS = st => {
   const o = typeof st === 'string' ? JSON.parse(st) : (st || {});
@@ -725,7 +756,28 @@ function inlineMd(s, tag = 'li') {
 /* ============================================================
    Logboek view
    ============================================================ */
+function renderPatterns() {
+  const card = $('#patternCard');
+  const st = S.stats;
+  if (!HOST || !st || !st.keys) { card.hidden = true; return; }
+  card.hidden = false;
+  const steps = key => {
+    const K = st.keys[key] || {};
+    return Object.keys(K).map(Number).sort((a, b) => a - b).filter(b => b < 70 && K[b].n >= 3).map(b => {
+      const B = K[b], up = Math.round(B.up / B.n * 100);
+      return `Bij ${b}%: ${up}% zakte verder${B.to ? ` naar ${B.to}%` : ''}${B.h != null ? `, meestal rond ${fmtHour(B.h)}` : ''}; ${100 - up}% was eerder op (${B.n}×).`;
+    });
+  };
+  const rows = [];
+  for (const s of myStores()) { const l = steps(`s:${s.id}`); if (l.length) rows.push(h('div', null, h('b', null, storeShort(s)), h('ul', { class: 'tips small' }, l.map(x => h('li', null, x))))); }
+  const cats = Object.keys(CATS).map(c => ({ c, l: steps(`c:${c}`) })).filter(x => x.l.length);
+  fill(card, h('h3', null, 'Hoe AH afprijst bij jou'),
+    h('p', { class: 'small muted' }, st.offers ? `Gebaseerd op ${st.offers} koopjes die de app heeft gevolgd. Elke keer dat je de app of de widget opent, komt er meer bij; na een paar weken worden de adviezen per product betrouwbaar.` : 'Nog geen metingen. Elke keer dat je de app of de widget opent, volgt de app hoe de korting oploopt.'),
+    rows.length ? rows : h('p', { class: 'small' }, 'Nog te weinig metingen per winkel.'),
+    cats.length ? h('details', null, h('summary', null, 'Per soort product'), ...cats.map(x => h('div', null, h('b', null, CATS[x.c]), h('ul', { class: 'tips small' }, x.l.map(t => h('li', null, t)))))) : null);
+}
 function renderLogboek() {
+  renderPatterns();
   const trips = S.trips;
   const month = todayISO().slice(0, 7);
   const tm = trips.filter(t => (t.date || '').startsWith(month));
@@ -858,7 +910,7 @@ function renderInfo() {
     T.digital && T.digital.length ? h('ul', { class: 'tips' }, T.digital.map(s => h('li', null, s))) : null);
   const mine = new Set(profileStores(S.profile));
   fill($('#storeCard'), h('h3', null, `Albert Heijn in Groningen (${STORES.length})`),
-    h('p', { class: 'small muted' }, `Je volgt ${mine.size} winkel${mine.size === 1 ? '' : 's'} (maximaal ${MAX_STORES}).`),
+    h('p', { class: 'small muted' }, `Je volgt ${mine.size} winkel${mine.size === 1 ? '' : 's'}.`),
     h('div', null, STORES.map(s => h('div', { class: 'store' + (mine.has(s.id) ? ' on' : '') },
       h('div', { style: 'min-width:0' }, h('div', { class: 'nm' }, s.name), h('div', { class: 'ad' }, `${s.street}, ${s.postcode} ${s.city || 'Groningen'}${s.area ? ` · ${s.area}` : ''}`),
         s.hours ? h('div', { class: 'ad' }, `Open: ${s.hours}`) : null,
@@ -1132,11 +1184,13 @@ function bind() {
   $('#storeSheetList').addEventListener('change', e => {
     const id = e.target && e.target.dataset && e.target.dataset.id; if (!id) return;
     const cur = (S.sheetSel || []).filter(x => x !== id);
-    S.sheetSel = e.target.checked ? [...cur, id].slice(0, MAX_STORES) : cur;
+    S.sheetSel = e.target.checked ? [...cur, id] : cur;
     syncSheet();
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeStoreSheet(); });
-  $('#liveStoreFilter').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setStoreFilter(b.dataset.v); });
+  $('#liveStoreSel').addEventListener('change', e => setStoreFilter(e.target.value));
+  $('#storeSheetAll').addEventListener('click', () => { S.sheetSel = STORES.map(x => x.id); syncSheet(); });
+  $('#storeSheetNone').addEventListener('click', () => { S.sheetSel = []; syncSheet(); });
   $('#dietForm').addEventListener('submit', submitDiet);
   $('#dUltra').addEventListener('change', e => { if (S.draft) S.draft.avoidUltra = e.target.checked; });
   $('#dFreezer').addEventListener('change', e => { if (S.draft) S.draft.freezer = e.target.checked; });
@@ -1204,11 +1258,13 @@ async function boot() {
   renderAll(); route();
   if (HOST) {
     if (HOST.readOnly) showLoadBanner('Je opgeslagen gegevens konden niet worden gelezen (iCloud). Wat je nu doet, wordt niet bewaard. Sluit de app en probeer het later opnieuw.');
+    if (HOST.stats) S.stats = HOST.stats;
     for (const p of [].concat(HOST.live || [])) if (p && p.items) applyLive(p, { stale: !!HOST.liveStale });
+    renderPatterns();
     if (HOST.liveError) window.LK_LIVE_STATUS(HOST.liveError);
     else if (myStores().length) liveRefresh();
   }
 }
 
-window.LK = { profileStores, setStores, evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, itemFromAH, nutritionFromAH, parseUnitSize, inferTags, exclusionsFor, defaultProfile, expState, GOALS, S, Store };
+window.LK = { timingAdvice, buildTimingStats, recordObservations, profileStores, setStores, evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, itemFromAH, nutritionFromAH, parseUnitSize, inferTags, exclusionsFor, defaultProfile, expState, GOALS, S, Store };
 boot();

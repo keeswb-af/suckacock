@@ -56,7 +56,7 @@ function defaultProfile() {
   return { goal: 'balanced', eat: 'alles', kcal: 2000, protein: 90, carbsMax: null, excl: {}, avoidUltra: false, freezer: true, persons: 1, budget: 40, notes: '', weight: null, stores: [], setAt: null, savedAt: 0 };
 }
 // The stores a profile follows (older profiles had a single "store").
-const MAX_STORES = 6;
+const MAX_STORES = 99; // no practical limit: every AH in the list can be followed
 function profileStores(P) {
   const known = id => typeof STORES === 'undefined' || STORES.some(s => s.id === id);
   // A non-empty list wins; otherwise fall back to the single store of older versions.
@@ -546,4 +546,146 @@ function itemFromAH(x) {
     qty: 1, source: 'ah', productId: x.productId ?? null, stock: x.stock != null && isFinite(+x.stock) ? +x.stock : null,
     nutriSource: label ? 'etiket' : strong ? 'tabel' : null, addedAt: Date.now(),
   };
+}
+
+/* ============================================================
+   Markdown history: how far and how fast stickers drop, per store
+   and product, so the app can say "buy now" or "wait".
+
+   history = { v, offers: { key: offer }, fetches: { storeKey: [ts] } }
+   offer   = { s: store, p: productId, c: category, n: name, e: expiry date,
+               w: normal price, f: first seen, l: last seen,
+               g: first time seen missing (sold out or taken away) or null,
+               o: [[ts, pct, priceNow, stock, lastSeenTs], ...] (one row per change;
+                   lastSeenTs is the last look at which that row still held) }
+   ============================================================ */
+const HISTORY_DAYS = 45, HISTORY_MAX = 8000;
+function pctBucket(p) { return p == null || !isFinite(p) ? null : Math.max(0, Math.min(95, Math.round(p / 5) * 5)); }
+function offerKey(storeKey, productId, expDate) { return `${storeKey}|${productId}|${expDate || ''}`; }
+function median(a) { if (!a || !a.length) return null; const b = a.slice().sort((x, y) => x - y); const m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; }
+function recordObservations(hist, payload, now) {
+  hist = hist && typeof hist === 'object' ? hist : {};
+  hist.v = 1; hist.offers = hist.offers || {}; hist.fetches = hist.fetches || {};
+  if (!payload || !payload.storeKey || !Array.isArray(payload.items)) return hist;
+  const sk = payload.storeKey;
+  const t = now || payload.fetchedAt || Date.now();
+  const seen = new Set();
+  for (const x of payload.items) {
+    if (x == null || x.productId == null) continue;
+    const it = itemFromAH(Object.assign({}, x, { storeKey: sk }));
+    const k = offerKey(sk, x.productId, it.expDate);
+    seen.add(k);
+    let o = hist.offers[k];
+    if (!o) o = hist.offers[k] = { s: sk, p: x.productId, c: it.cat, n: it.name, e: it.expDate, w: it.priceNormal, f: t, l: t, g: null, o: [] };
+    const last = o.o[o.o.length - 1];
+    const obs = [t, it.discountPct, it.priceNow, it.stock, t];
+    if (!last || last[1] !== obs[1] || last[2] !== obs[2] || last[3] !== obs[3]) o.o.push(obs);
+    else last[4] = t;
+    if (o.o.length > 40) o.o.splice(1, o.o.length - 40);
+    o.l = t; o.g = null;
+    if (it.priceNormal > 0) o.w = it.priceNormal;
+  }
+  // Offers this store had at the previous look that are missing now: sold out or taken off the shelf.
+  // An empty answer while there were offers before is more likely a hiccup than an empty shelf: skip.
+  const before = Object.values(hist.offers).filter(o => o.s === sk && o.g == null && o.l < t);
+  if (seen.size || before.length < 3) for (const o of before) if (!seen.has(offerKey(o.s, o.p, o.e))) o.g = t;
+  const fl = hist.fetches[sk] = hist.fetches[sk] || [];
+  fl.push(t);
+  if (fl.length > 300) fl.splice(0, fl.length - 300);
+  return hist;
+}
+function pruneHistory(hist, now) {
+  if (!hist || !hist.offers) return hist;
+  const cut = (now || Date.now()) - HISTORY_DAYS * 86400000;
+  for (const k in hist.offers) if (hist.offers[k].l < cut) delete hist.offers[k];
+  const keys = Object.keys(hist.offers);
+  if (keys.length > HISTORY_MAX) keys.sort((a, b) => hist.offers[a].l - hist.offers[b].l).slice(0, keys.length - HISTORY_MAX).forEach(k => delete hist.offers[k]);
+  return hist;
+}
+// For every discount level an offer was seen at: did it later get a deeper discount (when, how deep),
+// or was it gone first? Offers still on the shelf at the last look are left out (outcome unknown).
+function buildTimingStats(hist) {
+  const out = { v: 1, offers: 0, stores: {}, keys: {} };
+  if (!hist || !hist.offers) return out;
+  const acc = {};
+  const add = (key, b, rec) => {
+    const K = acc[key] = acc[key] || {};
+    const B = K[b] = K[b] || { up: 0, gone: 0, hrs: [], tos: [], dts: [] };
+    if (rec.up) { B.up++; B.hrs.push(rec.h); B.tos.push(rec.to); B.dts.push(rec.dt); } else B.gone++;
+  };
+  for (const k in hist.offers) {
+    const o = hist.offers[k], obs = o.o || [];
+    if (!obs.length) continue;
+    out.offers++;
+    out.stores[o.s] = (out.stores[o.s] || 0) + 1;
+    const firsts = [];
+    obs.forEach((ob, i) => { const b = pctBucket(ob[1]); if (b != null && (!firsts.length || firsts[firsts.length - 1].b !== b)) firsts.push({ b, t: ob[0], i }); });
+    firsts.forEach((cur, j) => {
+      const higher = firsts.slice(j + 1).find(x => x.b > cur.b);
+      let rec;
+      if (higher) {
+        const prev = higher.i > 0 ? obs[higher.i - 1] : null;
+        const prevT = prev ? (prev[4] || prev[0]) : cur.t;
+        const tt = (prevT + higher.t) / 2, d = new Date(tt);
+        rec = { up: true, h: d.getHours() + d.getMinutes() / 60, to: higher.b, dt: Math.max(0, (tt - cur.t) / 3600000) };
+      } else if (o.g != null) rec = { up: false };
+      else return;
+      for (const key of [`sp:${o.s}|${o.p}`, `sc:${o.s}|${o.c}`, `c:${o.c}`, `s:${o.s}`, 'all']) add(key, cur.b, rec);
+    });
+  }
+  const r1 = v => v == null ? null : Math.round(v * 10) / 10;
+  for (const key in acc) {
+    for (const b in acc[key]) {
+      const B = acc[key][b], n = B.up + B.gone;
+      if (key.startsWith('sp:') && n < 2) continue; // keep the file small: single sightings say little
+      // The next level is the most common one (a median of 40 and 70 would be a 55% that never happens),
+      // and the hour and wait are taken from the cases that went to that level.
+      let to = null, best = 0;
+      const cnt = {};
+      for (const v of B.tos) { cnt[v] = (cnt[v] || 0) + 1; if (cnt[v] > best || (cnt[v] === best && v > to)) { best = cnt[v]; to = v; } }
+      const sel = i => B.tos[i] === to;
+      (out.keys[key] = out.keys[key] || {})[b] = { n, up: B.up, h: r1(median(B.hrs.filter((_, i) => sel(i)))), to, dt: r1(median(B.dts.filter((_, i) => sel(i)))) };
+    }
+  }
+  return out;
+}
+function fmtHour(h) { let H = Math.floor(h), M = Math.round((h - H) * 4) * 15; if (M === 60) { H += 1; M = 0; } return `${String(H % 24).padStart(2, '0')}:${String(M).padStart(2, '0')}`; }
+// Buy now or wait? Uses the most specific history that has enough cases.
+function timingAdvice(it, stats, now) {
+  if (!it || it.discountPct == null || !(it.priceNormal > 0)) return null;
+  const st = expState(it);
+  if (st === 'verlopen') return null;
+  const p = pctBucket(it.discountPct);
+  if (p >= 70) return { kind: 'nu', text: 'Dit is al de hoogste korting die AH meestal geeft; wachten levert weinig op.' };
+  const catName = it.cat && CATS[it.cat] ? CATS[it.cat].toLowerCase() : 'dit soort product';
+  const chain = [
+    [it.storeKey && it.productId != null ? `sp:${it.storeKey}|${it.productId}` : null, 'dit product in deze winkel', 3],
+    [it.storeKey ? `sc:${it.storeKey}|${it.cat}` : null, `${catName} in deze winkel`, 5],
+    [`c:${it.cat}`, `${catName} in je winkels`, 8],
+    [it.storeKey ? `s:${it.storeKey}` : null, 'een koopje in deze winkel', 8],
+    ['all', 'een koopje in je winkels', 10],
+  ];
+  const K = (stats && stats.keys) || {};
+  let pick = null;
+  for (const [key, label, min] of chain) { const B = key && K[key] && K[key][p]; if (B && B.n >= min) { pick = { B, label }; break; } }
+  const hourNow = new Date(now || Date.now()).getHours();
+  if (!pick) {
+    if (st === 'vandaag' && p <= 40 && hourNow < 18) return { kind: 'info', weak: true, text: 'AH verhoogt de korting door de dag heen (25%, 40%, tot 70%). Er zijn nog te weinig eigen metingen om te zeggen of dit product het haalt.' };
+    return null;
+  }
+  const { B, label } = pick;
+  const raw = B.up / B.n;
+  const lastOne = it.stock != null && it.stock <= 1;
+  const late = B.h != null && st === 'vandaag' && hourNow > B.h + 1.5;
+  let pUp = raw;
+  if (lastOne) pUp *= 0.75;
+  if (late) pUp *= 0.4;
+  const nextPct = B.to || Math.min(70, p + 15);
+  const save = round2((itemPriceNow(it) || 0) - round2(it.priceNormal * (1 - nextPct / 100)));
+  const when = B.h != null ? ` rond ${fmtHour(B.h)}` : B.dt != null ? ` na zo'n ${Math.max(1, Math.round(B.dt))} uur` : '';
+  const upTxt = Math.round(raw * 100), basis = ` (${B.n}× gezien)`, one = lastOne ? ' Er ligt er nog maar één.' : '';
+  if (late && pUp < 0.6) return { kind: 'nu', p: pUp, text: `${label[0].toUpperCase() + label.slice(1)} zakt meestal${when} verder, en dat moment is al voorbij zonder dat het gebeurde.${one}${basis}` };
+  if (pUp >= 0.6 && save >= 0.3) return { kind: 'wacht', p: pUp, save, text: `In ${upTxt}% van de gevallen zakte ${label} verder naar ${nextPct}%${when}, ${fmtEur(save)} goedkoper.${one}${basis}` };
+  if (pUp <= 0.4) return { kind: 'nu', p: pUp, text: `In ${100 - upTxt}% van de gevallen was ${label} op voordat de korting verder zakte.${one}${basis}` };
+  return { kind: 'gok', p: pUp, save, text: `In ${upTxt}% van de gevallen zakte ${label} verder naar ${nextPct}%${when} (${fmtEur(Math.max(0, save))} goedkoper), maar regelmatig was hij ook eerder op.${one}${basis}` };
 }

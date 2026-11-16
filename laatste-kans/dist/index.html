@@ -94,6 +94,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .live-lines li.ok::before { background: var(--good); }
 .live-lines li.err::before { background: var(--bad); }
 .live-lines li.wait::before { background: var(--warn); }
+.live-lines details summary { min-height: 28px; font-weight: 500; }
+.timing { margin: 0; font-size: 0.86rem; }
+.timing .chip { margin-right: 4px; }
+.t-nu .chip { background: var(--good-bg); color: var(--good); }
+.t-wacht .chip { background: var(--warn-bg); color: var(--warn); }
+.t-gok .chip, .t-info .chip { background: var(--surface-2); color: var(--muted); }
+.t-info { color: var(--muted); }
+.alts { margin: 0; font-size: 0.8rem; color: var(--muted); }
 
 main { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 .view { display: flex; flex-direction: column; gap: 18px; padding-block: 16px 8px; }
@@ -289,7 +297,7 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
         <button type="button" data-v="fit">Past bij mij</button>
         <button type="button" data-v="all">Alles</button>
       </div>
-      <div class="seg" id="liveStoreFilter" role="group" aria-label="Winkel" hidden></div>
+      <label class="field" id="liveStoreWrap" for="liveStoreSel" hidden>Toon<select id="liveStoreSel"></select></label>
     </div>
     <div class="banner info" id="liveHint" hidden>
       <span>Wil je de Laatste Kans Koopjes van je winkel live zien? Dat kan via de gratis iPhone-app Scriptable.</span>
@@ -406,6 +414,7 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
   <section class="view wrap" id="view-logboek" hidden aria-labelledby="h-logboek">
     <h2 id="h-logboek">Logboek</h2>
     <div class="kpi-row" id="tripKpis"></div>
+    <div class="card" id="patternCard" hidden></div>
     <div class="list" id="tripList"></div>
   </section>
 
@@ -481,7 +490,8 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
       <h2 id="storeSheetTitle">Jouw winkels</h2>
       <button class="btn btn-sm btn-primary" id="storeSheetDone" type="button">Klaar</button>
     </div>
-    <p class="small muted">Kies een of meer AH's, tot 6. Van elke winkel komen de Laatste Kans Koopjes in je lijst. <span id="storeSheetCount"></span></p>
+    <p class="small muted">Kies een of meer AH's. Van elke winkel komen de Laatste Kans Koopjes in je lijst; hetzelfde product bij meerdere winkels staat op één kaart. <span id="storeSheetCount"></span></p>
+    <div class="btn-row"><button class="btn btn-sm" type="button" id="storeSheetAll">Alle winkels</button><button class="btn btn-sm btn-ghost" type="button" id="storeSheetNone">Geen</button></div>
     <div id="storeSheetList"></div>
   </div>
 </div>
@@ -551,7 +561,7 @@ function defaultProfile() {
   return { goal: 'balanced', eat: 'alles', kcal: 2000, protein: 90, carbsMax: null, excl: {}, avoidUltra: false, freezer: true, persons: 1, budget: 40, notes: '', weight: null, stores: [], setAt: null, savedAt: 0 };
 }
 // The stores a profile follows (older profiles had a single "store").
-const MAX_STORES = 6;
+const MAX_STORES = 99; // no practical limit: every AH in the list can be followed
 function profileStores(P) {
   const known = id => typeof STORES === 'undefined' || STORES.some(s => s.id === id);
   // A non-empty list wins; otherwise fall back to the single store of older versions.
@@ -1043,6 +1053,148 @@ function itemFromAH(x) {
   };
 }
 
+/* ============================================================
+   Markdown history: how far and how fast stickers drop, per store
+   and product, so the app can say "buy now" or "wait".
+
+   history = { v, offers: { key: offer }, fetches: { storeKey: [ts] } }
+   offer   = { s: store, p: productId, c: category, n: name, e: expiry date,
+               w: normal price, f: first seen, l: last seen,
+               g: first time seen missing (sold out or taken away) or null,
+               o: [[ts, pct, priceNow, stock, lastSeenTs], ...] (one row per change;
+                   lastSeenTs is the last look at which that row still held) }
+   ============================================================ */
+const HISTORY_DAYS = 45, HISTORY_MAX = 8000;
+function pctBucket(p) { return p == null || !isFinite(p) ? null : Math.max(0, Math.min(95, Math.round(p / 5) * 5)); }
+function offerKey(storeKey, productId, expDate) { return `${storeKey}|${productId}|${expDate || ''}`; }
+function median(a) { if (!a || !a.length) return null; const b = a.slice().sort((x, y) => x - y); const m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; }
+function recordObservations(hist, payload, now) {
+  hist = hist && typeof hist === 'object' ? hist : {};
+  hist.v = 1; hist.offers = hist.offers || {}; hist.fetches = hist.fetches || {};
+  if (!payload || !payload.storeKey || !Array.isArray(payload.items)) return hist;
+  const sk = payload.storeKey;
+  const t = now || payload.fetchedAt || Date.now();
+  const seen = new Set();
+  for (const x of payload.items) {
+    if (x == null || x.productId == null) continue;
+    const it = itemFromAH(Object.assign({}, x, { storeKey: sk }));
+    const k = offerKey(sk, x.productId, it.expDate);
+    seen.add(k);
+    let o = hist.offers[k];
+    if (!o) o = hist.offers[k] = { s: sk, p: x.productId, c: it.cat, n: it.name, e: it.expDate, w: it.priceNormal, f: t, l: t, g: null, o: [] };
+    const last = o.o[o.o.length - 1];
+    const obs = [t, it.discountPct, it.priceNow, it.stock, t];
+    if (!last || last[1] !== obs[1] || last[2] !== obs[2] || last[3] !== obs[3]) o.o.push(obs);
+    else last[4] = t;
+    if (o.o.length > 40) o.o.splice(1, o.o.length - 40);
+    o.l = t; o.g = null;
+    if (it.priceNormal > 0) o.w = it.priceNormal;
+  }
+  // Offers this store had at the previous look that are missing now: sold out or taken off the shelf.
+  // An empty answer while there were offers before is more likely a hiccup than an empty shelf: skip.
+  const before = Object.values(hist.offers).filter(o => o.s === sk && o.g == null && o.l < t);
+  if (seen.size || before.length < 3) for (const o of before) if (!seen.has(offerKey(o.s, o.p, o.e))) o.g = t;
+  const fl = hist.fetches[sk] = hist.fetches[sk] || [];
+  fl.push(t);
+  if (fl.length > 300) fl.splice(0, fl.length - 300);
+  return hist;
+}
+function pruneHistory(hist, now) {
+  if (!hist || !hist.offers) return hist;
+  const cut = (now || Date.now()) - HISTORY_DAYS * 86400000;
+  for (const k in hist.offers) if (hist.offers[k].l < cut) delete hist.offers[k];
+  const keys = Object.keys(hist.offers);
+  if (keys.length > HISTORY_MAX) keys.sort((a, b) => hist.offers[a].l - hist.offers[b].l).slice(0, keys.length - HISTORY_MAX).forEach(k => delete hist.offers[k]);
+  return hist;
+}
+// For every discount level an offer was seen at: did it later get a deeper discount (when, how deep),
+// or was it gone first? Offers still on the shelf at the last look are left out (outcome unknown).
+function buildTimingStats(hist) {
+  const out = { v: 1, offers: 0, stores: {}, keys: {} };
+  if (!hist || !hist.offers) return out;
+  const acc = {};
+  const add = (key, b, rec) => {
+    const K = acc[key] = acc[key] || {};
+    const B = K[b] = K[b] || { up: 0, gone: 0, hrs: [], tos: [], dts: [] };
+    if (rec.up) { B.up++; B.hrs.push(rec.h); B.tos.push(rec.to); B.dts.push(rec.dt); } else B.gone++;
+  };
+  for (const k in hist.offers) {
+    const o = hist.offers[k], obs = o.o || [];
+    if (!obs.length) continue;
+    out.offers++;
+    out.stores[o.s] = (out.stores[o.s] || 0) + 1;
+    const firsts = [];
+    obs.forEach((ob, i) => { const b = pctBucket(ob[1]); if (b != null && (!firsts.length || firsts[firsts.length - 1].b !== b)) firsts.push({ b, t: ob[0], i }); });
+    firsts.forEach((cur, j) => {
+      const higher = firsts.slice(j + 1).find(x => x.b > cur.b);
+      let rec;
+      if (higher) {
+        const prev = higher.i > 0 ? obs[higher.i - 1] : null;
+        const prevT = prev ? (prev[4] || prev[0]) : cur.t;
+        const tt = (prevT + higher.t) / 2, d = new Date(tt);
+        rec = { up: true, h: d.getHours() + d.getMinutes() / 60, to: higher.b, dt: Math.max(0, (tt - cur.t) / 3600000) };
+      } else if (o.g != null) rec = { up: false };
+      else return;
+      for (const key of [`sp:${o.s}|${o.p}`, `sc:${o.s}|${o.c}`, `c:${o.c}`, `s:${o.s}`, 'all']) add(key, cur.b, rec);
+    });
+  }
+  const r1 = v => v == null ? null : Math.round(v * 10) / 10;
+  for (const key in acc) {
+    for (const b in acc[key]) {
+      const B = acc[key][b], n = B.up + B.gone;
+      if (key.startsWith('sp:') && n < 2) continue; // keep the file small: single sightings say little
+      // The next level is the most common one (a median of 40 and 70 would be a 55% that never happens),
+      // and the hour and wait are taken from the cases that went to that level.
+      let to = null, best = 0;
+      const cnt = {};
+      for (const v of B.tos) { cnt[v] = (cnt[v] || 0) + 1; if (cnt[v] > best || (cnt[v] === best && v > to)) { best = cnt[v]; to = v; } }
+      const sel = i => B.tos[i] === to;
+      (out.keys[key] = out.keys[key] || {})[b] = { n, up: B.up, h: r1(median(B.hrs.filter((_, i) => sel(i)))), to, dt: r1(median(B.dts.filter((_, i) => sel(i)))) };
+    }
+  }
+  return out;
+}
+function fmtHour(h) { let H = Math.floor(h), M = Math.round((h - H) * 4) * 15; if (M === 60) { H += 1; M = 0; } return `${String(H % 24).padStart(2, '0')}:${String(M).padStart(2, '0')}`; }
+// Buy now or wait? Uses the most specific history that has enough cases.
+function timingAdvice(it, stats, now) {
+  if (!it || it.discountPct == null || !(it.priceNormal > 0)) return null;
+  const st = expState(it);
+  if (st === 'verlopen') return null;
+  const p = pctBucket(it.discountPct);
+  if (p >= 70) return { kind: 'nu', text: 'Dit is al de hoogste korting die AH meestal geeft; wachten levert weinig op.' };
+  const catName = it.cat && CATS[it.cat] ? CATS[it.cat].toLowerCase() : 'dit soort product';
+  const chain = [
+    [it.storeKey && it.productId != null ? `sp:${it.storeKey}|${it.productId}` : null, 'dit product in deze winkel', 3],
+    [it.storeKey ? `sc:${it.storeKey}|${it.cat}` : null, `${catName} in deze winkel`, 5],
+    [`c:${it.cat}`, `${catName} in je winkels`, 8],
+    [it.storeKey ? `s:${it.storeKey}` : null, 'een koopje in deze winkel', 8],
+    ['all', 'een koopje in je winkels', 10],
+  ];
+  const K = (stats && stats.keys) || {};
+  let pick = null;
+  for (const [key, label, min] of chain) { const B = key && K[key] && K[key][p]; if (B && B.n >= min) { pick = { B, label }; break; } }
+  const hourNow = new Date(now || Date.now()).getHours();
+  if (!pick) {
+    if (st === 'vandaag' && p <= 40 && hourNow < 18) return { kind: 'info', weak: true, text: 'AH verhoogt de korting door de dag heen (25%, 40%, tot 70%). Er zijn nog te weinig eigen metingen om te zeggen of dit product het haalt.' };
+    return null;
+  }
+  const { B, label } = pick;
+  const raw = B.up / B.n;
+  const lastOne = it.stock != null && it.stock <= 1;
+  const late = B.h != null && st === 'vandaag' && hourNow > B.h + 1.5;
+  let pUp = raw;
+  if (lastOne) pUp *= 0.75;
+  if (late) pUp *= 0.4;
+  const nextPct = B.to || Math.min(70, p + 15);
+  const save = round2((itemPriceNow(it) || 0) - round2(it.priceNormal * (1 - nextPct / 100)));
+  const when = B.h != null ? ` rond ${fmtHour(B.h)}` : B.dt != null ? ` na zo'n ${Math.max(1, Math.round(B.dt))} uur` : '';
+  const upTxt = Math.round(raw * 100), basis = ` (${B.n}× gezien)`, one = lastOne ? ' Er ligt er nog maar één.' : '';
+  if (late && pUp < 0.6) return { kind: 'nu', p: pUp, text: `${label[0].toUpperCase() + label.slice(1)} zakt meestal${when} verder, en dat moment is al voorbij zonder dat het gebeurde.${one}${basis}` };
+  if (pUp >= 0.6 && save >= 0.3) return { kind: 'wacht', p: pUp, save, text: `In ${upTxt}% van de gevallen zakte ${label} verder naar ${nextPct}%${when}, ${fmtEur(save)} goedkoper.${one}${basis}` };
+  if (pUp <= 0.4) return { kind: 'nu', p: pUp, text: `In ${100 - upTxt}% van de gevallen was ${label} op voordat de korting verder zakte.${one}${basis}` };
+  return { kind: 'gok', p: pUp, save, text: `In ${upTxt}% van de gevallen zakte ${label} verder naar ${nextPct}%${when} (${fmtEur(Math.max(0, save))} goedkoper), maar regelmatig was hij ook eerder op.${one}${basis}` };
+}
+
 </script>
 <script>
 'use strict';
@@ -1268,7 +1420,7 @@ function openStoreSheet() {
 }
 function syncSheet() {
   const sel = new Set(S.sheetSel || []);
-  $$('#storeSheetList input').forEach(i => { i.checked = sel.has(i.dataset.id); i.disabled = !i.checked && sel.size >= MAX_STORES; });
+  $$('#storeSheetList input').forEach(i => { i.checked = sel.has(i.dataset.id); });
   $('#storeSheetCount').textContent = sel.size ? `${sel.size} gekozen.` : '';
 }
 function closeStoreSheet() {
@@ -1297,7 +1449,6 @@ function setStores(ids) {
 function toggleStore(id) {
   const cur = profileStores(S.profile);
   if (cur.includes(id)) setStores(cur.filter(x => x !== id));
-  else if (cur.length >= MAX_STORES) toast(`Maximaal ${MAX_STORES} winkels`);
   else setStores([...cur, id]);
 }
 function showLoadBanner(msg, action) {
@@ -1316,7 +1467,8 @@ function stickerFor(it) {
   return pct > 0 ? h('div', { class: 'sticker', 'aria-label': `${pct} procent korting` }, `-${pct}%`) : null;
 }
 const EXP_NL = { vandaag: 'tot vandaag', morgen: 'tot morgen', verlopen: 'datum verstreken', later: null };
-function itemCard(it, where) {
+const TIMING_NL = { nu: 'Nu kopen', wacht: 'Wachten loont', gok: 'Gok', info: 'Afprijzen' };
+function itemCard(it, where, alts) {
   const ev = evaluate(it, S.profile);
   const price = itemPriceNow(it);
   const meta = [it.grams ? `${fmtNum(it.grams)} g` : (it.unitSize || null), EXP_NL[ev.exp], CATS[it.cat] || null,
@@ -1361,6 +1513,8 @@ function itemCard(it, where) {
       h('span', { class: 'score' }, `${ev.score}/100`)),
     metrics.length ? h('ul', { class: 'metrics' }, metrics) : null,
     ev.reasons.length ? h('ul', { class: 'reasons' }, ev.reasons.map(r => h('li', { class: r.pos ? 'pos' : r.neg ? 'neg' : '' }, r.s))) : null,
+    (() => { const a = where === 'cand' && ev.verdict !== 'nee' ? timingAdvice(it, S.stats, Date.now()) : null; return a ? h('p', { class: 'timing t-' + a.kind }, h('span', { class: 'chip' }, TIMING_NL[a.kind] || ''), ' ', a.text) : null; })(),
+    alts && alts.length ? h('p', { class: 'alts' }, 'Ook bij: ', alts.slice(0, 6).map(a => `${a.storeName || '?'} ${fmtEur(itemPriceNow(a))}${a.discountPct ? ` (-${a.discountPct}%)` : ''}`).join(', '), alts.length > 6 ? ` en ${alts.length - 6} meer` : '') : null,
     h('div', { class: 'item-actions' }, actions));
 }
 
@@ -1403,7 +1557,21 @@ function renderCandidates() {
       h('div', { class: 'btn-row' }, h('button', { class: 'btn btn-sm', type: 'button', onclick: addExamples }, 'Laat voorbeelden zien'))));
     return;
   }
-  const kids = [hiddenNote, ...list.map(it => itemCard(it, 'cand'))];
+  // The same product at several stores: show the best offer, list the others on its card.
+  const multi = !sf && profileStores(S.profile).length > 1;
+  const shown = [], altsOf = new Map(), seenP = new Map();
+  for (const it of list) {
+    if (multi && it.source === 'ah' && it.productId != null) {
+      const lead = seenP.get(it.productId);
+      if (lead) { altsOf.get(lead).push(it); continue; }
+      seenP.set(it.productId, it); altsOf.set(it, []);
+    }
+    shown.push(it);
+  }
+  const cap = S.showMax || 60;
+  const more = shown.length > cap ? h('div', { class: 'btn-row' }, h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { S.showMax = cap + 60; renderCandidates(); } }, `Toon meer (${shown.length - cap})`)) : null;
+  $('#candCount').textContent = shown.length ? `${shown.length} product${shown.length === 1 ? '' : 'en'}` : '';
+  const kids = [hiddenNote, ...shown.slice(0, cap).map(it => itemCard(it, 'cand', altsOf.get(it))), more];
   if (list.some(it => it.example)) kids.push(h('div', { class: 'btn-row' }, h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: clearExamples }, 'Wis voorbeelden')));
   fill($('#candList'), ...kids);
 }
@@ -1439,7 +1607,7 @@ function renderLive() {
   else if (L.message) msg = L.message;
   $('#liveStatus').textContent = msg;
   $('#liveStatus').hidden = !msg;
-  fill($('#liveLines'), ...ss.map(st => {
+  const lineFor = st => {
     const m = meta[st.id], ps = per[st.id] || {}, nm = storeShort(st);
     let cls = '', txt;
     if (ps.status === 'loading') { cls = 'wait'; txt = `${nm}: ophalen…`; }
@@ -1447,8 +1615,20 @@ function renderLive() {
     else if (ps.status === 'error') { cls = 'err'; txt = `${nm}: ${ps.message || 'ophalen lukte niet'}${m ? ` Je ziet de koopjes van ${fmtTime(m.fetchedAt)}.` : ''}`; }
     else if (m) { cls = m.stale ? 'wait' : 'ok'; txt = `${nm}: ${m.count} koopje${m.count === 1 ? '' : 's'}, ${m.stale ? 'van ' + fmtTime(m.fetchedAt) + ' (wordt ververst)' : 'bijgewerkt om ' + fmtTime(m.fetchedAt)}`; }
     else txt = `${nm}: nog niet opgehaald`;
-    return h('li', { class: cls }, txt);
-  }));
+    return { cls, li: h('li', { class: cls }, txt) };
+  };
+  const all = ss.map(lineFor);
+  if (ss.length <= 4) fill($('#liveLines'), ...all.map(x => x.li));
+  else {
+    // Many stores: one summary line, problems listed, the rest folded away.
+    const ms = ss.map(st => meta[st.id]).filter(Boolean);
+    const total = ms.reduce((a, m) => a + (m.count || 0), 0);
+    const loading = ss.filter(st => (per[st.id] || {}).status === 'loading').length;
+    const newest = ms.length ? Math.max(...ms.map(m => m.fetchedAt || 0)) : null;
+    const sum = h('li', { class: loading ? 'wait' : ms.length ? 'ok' : '' }, `${ss.length} winkels: ${total} koopjes${loading ? `, nog ${loading} aan het ophalen` : newest ? `, bijgewerkt om ${fmtTime(newest)}` : ''}`);
+    const bad = all.filter(x => x.cls === 'err').map(x => x.li);
+    fill($('#liveLines'), sum, ...bad, h('li', null, h('details', null, h('summary', null, 'Per winkel'), h('ul', { class: 'live-lines' }, all.filter(x => x.cls !== 'err').map(x => x.li)))));
+  }
   const metas = ss.map(st => meta[st.id]).filter(Boolean);
   const anyLoading = ss.some(st => (per[st.id] || {}).status === 'loading');
   const dot = $('#liveDot');
@@ -1457,12 +1637,14 @@ function renderLive() {
   const anonEmpty = !anyLoading && metas.length && metas.every(m => m.count === 0 && m.kind === 'anon');
   $('#liveLogin').hidden = !(L.status === 'login' || anonEmpty);
   setSeg('#liveFilter', S.session.liveFilter || 'fit');
-  const sf = $('#liveStoreFilter');
-  sf.hidden = ss.length < 2;
+  $('#liveStoreWrap').hidden = ss.length < 2;
   if (ss.length >= 2) {
     const cur = ss.some(st => st.id === S.session.storeFilter) ? S.session.storeFilter : 'all';
-    fill(sf, h('button', { type: 'button', 'data-v': 'all', 'aria-pressed': String(cur === 'all') }, 'Alle winkels'),
-      ...ss.map(st => h('button', { type: 'button', 'data-v': st.id, 'aria-pressed': String(cur === st.id) }, storeShort(st))));
+    const counts = {};
+    for (const c of S.session.candidates) if (c.source === 'ah' && c.storeKey) counts[c.storeKey] = (counts[c.storeKey] || 0) + 1;
+    const sel = $('#liveStoreSel');
+    fill(sel, h('option', { value: 'all' }, `Alle winkels (${ss.length})`), ...ss.map(st => h('option', { value: st.id }, `${storeShort(st)}${counts[st.id] ? ` (${counts[st.id]})` : ''}`)));
+    sel.value = cur;
   }
 }
 function setLiveFilter(v) { S.session.liveFilter = v === 'all' ? 'all' : 'fit'; saveSession(); renderWinkel(); }
@@ -1505,6 +1687,7 @@ function applyLive(p, opts) {
   saveSession(); renderWinkel(); if (S.tab === 'koken') renderKoken();
 }
 window.LK_LIVE = payload => { try { applyLive(typeof payload === 'string' ? JSON.parse(payload) : payload); return 'ok'; } catch (e) { return 'error: ' + e.message; } };
+window.LK_STATS = st => { try { S.stats = typeof st === 'string' ? JSON.parse(st) : st; renderCandidates(); renderPatterns(); return 'ok'; } catch (e) { return 'error: ' + e.message; } };
 window.LK_TOAST = m => { toast(String(typeof m === 'string' && m[0] === '"' ? JSON.parse(m) : m)); return 'ok'; };
 window.LK_LIVE_STATUS = st => {
   const o = typeof st === 'string' ? JSON.parse(st) : (st || {});
@@ -1772,7 +1955,28 @@ function inlineMd(s, tag = 'li') {
 /* ============================================================
    Logboek view
    ============================================================ */
+function renderPatterns() {
+  const card = $('#patternCard');
+  const st = S.stats;
+  if (!HOST || !st || !st.keys) { card.hidden = true; return; }
+  card.hidden = false;
+  const steps = key => {
+    const K = st.keys[key] || {};
+    return Object.keys(K).map(Number).sort((a, b) => a - b).filter(b => b < 70 && K[b].n >= 3).map(b => {
+      const B = K[b], up = Math.round(B.up / B.n * 100);
+      return `Bij ${b}%: ${up}% zakte verder${B.to ? ` naar ${B.to}%` : ''}${B.h != null ? `, meestal rond ${fmtHour(B.h)}` : ''}; ${100 - up}% was eerder op (${B.n}×).`;
+    });
+  };
+  const rows = [];
+  for (const s of myStores()) { const l = steps(`s:${s.id}`); if (l.length) rows.push(h('div', null, h('b', null, storeShort(s)), h('ul', { class: 'tips small' }, l.map(x => h('li', null, x))))); }
+  const cats = Object.keys(CATS).map(c => ({ c, l: steps(`c:${c}`) })).filter(x => x.l.length);
+  fill(card, h('h3', null, 'Hoe AH afprijst bij jou'),
+    h('p', { class: 'small muted' }, st.offers ? `Gebaseerd op ${st.offers} koopjes die de app heeft gevolgd. Elke keer dat je de app of de widget opent, komt er meer bij; na een paar weken worden de adviezen per product betrouwbaar.` : 'Nog geen metingen. Elke keer dat je de app of de widget opent, volgt de app hoe de korting oploopt.'),
+    rows.length ? rows : h('p', { class: 'small' }, 'Nog te weinig metingen per winkel.'),
+    cats.length ? h('details', null, h('summary', null, 'Per soort product'), ...cats.map(x => h('div', null, h('b', null, CATS[x.c]), h('ul', { class: 'tips small' }, x.l.map(t => h('li', null, t)))))) : null);
+}
 function renderLogboek() {
+  renderPatterns();
   const trips = S.trips;
   const month = todayISO().slice(0, 7);
   const tm = trips.filter(t => (t.date || '').startsWith(month));
@@ -1905,7 +2109,7 @@ function renderInfo() {
     T.digital && T.digital.length ? h('ul', { class: 'tips' }, T.digital.map(s => h('li', null, s))) : null);
   const mine = new Set(profileStores(S.profile));
   fill($('#storeCard'), h('h3', null, `Albert Heijn in Groningen (${STORES.length})`),
-    h('p', { class: 'small muted' }, `Je volgt ${mine.size} winkel${mine.size === 1 ? '' : 's'} (maximaal ${MAX_STORES}).`),
+    h('p', { class: 'small muted' }, `Je volgt ${mine.size} winkel${mine.size === 1 ? '' : 's'}.`),
     h('div', null, STORES.map(s => h('div', { class: 'store' + (mine.has(s.id) ? ' on' : '') },
       h('div', { style: 'min-width:0' }, h('div', { class: 'nm' }, s.name), h('div', { class: 'ad' }, `${s.street}, ${s.postcode} ${s.city || 'Groningen'}${s.area ? ` · ${s.area}` : ''}`),
         s.hours ? h('div', { class: 'ad' }, `Open: ${s.hours}`) : null,
@@ -2179,11 +2383,13 @@ function bind() {
   $('#storeSheetList').addEventListener('change', e => {
     const id = e.target && e.target.dataset && e.target.dataset.id; if (!id) return;
     const cur = (S.sheetSel || []).filter(x => x !== id);
-    S.sheetSel = e.target.checked ? [...cur, id].slice(0, MAX_STORES) : cur;
+    S.sheetSel = e.target.checked ? [...cur, id] : cur;
     syncSheet();
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeStoreSheet(); });
-  $('#liveStoreFilter').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setStoreFilter(b.dataset.v); });
+  $('#liveStoreSel').addEventListener('change', e => setStoreFilter(e.target.value));
+  $('#storeSheetAll').addEventListener('click', () => { S.sheetSel = STORES.map(x => x.id); syncSheet(); });
+  $('#storeSheetNone').addEventListener('click', () => { S.sheetSel = []; syncSheet(); });
   $('#dietForm').addEventListener('submit', submitDiet);
   $('#dUltra').addEventListener('change', e => { if (S.draft) S.draft.avoidUltra = e.target.checked; });
   $('#dFreezer').addEventListener('change', e => { if (S.draft) S.draft.freezer = e.target.checked; });
@@ -2251,13 +2457,15 @@ async function boot() {
   renderAll(); route();
   if (HOST) {
     if (HOST.readOnly) showLoadBanner('Je opgeslagen gegevens konden niet worden gelezen (iCloud). Wat je nu doet, wordt niet bewaard. Sluit de app en probeer het later opnieuw.');
+    if (HOST.stats) S.stats = HOST.stats;
     for (const p of [].concat(HOST.live || [])) if (p && p.items) applyLive(p, { stale: !!HOST.liveStale });
+    renderPatterns();
     if (HOST.liveError) window.LK_LIVE_STATUS(HOST.liveError);
     else if (myStores().length) liveRefresh();
   }
 }
 
-window.LK = { profileStores, setStores, evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, itemFromAH, nutritionFromAH, parseUnitSize, inferTags, exclusionsFor, defaultProfile, expState, GOALS, S, Store };
+window.LK = { timingAdvice, buildTimingStats, recordObservations, profileStores, setStores, evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, itemFromAH, nutritionFromAH, parseUnitSize, inferTags, exclusionsFor, defaultProfile, expState, GOALS, S, Store };
 boot();
 
 </script>

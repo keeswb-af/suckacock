@@ -114,13 +114,40 @@ function ok(cond, msg) { if (cond) console.log('  ok  ' + msg); else { failures+
       }));
       ok(ms.old.join() === 'ah-1330', 'old single-store profile migrates: ' + ms.old);
       ok(ms.both.join() === 'ah-1330,ah-1829', 'unknown store ids dropped');
-      ok(ms.cap === 6, 'at most 6 stores');
+      ok(ms.cap === 23, 'all 23 stores can be followed: ' + ms.cap);
       await page.click('#storeBtn');
       await page.click('#storeSheetList input[data-id="ah-1330"]');
       await page.click('#storeSheetList input[data-id="ah-1829"]');
       await page.click('#storeSheetDone');
       ok(/2 winkels/.test(await page.textContent('#storeBtn')), 'store sheet picks two stores');
       ok((await page.evaluate(() => window.LK.S.profile.stores)).join() === 'ah-1330,ah-1829', 'stores saved in profile');
+      const tim = await page.evaluate(() => {
+        const { recordObservations, buildTimingStats, timingAdvice, itemFromAH } = window.LK;
+        let hist = {};
+        const day0 = Date.now() - 25 * 86400000;
+        for (let d = 0; d < 20; d++) {
+          const base = new Date(day0 + d * 86400000); base.setHours(0, 0, 0, 0);
+          const iso = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`;
+          for (const hr of [8, 10, 12, 14, 16, 18, 20, 22]) {
+            const t = base.getTime() + hr * 3600000, items = [];
+            const sold = d % 10 < 7 && hr >= 17;
+            if (hr >= 9 && !sold) { const pct = hr >= 20 ? 70 : hr >= 15 ? 40 : 25; items.push({ productId: 101, title: 'AH Kipdijfilet', unitSize: '400 g', pct, expDate: iso, stock: 3, priceWas: '4.99', priceNow: (4.99 * (1 - pct / 100)).toFixed(2) }); }
+            items.push({ productId: 103, title: 'Campina Volle yoghurt', brand: 'Campina', unitSize: '1 l', pct: 35, expDate: iso, stock: 4, priceWas: '1.95', priceNow: '1.27' });
+            hist = recordObservations(hist, { storeKey: 'ah-1829', items }, t);
+          }
+        }
+        const stats = buildTimingStats(hist);
+        const today = new Date(); const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const at = h => { const x = new Date(); x.setHours(h, 0, 0, 0); return x.getTime(); };
+        const mk = (pct, now) => itemFromAH({ productId: 101, title: 'AH Kipdijfilet', unitSize: '400 g', pct, expDate: iso, stock: 3, priceWas: '4.99', priceNow: now, storeKey: 'ah-1829' });
+        return { b25: stats.keys['sp:ah-1829|101'][25], b40: stats.keys['sp:ah-1829|101'][40], w: timingAdvice(mk(25, '3.74'), stats, at(10)), n: timingAdvice(mk(40, '2.99'), stats, at(16)), top: timingAdvice(mk(70, '1.50'), stats, at(20)), none: timingAdvice(mk(25, '3.74'), null, at(10)) };
+      });
+      ok(tim.b25.up === 20 && tim.b25.h === 15 && tim.b25.to === 40, '25% always went to 40% around 15:00: ' + JSON.stringify(tim.b25));
+      ok(tim.b40.n === 20 && tim.b40.up === 6, '40% reached 70% on 6 of 20 days: ' + JSON.stringify(tim.b40));
+      ok(tim.w.kind === 'wacht' && /15:00/.test(tim.w.text), 'advice at 25% in the morning: wait');
+      ok(tim.n.kind === 'nu', 'advice at 40% in the afternoon: buy now');
+      ok(tim.top.kind === 'nu', 'advice at 70%: buy now');
+      ok(tim.none && tim.none.kind === 'info', 'no history: general hint only');
       // Full flow: set diet, add product via search, basket, finish, logboek.
       await page.goto(FILE + '#dieet');
       await page.fill('#dNotes', 'Ik lust geen champignons');

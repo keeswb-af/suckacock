@@ -285,12 +285,12 @@ function run(env) {
   ok(both.join() === 'ah-1093,ah-1829', 'bargains from both stores: ' + both);
   ok(/bij Selwerd/.test(await page.textContent('#candList')), 'cards say which store');
   ok(/2 winkels/.test(await page.textContent('#storeBtn')), 'header shows 2 winkels');
-  ok(await page.isVisible('#liveStoreFilter') && (await page.$$('#liveStoreFilter button')).length === 3, 'store filter chips');
+  ok(await page.isVisible('#liveStoreSel') && (await page.$$('#liveStoreSel option')).length === 3, 'store dropdown with all + 2 stores');
   ok((await page.$$('#liveLines li')).length === 2, 'one status line per store');
-  await page.click('#liveStoreFilter button[data-v="ah-1093"]');
+  await page.selectOption('#liveStoreSel', 'ah-1093');
   const only = await page.$$eval('#candList .item', els => els.map(e => e.textContent));
   ok(only.length >= 1 && only.every(t => /Broccoli/.test(t) || !/live/.test(t)), 'store filter shows only that store');
-  await page.click('#liveStoreFilter button[data-v="all"]');
+  await page.selectOption('#liveStoreSel', 'all');
   // One store failing does not hide the other.
   AH.failStore = '1093';
   await page.click('#liveRefresh');
@@ -302,7 +302,7 @@ function run(env) {
   await pickStores(page, ['ah-1829']);
   const left = await page.evaluate(() => window.LK.S.session.candidates.filter(c => c.source === 'ah' && c.storeKey === 'ah-1093').length);
   ok(left === 0, 'unfollowed store items cleared');
-  ok(await page.isHidden('#liveStoreFilter'), 'store filter hidden with one store');
+  ok(await page.isHidden('#liveStoreWrap'), 'store dropdown hidden with one store');
   await page.click('#candList .item:has-text("Kipdijfilet") button:has-text("Weg")');
   await wait(800);
   wv.dismiss();
@@ -325,6 +325,50 @@ function run(env) {
   ok(mt.some(t => /2 winkels/.test(t)) && mt.some(t => /Broccoli.*Selwerd/.test(t)), 'widget combines stores: ' + mt.join(' | '));
   stw.profile.stores = ['ah-1829'];
   fs.writeFileSync(stFile, JSON.stringify(stw));
+
+  // Markdown history: kept per store and product, offers that disappear are marked as gone.
+  const histFile = path.join(docs2, 'Laatste Kans data', 'afprijs-geschiedenis.json');
+  let hist = JSON.parse(fs.readFileSync(histFile, 'utf8'));
+  const k101 = Object.keys(hist.offers).find(k => k.startsWith('ah-1829|101|'));
+  ok(k101 && hist.offers[k101].o.length >= 1 && hist.fetches['ah-1829'].length >= 2, 'history records offers and fetches per store');
+  const saved = BARGAINS.splice(0, 1); // Kipdijfilet sold out
+  env = run(makeEnv(ctx, docs2, kc2, { widget: true }));
+  await env.done;
+  BARGAINS.unshift(...saved);
+  hist = JSON.parse(fs.readFileSync(histFile, 'utf8'));
+  ok(hist.offers[k101].g != null, 'an offer that disappears is marked as gone');
+  // Seed 20 days of history: Spekreepjes at 40% sold out before reaching 70% on 14 of 20 days.
+  const now = Date.now();
+  for (let d = 1; d <= 20; d++) {
+    const t0 = now - d * 86400000, e = new Date(t0).toISOString().slice(0, 10);
+    const up = d % 10 >= 7;
+    hist.offers[`ah-1829|104|${e}`] = { s: 'ah-1829', p: 104, c: 'vlees', n: 'Spekreepjes', e, w: 2.29, f: t0, l: t0 + 4 * 3600000, g: up ? null : t0 + 4 * 3600000,
+      o: up ? [[t0, 40, 1.37, 1, t0 + 3600000], [t0 + 3 * 3600000, 70, 0.69, 1, t0 + 4 * 3600000]] : [[t0, 40, 1.37, 1, t0 + 3 * 3600000]] };
+    if (up) hist.offers[`ah-1829|104|${e}`].g = t0 + 5 * 3600000;
+  }
+  fs.writeFileSync(histFile, JSON.stringify(hist));
+  env = run(makeEnv(ctx, docs2, kc2, {}));
+  await until(() => env.webviews[0] && env.webviews[0].page, 8000, 'webview');
+  wv = env.webviews[0];
+  await until(() => wv.page.evaluate(() => window.LK && (m => m && !m.stale)(window.LK.S.session.liveMeta['ah-1829'])), 10000, 'fresh live');
+  page = wv.page;
+  await page.click('#liveFilter button[data-v="all"]');
+  const kdCard = await page.textContent('#candList .item:has-text("Spekreepjes")');
+  ok(/Nu kopen/.test(kdCard) && /op voordat de korting verder zakte/.test(kdCard), 'card advises to buy now from history: ' + (kdCard.match(/Nu kopen[^(]*/) || [''])[0]);
+  ok(await page.evaluate(() => window.LK.S.stats && window.LK.S.stats.offers > 20), 'stats sent to the page after a refresh');
+  await page.click('a[href="#logboek"]');
+  ok(/Hoe AH afprijst bij jou/.test(await page.textContent('#patternCard')) && /Paddepoel/.test(await page.textContent('#patternCard')), 'Logboek shows the markdown pattern per store');
+  // All stores at once: no limit, summary line instead of 23 lines.
+  await page.click('a[href="#winkel"]');
+  await page.click('#storeBtn');
+  await page.click('#storeSheetAll');
+  await page.click('#storeSheetDone');
+  ok(/23 winkels/.test(await page.textContent('#storeBtn')), 'all 23 stores followed');
+  await until(() => page.evaluate(() => Object.values(window.LK.S.live.per).filter(x => x.status === 'loading').length === 0), 20000, 'all fetched');
+  ok(/23 winkels: \d+ koopjes/.test(await page.textContent('#liveLines')), 'summary line for many stores: ' + (await page.textContent('#liveLines')).slice(0, 80));
+  await pickStores(page, ['ah-1829']);
+  wv.dismiss();
+  await until(() => Promise.race([env.done.then(() => true), wait(50).then(() => false)]), 8000, 'end');
 
   // A GraphQL field error (data.bargainItems null) asks for a login instead of showing 0 bargains.
   AH.partialAuth = true; kc2.clear();

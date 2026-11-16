@@ -32,6 +32,28 @@ const FM = (() => { try { const f = FileManager.iCloud(); f.documentsDirectory()
 const DIR = FM.joinPath(FM.documentsDirectory(), 'Laatste Kans data');
 const STATE_FILE = FM.joinPath(DIR, 'state.json');
 const CACHE_FILE = FM.joinPath(DIR, 'voeding-cache.json');
+const HISTORY_FILE = FM.joinPath(DIR, 'afprijs-geschiedenis.json');
+// One copy of the nutrition cache and the markdown history per run, written once at the end,
+// so stores fetched side by side do not overwrite each other's additions.
+const RUN = { cache: null, hist: null, histOk: true, dirty: false };
+async function runCache() { if (!RUN.cache) RUN.cache = await readJSON(CACHE_FILE, {}); return RUN.cache; }
+async function runHistory() {
+  if (!RUN.hist) {
+    try { RUN.hist = await readJSONStrict(HISTORY_FILE, {}) || {}; }
+    catch (e) { RUN.hist = {}; RUN.histOk = false; } // unreadable: keep measuring in memory, never overwrite the file
+  }
+  return RUN.hist;
+}
+async function record(payload) { recordObservations(await runHistory(), payload, payload.fetchedAt); RUN.dirty = true; }
+function flushRun() {
+  try { if (RUN.cache) writeJSON(CACHE_FILE, RUN.cache); } catch (e) { /* optional */ }
+  try { if (RUN.hist && RUN.histOk && RUN.dirty) { pruneHistory(RUN.hist, Date.now()); writeJSON(HISTORY_FILE, RUN.hist); RUN.dirty = false; } } catch (e) { /* optional */ }
+}
+async function pool(list, n, fn) {
+  let i = 0;
+  const worker = async () => { while (i < list.length) { const x = list[i++]; await fn(x); } };
+  await Promise.all(Array.from({ length: Math.min(n, list.length) }, worker));
+}
 async function readJSONStrict(path, fallback) {
   if (!FM.fileExists(path)) return fallback;
   if (FM.isFileStoredIniCloud(path) && !FM.isFileDownloaded(path)) await withTimeout(FM.downloadFileFromiCloud(path), 8000, 'file');
@@ -102,7 +124,11 @@ const AH = {
     return t;
   },
   logout() { if (Keychain.contains(KC)) Keychain.remove(KC); },
-  async token(force) {
+  token(force) {
+    if (!this._pending) this._pending = this._token(force).finally(() => { this._pending = null; });
+    return this._pending;
+  },
+  async _token(force) {
     const t = this.tokens();
     if (t && t.access && t.expiresAt > Date.now() && !force) return t;
     if (t && t.refresh) {
@@ -201,7 +227,7 @@ async function fetchLive(s, state) {
     if (seen[k]) return false; seen[k] = true; return true;
   });
   // Label nutrition per product. Cache entries are {n, t}; n null means AH has no label for it.
-  const cache = await readJSON(CACHE_FILE, {});
+  const cache = await runCache();
   const need = [...new Set(items.map(x => String(x.productId)))].filter(id => !cache[id]).slice(0, 80);
   for (let i = 0; i < need.length; i += 20) {
     const chunk = need.slice(i, i + 20);
@@ -221,7 +247,7 @@ async function fetchLive(s, state) {
   const ids = Object.keys(cache).filter(id => !current.has(id)).sort((a, b) => ((cache[a] && cache[a].t) || 0) - ((cache[b] && cache[b].t) || 0));
   const extra = Object.keys(cache).length - 3000;
   if (extra > 0) for (const id of ids.slice(0, extra)) delete cache[id];
-  try { writeJSON(CACHE_FILE, cache); } catch (e) { /* the cache is optional */ }
+
   return { storeKey: s.key, storeName: s.name, storeId, fetchedAt: Date.now(), kind: res.kind, items };
 }
 function lastLiveMap(state) {
@@ -238,7 +264,7 @@ function pageWith(state, opts) {
   const host = {
     kind: 'scriptable', version: VERSION,
     state: { profile: state.profile || null, session: state.session || null, trips: state.trips || [] },
-    live: opts.live || null, liveStale: !!opts.stale, liveError: opts.error || null, readOnly: !!opts.readOnly,
+    live: opts.live || null, liveStale: !!opts.stale, liveError: opts.error || null, readOnly: !!opts.readOnly, stats: opts.stats || null,
   };
   const inject = `<script>window.LK_HOST = ${scriptJSON(host)};</script>`;
   // Fonts must not hold up the first paint in a shop with weak reception.
@@ -270,17 +296,23 @@ async function runApp() {
     let list = arg && Array.isArray(arg.stores) ? arg.stores : arg && arg.key ? [arg] : null;
     if (!list) list = profileStores(state.profile || {}).map(storeFromKey).filter(Boolean).map(storeArg);
     if (!list.length) return pageStatus({ status: 'error', message: 'Kies eerst je winkels.' });
-    for (const st of list) {
+    try { await AH.token(); } catch (e) { return pageStatus(Object.assign(statusFor(e), { all: true })); }
+    let needLogin = false;
+    await pool(list, 4, async st => {
+      if (needLogin) return;
       try {
         const payload = await fetchLive(st, state);
         state.lastLive = Object.assign(lastLiveMap(state), { [st.key]: payload });
-        save();
+        await record(payload);
         await call('LK_LIVE', payload);
       } catch (e) {
-        if (e.code === 'login') { await pageStatus(Object.assign(statusFor(e), { all: true })); return; }
+        if (e.code === 'login') { if (!needLogin) { needLogin = true; await pageStatus(Object.assign(statusFor(e), { all: true })); } return; }
         await pageStatus(Object.assign(statusFor(e), { storeKey: st.key }));
       }
-    }
+    });
+    save();
+    flushRun();
+    await call('LK_STATS', buildTimingStats(await runHistory()));
   }
   function startRefresh(arg) {
     if (refreshing) { queued = arg; return; }
@@ -298,7 +330,7 @@ async function runApp() {
       if (!code) throw fail('login', 'Inloggen is afgebroken.');
       await AH.exchange(code);
       state.storeIds = {}; // look the store up again with the member token
-      await reloadApp({}); // the page asks for fresh bargains itself
+      await reloadApp({ stats: buildTimingStats(await runHistory()) }); // the page asks for fresh bargains itself
     } catch (e) { await reloadApp({ error: statusFor(e) }); }
   }
   wv.shouldAllowRequest = req => {
@@ -334,7 +366,8 @@ async function runApp() {
   // Show the app at once with the last known bargains; the page then asks for fresh ones.
   const lastMap = lastLiveMap(state);
   const last = profileStores(state.profile || {}).map(k => lastMap[k]).filter(Boolean);
-  await reloadApp({ live: last, stale: last.length > 0 });
+  const stats0 = buildTimingStats(await runHistory());
+  await reloadApp({ live: last, stale: last.length > 0, stats: stats0 });
   wv.present(true).then(() => { open = false; }, () => { open = false; });
   let busy = false;
   while (open) {
@@ -350,6 +383,7 @@ async function runApp() {
   }
   await saveFromPage();
   if (refreshing) { try { await withTimeout(refreshing, 5000); } catch (e) { /* ignore */ } }
+  flushRun();
 }
 
 /* ============================================================
@@ -358,7 +392,7 @@ async function runApp() {
 async function runWidget() {
   const state = await readJSON(STATE_FILE, {});
   const P = Object.assign(defaultProfile(), state.profile || {});
-  const stores = profileStores(P).map(storeFromKey).filter(Boolean).slice(0, 3);
+  const stores = profileStores(P).map(storeFromKey).filter(Boolean);
   const family = config.widgetFamily || 'small';
   const accessory = !!config.runsInAccessoryWidget || /^accessory/.test(family);
   const w = new ListWidget();
@@ -375,25 +409,31 @@ async function runWidget() {
     const ses = state.session || {};
     const gone = new Set([...(ses.hiddenAH || []), ...(ses.basket || []).map(b => b.id)]);
     const lives = {};
-    let items = [], failed = 0;
+    let failed = 0;
+    // A widget gets little time: fetch at most 4 stores per run, taking turns.
+    const start = (state.widgetCursor || 0) % stores.length;
+    const turn = stores.slice(start).concat(stores.slice(0, start)).slice(0, 4);
+    try { await AH.token(); } catch (e) { if (e.code === 'login') problem = 'Log in via de app'; }
+    if (!problem) await pool(turn, 4, async st => {
+      try { const live = await fetchLive(storeArg(st), state); lives[st.id] = live; await record(live); }
+      catch (e) { failed++; if (e.code === 'login') problem = 'Log in via de app'; }
+    });
+    if (!problem && failed === turn.length) problem = 'Ophalen lukte niet';
+    flushRun();
+    try {
+      const fresh = await readJSONStrict(STATE_FILE, {});
+      fresh.storeIds = Object.assign({}, fresh.storeIds || {}, state.storeIds || {});
+      fresh.lastLive = Object.assign(lastLiveMap(fresh), lives);
+      fresh.widgetCursor = (start + turn.length) % stores.length;
+      writeJSON(STATE_FILE, fresh);
+    } catch (e) { /* the file could not be read: leave it alone */ }
+    // Show every followed store: fresh answers from this run, otherwise what was fetched in the last 3 hours.
+    const known = Object.assign({}, lastLiveMap(state), lives);
+    let items = [];
     for (const st of stores) {
-      try {
-        const live = await fetchLive(storeArg(st), state);
-        lives[st.id] = live;
-        items = items.concat(live.items.map(x => itemFromAH(Object.assign({}, x, { storeKey: st.id, storeName: st.short || st.name }))));
-      } catch (e) {
-        failed++;
-        if (e.code === 'login') { problem = 'Log in via de app'; break; }
-      }
-    }
-    if (!problem && failed === stores.length) problem = 'Ophalen lukte niet';
-    if (Object.keys(lives).length) {
-      try {
-        const fresh = await readJSONStrict(STATE_FILE, {});
-        fresh.storeIds = Object.assign({}, fresh.storeIds || {}, state.storeIds || {});
-        fresh.lastLive = Object.assign(lastLiveMap(fresh), lives);
-        writeJSON(STATE_FILE, fresh);
-      } catch (e) { /* the file could not be read: leave it alone */ }
+      const l = known[st.id];
+      if (!l || Date.now() - (l.fetchedAt || 0) > 3 * 3600000) continue;
+      items = items.concat(l.items.map(x => itemFromAH(Object.assign({}, x, { storeKey: st.id, storeName: st.short || st.name }))));
     }
     items = items.filter(it => !gone.has(it.id));
     const fits = items.map(it => ({ it, ev: evaluate(it, P) })).filter(x => x.ev.verdict === 'ja').sort((a, b) => b.ev.score - a.ev.score);
