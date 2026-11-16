@@ -248,6 +248,16 @@ function run(env) {
   ok(texts.some(t => /voor jou/.test(t)) && texts.some(t => /Paddepoel/.test(t)), 'widget shows matches and the store: ' + texts.join(' | '));
   ok(texts.some(t => /Kipdijfilet/.test(t)), 'widget lists Kipdijfilet as a match');
   ok(env.widget && env.widget.refreshAfterDate instanceof Date, 'widget asks to refresh later');
+  ok(texts.some(t => /^Halen €\s?[\d,]+: .*Bananen/.test(t)), 'medium widget says what to buy today');
+  const sesBefore = JSON.stringify(JSON.parse(fs.readFileSync(path.join(docs, 'Laatste Kans data', 'state.json'), 'utf8')).session);
+  env = run(makeEnv(ctx, docs, keychain, { widget: true, family: 'large' }));
+  await env.done;
+  const lt = env.widget.texts.map(t => t.text);
+  ok(lt.some(t => /^Vandaag halen · €/.test(t)) && lt.some(t => /koopje.* voor jou/.test(t)), 'large widget: shopping list and bargains: ' + lt.join(' | '));
+  ok(JSON.stringify(JSON.parse(fs.readFileSync(path.join(docs, 'Laatste Kans data', 'state.json'), 'utf8')).session) === sesBefore, 'the widget does not change the stock');
+  env = run(makeEnv(ctx, docs, keychain, { widget: true, family: 'small' }));
+  await env.done;
+  ok(env.widget.texts.some(t => /^Halen: \d+ · €/.test(t.text)), 'small widget shows the count to buy');
 
   console.log('\n[review regressions]');
   const docs2 = fs.mkdtempSync(path.join(os.tmpdir(), 'lk-scriptable2-'));

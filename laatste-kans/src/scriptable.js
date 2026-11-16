@@ -389,9 +389,26 @@ async function runApp() {
 /* ============================================================
    Widgets: Home Screen (small/medium/large) and Lock Screen
    ============================================================ */
+// Today's shopping list from the day plan, worked out on a copy: the widget never writes the stock.
+function widgetBuy(state, P) {
+  try {
+    const ses = state.session || {};
+    const s = { stock: Object.assign({}, ses.stock || {}), stockDay: ses.stockDay || null, dayLog: Object.assign({}, ses.dayLog || {}), basket: clone(ses.basket || []), pantry: clone(ses.pantry || []) };
+    const iso = todayISO(), shop = defaultShop(P);
+    rollStock(s, iso, P);
+    return buyList(dayPlan(P, iso, { shop, have: planHave(s, P, iso) }), s.stock, shop);
+  } catch (e) { return null; }
+}
+const forYou = r => `${r.fits.length} koopje${r.fits.length === 1 ? '' : 's'} voor jou`;
+function buyLine(buy) {
+  if (!buy) return null;
+  if (!buy.lines.length) return 'Vandaag niets te halen';
+  return `Halen ${fmtEur(buy.total)}: ${buy.lines.map(l => l.st.name).join(', ')}`;
+}
 async function runWidget() {
   const state = await readJSON(STATE_FILE, {});
   const P = Object.assign(defaultProfile(), state.profile || {});
+  const buy = widgetBuy(state, P);
   const stores = profileStores(P).map(storeFromKey).filter(Boolean);
   const family = config.widgetFamily || 'small';
   const accessory = !!config.runsInAccessoryWidget || /^accessory/.test(family);
@@ -443,32 +460,55 @@ async function runWidget() {
   const multi = stores.length > 1;
   const none = !stores.length;
   if (family === 'accessoryInline') {
-    line(none ? 'Kies je AH' : problem || `${result.fits.length} koopjes voor jou`, 12, '', false);
+    line(none ? 'Kies je AH' : problem || forYou(result), 12, '', false);
   } else if (family === 'accessoryCircular') {
     if (w.addAccessoryWidgetBackground !== undefined) w.addAccessoryWidgetBackground = true;
     line(none || problem ? '?' : String(result.fits.length), 22, '', true);
     line('koopjes', 9, '', false);
   } else if (accessory) {
-    line(none ? 'Kies je AH in de app' : problem || `${result.fits.length} koopjes voor jou`, 14, '', true);
+    line(none ? 'Kies je AH in de app' : problem || forYou(result), 14, '', true);
     if (result && result.fits[0]) line(`${result.fits[0].it.name} ${fmtEur(itemPriceNow(result.fits[0].it))}`, 12, '', false);
     if (!none) line(where, 11, '', false);
   } else {
     line('LAATSTE KANS', 11, '#F2541B', true);
     w.addSpacer(4);
-    if (none) line('Open de app en kies je winkels', 13, '#E5EDE8', false);
-    else if (problem) line(problem, 13, '#FF8F85', false);
-    else {
-      line(`${result.fits.length} voor jou`, 24, '#FFFFFF', true);
-      line(`${result.total} koopjes · ${where}`, 11, '#9AABA1', false);
-      w.addSpacer(6);
-      const n = family === 'small' ? 2 : family === 'medium' ? 3 : 8;
-      for (const { it } of result.fits.slice(0, n)) {
-        const pct = it.discountPct ? `-${it.discountPct}% ` : '';
-        line(`${it.name}  ${pct}${fmtEur(itemPriceNow(it))}${multi && it.storeName ? ' · ' + it.storeName : ''}`, 12, '#E5EDE8', false);
+    const bargain = it => line(`${it.name}  ${it.discountPct ? `-${it.discountPct}% ` : ''}${fmtEur(itemPriceNow(it))}${multi && it.storeName ? ' · ' + it.storeName : ''}`, 12, '#E5EDE8', false);
+    if (family === 'large') {
+      // Top: what to buy today, line by line. Below: the bargains that fit.
+      if (buy) {
+        line(buy.lines.length ? `Vandaag halen · ${fmtEur(buy.total)}` : 'Vandaag niets te halen', 15, '#FFFFFF', true);
+        for (const l of buy.lines.slice(0, 5)) line(`${l.packs > 1 ? l.packs + '× ' : ''}${l.st.name}  ${fmtEur(l.cost)}${l.offer.chain !== defaultShop(P) ? ' · ' + SHOP_NL[l.offer.chain] : ''}`, 12, '#E5EDE8', false);
+        if (buy.lines.length > 5) line(`en nog ${buy.lines.length - 5}`, 11, '#9AABA1', false);
+        w.addSpacer(8);
       }
-      w.addSpacer();
-      line(`bijgewerkt ${new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`, 9, '#9AABA1', false);
+      if (none) line('Kies je winkels in de app voor koopjes', 13, '#E5EDE8', false);
+      else if (problem) line(problem, 13, '#FF8F85', false);
+      else {
+        line(`${forYou(result)} · ${where}`, 15, '#FFFFFF', true);
+        for (const { it } of result.fits.slice(0, buy ? 4 : 8)) bargain(it);
+      }
+    } else if (family === 'medium') {
+      if (buy) line(buyLine(buy), 13, '#FFFFFF', true);
+      if (none) line('Kies je winkels in de app', 12, '#E5EDE8', false);
+      else if (problem) line(problem, 12, '#FF8F85', false);
+      else {
+        line(`${forYou(result)} · ${where}`, 11, '#9AABA1', false);
+        w.addSpacer(4);
+        for (const { it } of result.fits.slice(0, buy ? 2 : 3)) bargain(it);
+      }
+    } else {
+      if (none) line('Open de app en kies je winkels', 13, '#E5EDE8', false);
+      else if (problem) line(problem, 13, '#FF8F85', false);
+      else {
+        line(`${result.fits.length} voor jou`, 24, '#FFFFFF', true);
+        line(`${result.total} koopjes · ${where}`, 11, '#9AABA1', false);
+        w.addSpacer(4);
+        for (const { it } of result.fits.slice(0, 1)) bargain(it);
+      }
+      if (buy) line(buy.lines.length ? `Halen: ${buy.lines.length} · ${fmtEur(buy.total)}` : 'Niets te halen', 11, '#F2C94C', true);
     }
+    w.addSpacer();
+    line(`bijgewerkt ${new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`, 9, '#9AABA1', false);
   }
   w.refreshAfterDate = new Date(Date.now() + 30 * 60 * 1000);
   Script.setWidget(w);

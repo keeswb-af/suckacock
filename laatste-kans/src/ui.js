@@ -168,7 +168,8 @@ const S = {
   finishing: false, pendingTripId: null,
   live: { status: 'idle', message: null, per: {} },
 };
-function emptySession() { return { candidates: [], basket: [], pantry: [], startedAt: null, savedAt: 0, hiddenAH: [], liveFilter: 'fit', storeFilter: 'all', liveMeta: {} }; }
+function emptySession() { return { candidates: [], basket: [], pantry: [], startedAt: null, savedAt: 0, hiddenAH: [], liveFilter: 'fit', storeFilter: 'all', liveMeta: {}, stock: {}, stockDay: null, dayLog: {} }; }
+const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
 function normalizeSession(d) {
   const s = Object.assign(emptySession(), d || {});
   for (const k of ['candidates', 'basket', 'pantry']) s[k] = (Array.isArray(s[k]) ? s[k] : []).map(migrateItem).filter(Boolean);
@@ -176,12 +177,20 @@ function normalizeSession(d) {
   s.candidates = s.candidates.filter(c => c.source !== 'ah' || c.storeKey || c.edited);
   const m = s.liveMeta;
   s.liveMeta = !m || typeof m !== 'object' ? {} : m.storeKey ? {} : m;
+  // Staples at home (day plan): known staples with a positive amount only.
+  const st = isObj(s.stock) ? s.stock : {};
+  s.stock = {};
+  for (const [id, v] of Object.entries(st)) if (stapleById(id) && isFinite(+v) && +v > 0) s.stock[id] = +v;
+  s.dayLog = isObj(s.dayLog) ? s.dayLog : {};
+  if (typeof s.stockDay !== 'string') s.stockDay = null;
   return s;
 }
 function normalizeProfile(d) {
   const p = Object.assign(defaultProfile(), d || {});
   p.stores = profileStores(p);
   delete p.store;
+  if (!SHOP_NL[p.baseShop]) delete p.baseShop;
+  p.skipStaples = Array.isArray(p.skipStaples) ? [...new Set(p.skipStaples.filter(id => stapleById(id)))] : [];
   return p;
 }
 function myStores() { return profileStores(S.profile).map(storeById).filter(Boolean); }
@@ -391,7 +400,144 @@ function renderBasket() {
 }
 function renderWinkel() {
   $('#dietBanner').hidden = !!S.profile.setAt || !Store.loaded;
-  renderLive(); renderSummary(); renderCandidates(); renderBasket();
+  renderToday(); renderLive(); renderSummary(); renderCandidates(); renderBasket();
+}
+
+/* --- Vandaag halen: today's menu from staples, and what to buy for it --- */
+const PER_TEXT = { prot: ['per 100 g eiwit', 100], kcal: ['per 1000 kcal', 1000], g: ['per kg', 1000] };
+const EUR0 = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0, minimumFractionDigits: 0 });
+let weekMemo = { key: null, cost: 0 };
+function weekCost(P, shop, iso) {
+  const key = JSON.stringify([P.goal, P.eat, P.kcal, P.protein, P.carbsMax, P.excl, P.persons, P.freezer, P.skipStaples, shop, iso]);
+  if (weekMemo.key !== key) {
+    let c = 0;
+    for (let i = 0; i < 7; i++) c += dayPlan(P, addDays(iso, i), { shop }).cost;
+    weekMemo = { key, cost: c };
+  }
+  return weekMemo.cost;
+}
+function dayLabel(iso) { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' }); }
+function renderToday() {
+  const card = $('#todayCard');
+  if (!STAPLE_LIST.length || !Store.loaded) { card.hidden = true; return; }
+  card.hidden = false;
+  const s = S.session, P = S.profile, iso = todayISO(), shop = defaultShop(P);
+  let dirty = rollStock(s, iso, P);
+  const plan = dayPlan(P, iso, { shop, have: planHave(s, P, iso), cands: s.candidates });
+  const log = compactPlan(plan);
+  if (JSON.stringify(s.dayLog[iso] || null) !== JSON.stringify(log)) { s.dayLog[iso] = log; dirty = true; }
+  if (dirty) saveSession();
+  const buy = buyList(plan, s.stock, shop);
+  // Tomorrow, if today's list is bought and today's menu eaten: what runs out.
+  const next = addDays(iso, 1);
+  const proj = projectAfter(s, log, buy.lines);
+  const tBuy = buyList(dayPlan(P, next, { shop, have: planHave(proj, P, next) }), proj.stock, shop);
+  const t = plan.totals, persons = plan.persons;
+  const kids = [
+    h('div', { class: 'section-head' }, h('h2', { id: 'h-today' }, 'Vandaag halen'), h('span', { class: 'count' }, dayLabel(iso))),
+    h('div', { class: 'today-shop' }, h('span', { class: 'small muted' }, 'Halen bij'),
+      h('div', { class: 'seg', id: 'todayShop', role: 'group', 'aria-label': 'Winkel voor basisproducten' },
+        ...['ah', 'jumbo', 'lidl', 'cheapest'].map(k => h('button', { type: 'button', 'data-v': k, 'aria-pressed': String(shop === k), onclick: () => setBaseShop(k) }, SHOP_NL[k])))),
+    h('p', { class: 'small today-sum' }, 'Menu: ', h('b', null, `${fmtNum(t.kcal)} kcal`), ' · ', h('b', null, `${fmtNum(t.prot)} g eiwit`), ' · ',
+      h('b', null, `≈ ${fmtEur(plan.cost)}`), persons > 1 ? ` voor ${persons} personen` : '', `, ongeveer ${EUR0.format(weekCost(P, shop, iso))} per week`),
+  ];
+  if (plan.swaps.length) {
+    kids.push(h('div', { class: 'today-block' }, h('h3', null, 'Koopjes voor je plan'), ...plan.swaps.map(sw => {
+      const [unit, f] = PER_TEXT[sw.metric];
+      const pct = discountOf(sw.it);
+      return h('div', { class: 'buy-row deal' },
+        h('div', { class: 'buy-top' }, h('div', { class: 'buy-name' }, sw.it.name, sw.it.grams ? ` ${fmtNum(sw.it.grams)} g` : ''),
+          h('b', { class: 'buy-cost' }, pct > 0 ? h('span', { class: 'pct' }, `-${pct}% `) : null, fmtEur(itemPriceNow(sw.it)))),
+        h('div', { class: 'buy-bottom' },
+          h('div', { class: 'buy-sub' }, `In plaats van ${stapleLabel(sw.staple, sw.line.amount * persons)}: ${fmtEur(sw.per * f)} ${unit} tegen ${fmtEur(sw.perStaple * f)}${sw.it.storeName ? ` · bij ${sw.it.storeName}` : ''}`),
+          h('div', { class: 'buy-act' }, h('button', { class: 'btn btn-sm btn-primary', type: 'button', onclick: () => moveToBasket(sw.it.id) }, 'In mandje'))));
+    })));
+  }
+  if (buy.lines.length) {
+    kids.push(h('div', { class: 'today-block', id: 'todayBuy' },
+      h('div', { class: 'section-head' }, h('h3', null, 'Halen'), h('span', { class: 'count' }, fmtEur(buy.total))),
+      Object.keys(s.stock).length ? null : h('p', { class: 'small muted' }, 'Eerste keer? Tik op Heb ik bij wat je al in huis hebt, zoals rijst, olie of cacao. Daarna houdt de app je voorraad bij.'),
+      ...buy.lines.map(l => buyRow(l, shop, true))));
+  } else {
+    kids.push(h('p', { class: 'today-ok', id: 'todayBuy' }, 'Alles voor vandaag heb je in huis.'));
+  }
+  if (tBuy.lines.length) {
+    kids.push(h('details', { class: 'today-more', id: 'todayNext' }, h('summary', null, `Voor morgen alvast: ${tBuy.lines.length} · ${fmtEur(tBuy.total)}`),
+      ...tBuy.lines.map(l => buyRow(l, shop, false))));
+  }
+  kids.push(h('details', { class: 'today-more', id: 'todayMenu' }, h('summary', null, 'Menu van vandaag'),
+    ...plan.meals.map(m => h('div', { class: 'menu-meal' }, h('div', { class: 'menu-name' }, m.name), h('div', { class: 'menu-items' }, ...m.lines.map(l => menuChip(l, persons))))),
+    P.skipStaples && P.skipStaples.length ? h('div', { class: 'menu-skip small' }, h('span', { class: 'muted' }, 'Niet in je menu:'),
+      ...P.skipStaples.map(id => h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: () => unskipStaple(id) }, `${stapleById(id).name} terugzetten`))) : null));
+  const ids = Object.keys(s.stock).filter(id => stapleById(id)).sort((a, b) => AISLE.indexOf(a) - AISLE.indexOf(b));
+  kids.push(h('details', { class: 'today-more', id: 'todayStock' }, h('summary', null, `Voorraad${ids.length ? ` (${ids.length})` : ''}`),
+    ids.length ? ids.map(id => {
+      const st = stapleById(id), off = offerFor(st, shop);
+      return h('div', { class: 'stock-row' }, h('span', { class: 'nm' }, st.name), h('span', { class: 'num small' }, fmtAmt(st, s.stock[id])),
+        off ? h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'aria-label': `Een pak ${st.name} erbij`, onclick: () => stockAdd(id, off.pack) }, '+ pak') : null,
+        h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'aria-label': `${st.name} is op`, onclick: () => stockGone(id) }, 'Op'));
+    }) : h('p', { class: 'small muted' }, 'Nog leeg. Tik bij Halen op Gekocht of Heb ik. De app trekt elke dag af wat je menu gebruikt.')));
+  if (plan.notes.length) kids.push(h('ul', { class: 'tips small' }, plan.notes.map(n => h('li', null, n))));
+  const when = STAPLES.checked ? new Date(STAPLES.checked + 'T12:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  kids.push(h('p', { class: 'small muted' }, `Prijzen van basisproducten: open prijsdata van checkjebon.nl${when ? ', ' + when : ''}. Een koopje uit Gevonden gaat voor als het goedkoper is.`));
+  // Keep open sections open across re-renders (tapping Gekocht or + pak redraws the card).
+  const open = new Set($$('#todayCard details[open]').map(d => d.id));
+  fill(card, ...kids);
+  for (const id of open) { const d = id && document.getElementById(id); if (d) d.open = true; }
+}
+function buyRow(l, shop, today) {
+  const st = l.st;
+  const sub = [
+    shop === 'cheapest' || l.offer.chain !== shop ? SHOP_NL[l.offer.chain] : null,
+    `nodig ${fmtAmt(st, l.need)}${l.have > 0 ? `, in huis ${fmtAmt(st, l.have)}` : ''}`,
+    l.rest >= 50 && st.freezable && !st.frozen && S.profile.freezer && st.tags.some(t => t === 'meat' || t === 'fish') ? `rest (${fmtAmt(st, l.rest)}) invriezen` : null,
+    l.alt ? `${SHOP_NL[l.alt.chain]}: ${fmtEur(l.alt.price)} voor ${fmtAmt(st, l.alt.pack)}` : null,
+  ].filter(Boolean).join(' · ');
+  return h('div', { class: 'buy-row', 'data-id': l.id },
+    h('div', { class: 'buy-top' }, h('div', { class: 'buy-name' }, `${l.packs > 1 ? l.packs + '× ' : ''}${l.offer.product}`), h('b', { class: 'buy-cost' }, fmtEur(l.cost))),
+    h('div', { class: 'buy-bottom' }, h('div', { class: 'buy-sub' }, sub),
+      h('div', { class: 'buy-act' },
+        h('button', { class: 'btn btn-sm btn-primary', type: 'button', onclick: () => stockAdd(l.id, l.packs * l.offer.pack, `${st.name} staat in je voorraad`) }, 'Gekocht'),
+        today ? h('button', { class: 'btn btn-sm', type: 'button', onclick: () => stockHave(l) }, 'Heb ik') : null)));
+}
+function menuChip(l, persons) {
+  if (l.item) return h('span', { class: 'menu-item deal' }, `${l.item.name} ${fmtNum(l.grams * persons)} g`);
+  const st = stapleById(l.id);
+  return h('span', { class: 'menu-item' }, stapleLabel(st, l.amount * persons),
+    h('button', { type: 'button', 'aria-label': `${st.name} niet meer in je menu`, title: 'Niet in mijn menu', onclick: () => skipStaple(l.id) }, '×'));
+}
+function setBaseShop(v) {
+  if (!SHOP_NL[v] || !Store.loaded || S.profile.baseShop === v) return;
+  S.profile.baseShop = v;
+  if (S.draft) S.draft.baseShop = v;
+  saveProfile(); renderToday();
+}
+function stockAdd(id, amount, msg) {
+  if (!Store.loaded) return;
+  S.session.stock[id] = round2((+S.session.stock[id] || 0) + amount);
+  saveSession(); renderToday();
+  if (msg) toast(msg);
+}
+// "Heb ik": at least today's need, and at least a pack: you rarely keep less than a pack of rice or oil.
+function stockHave(l) {
+  if (!Store.loaded) return;
+  S.session.stock[l.id] = Math.max(+S.session.stock[l.id] || 0, l.need, l.offer.pack);
+  saveSession(); renderToday();
+  toast(`${l.st.name} staat in je voorraad`);
+}
+function stockGone(id) { if (!Store.loaded) return; delete S.session.stock[id]; saveSession(); renderToday(); }
+function skipStaple(id) {
+  if (!Store.loaded) return;
+  S.profile.skipStaples = [...new Set([...(S.profile.skipStaples || []), id])];
+  if (S.draft) S.draft.skipStaples = S.profile.skipStaples.slice();
+  saveProfile(); renderToday();
+  toast(`${stapleById(id).name} komt niet meer in je menu`);
+}
+function unskipStaple(id) {
+  if (!Store.loaded) return;
+  S.profile.skipStaples = (S.profile.skipStaples || []).filter(x => x !== id);
+  if (S.draft) S.draft.skipStaples = S.profile.skipStaples.slice();
+  saveProfile(); renderToday();
 }
 
 /* --- live AH data (Scriptable host only) --- */
@@ -687,7 +833,9 @@ async function confirmFinish() {
    Koken view
    ============================================================ */
 function kitchenItems() {
-  const have = [...S.session.basket, ...S.session.pantry];
+  // A bargain the day plan has eaten up is no longer in the kitchen.
+  const left = it => !(it.grams > 0) || (it.usedG || 0) < it.grams * (it.qty || 1) - 1;
+  const have = [...S.session.basket, ...S.session.pantry].filter(left);
   return have.length ? { items: have, kind: 'have' } : { items: S.session.candidates, kind: 'seen' };
 }
 function renderKoken() {
@@ -847,7 +995,9 @@ function submitDiet(e) {
   const b = num('#dBudget'); d.budget = b == null ? null : Math.max(0, b);
   d.avoidUltra = $('#dUltra').checked; d.freezer = $('#dFreezer').checked;
   d.notes = $('#dNotes').value.slice(0, 2000);
-  S.profile = Object.assign({}, d, { stores: profileStores(S.profile), setAt: Date.now() });
+  // Store choice, shop and skipped staples are set outside this form: keep the current ones.
+  S.profile = Object.assign({}, d, { stores: profileStores(S.profile), baseShop: S.profile.baseShop, skipStaples: (S.profile.skipStaples || []).slice(), setAt: Date.now() });
+  if (!S.profile.baseShop) delete S.profile.baseShop;
   delete S.profile.store;
   S.draft = clone(S.profile);
   saveProfile(); renderAll();
@@ -1266,5 +1416,5 @@ async function boot() {
   }
 }
 
-window.LK = { timingAdvice, buildTimingStats, recordObservations, profileStores, setStores, evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, itemFromAH, nutritionFromAH, parseUnitSize, inferTags, exclusionsFor, defaultProfile, expState, GOALS, S, Store };
+window.LK = { timingAdvice, buildTimingStats, recordObservations, profileStores, setStores, evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, itemFromAH, nutritionFromAH, parseUnitSize, inferTags, exclusionsFor, defaultProfile, expState, GOALS, S, Store, dayPlan, buyList, rollStock, planHave, compactPlan, projectAfter, stapleById, fmtAmt };
 boot();

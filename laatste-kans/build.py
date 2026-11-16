@@ -55,12 +55,62 @@ def check_food(food):
         assert isinstance(f["freezable"], bool), f["id"]
 
 
+ROLES = {"eiwit", "zetmeel", "groente", "fruit", "brood", "zuivel"}
+CHAINS = {"ah", "jumbo", "lidl"}
+
+
+def check_staples(st):
+    """Staples for the day plan: nutrition per 100 g (or ml), prices per chain, and the day template."""
+    assert st.get("checked") and st.get("source"), "staples need a price date and source"
+    ids = {}
+    for s in st["items"]:
+        sid = s["id"]
+        assert sid not in ids, f"duplicate staple {sid}"
+        ids[sid] = s
+        assert s["unit"] in ("g", "ml", "st"), f"{sid}: unit"
+        if s["unit"] == "st":
+            assert s.get("per", 0) > 0 and s.get("one") and s.get("many"), f"{sid}: pieces need per/one/many"
+        bad = set(s["tags"]) - TAGS
+        assert not bad, f"{sid}: bad tags {bad}"
+        for k in ("kcal", "protein", "carbs", "fat", "fiber"):
+            assert isinstance(s.get(k), (int, float)) and s[k] >= 0, f"{sid}: bad {k}"
+        est = 4 * s["protein"] + 4 * s["carbs"] + 9 * s["fat"] + 2 * s["fiber"]
+        assert abs(est - s["kcal"]) <= 0.3 * s["kcal"] + 25, f"{sid}: kcal {s['kcal']} vs macros {est:.0f}"
+        lo, hi, step = s["scale"]
+        assert 0 <= lo <= hi and step > 0, f"{sid}: scale"
+        assert s["offers"], f"{sid}: no prices"
+        for chain, o in s["offers"].items():
+            assert chain in CHAINS, f"{sid}: chain {chain}"
+            assert o["product"] and o["pack"] > 0 and 0 < o["price"] < 50, f"{sid}: offer {chain}"
+    for meal in st["plan"]["meals"]:
+        assert meal["id"] and meal["name"] and meal["slots"], "meal"
+        for slot in meal["slots"]:
+            lists = [slot.get("items"), slot.get("lc"), slot.get("keto")] + list(slot.get("rot", {}).values()) + [[a] for a in slot.get("alt", [])]
+            if "rot" in slot:
+                assert set(slot["rot"]) == {str(d) for d in range(7)}, f"{meal['id']}: rotation needs all 7 days"
+            else:
+                assert slot.get("items") or "lc" in slot or "keto" in slot, f"{meal['id']}: slot without items"
+            assert isinstance(slot.get("min", 0), (int, float)) and isinstance(slot.get("optional", False), bool), f"{meal['id']}: min/optional"
+            for lst in lists:
+                for entry in lst or []:
+                    sid, amount = entry[0], entry[1]
+                    assert sid in ids, f"{meal['id']}: unknown staple {sid}"
+                    lo, hi, _ = ids[sid]["scale"]
+                    assert lo <= amount <= hi, f"{meal['id']}: {sid} {amount} outside {lo}-{hi}"
+                    assert len(entry) == 2 or entry[2] == "vast", f"{meal['id']}: {entry}"
+            assert slot.get("flex") in (None, "prot", "kcal"), f"{meal['id']}: flex"
+            assert slot.get("role") in (None, *ROLES), f"{meal['id']}: role"
+            assert slot.get("needs") in (None, *ids), f"{meal['id']}: needs"
+
+
 def main():
     food = load("food.json")
     stores = load("stores.json")
     tips = load("tips.json")
     safety = load("safety.json")
+    staples = load("staples.json")
     check_food(food)
+    check_staples(staples)
     for s in stores:
         for k in ("id", "name", "street", "postcode"):
             assert s.get(k), f"store missing {k}: {s}"
@@ -69,6 +119,7 @@ def main():
         "const STORES = " + json.dumps(stores, ensure_ascii=False, separators=(",", ":")) + ";",
         "const TIPS = " + json.dumps(tips, ensure_ascii=False, separators=(",", ":")) + ";",
         "const SAFETY = " + json.dumps(safety, ensure_ascii=False, separators=(",", ":")) + ";",
+        "const STAPLES = " + json.dumps(staples, ensure_ascii=False, separators=(",", ":")) + ";",
     ])
     engine = (SRC / "engine.js").read_text(encoding="utf-8")
     ui = (SRC / "ui.js").read_text(encoding="utf-8").replace("@@SCRIPT_URL@@", SCRIPT_URL)
@@ -106,7 +157,7 @@ def main():
         text = (DIST / name).read_text(encoding="utf-8")
         assert "\u2014" not in text, f"em dash in {name}"
         assert "@@" not in text.replace("@@DATA@@", ""), f"unfilled slot in {name}"
-    print(f"built {version}: {len(food)} foods, {len(stores)} stores, page {len(page)//1024} KB, Scriptable {len(sc)//1024} KB")
+    print(f"built {version}: {len(food)} foods, {len(staples['items'])} staples, {len(stores)} stores, page {len(page)//1024} KB, Scriptable {len(sc)//1024} KB")
 
 
 if __name__ == "__main__":

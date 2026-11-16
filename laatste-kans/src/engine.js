@@ -689,3 +689,345 @@ function timingAdvice(it, stats, now) {
   if (pUp <= 0.4) return { kind: 'nu', p: pUp, text: `In ${100 - upTxt}% van de gevallen was ${label} op voordat de korting verder zakte.${one}${basis}` };
   return { kind: 'gok', p: pUp, save, text: `In ${upTxt}% van de gevallen zakte ${label} verder naar ${nextPct}%${when} (${fmtEur(Math.max(0, save))} goedkoper), maar regelmatig was hij ook eerder op.${one}${basis}` };
 }
+
+/* ============================================================
+   Day plan: what to eat today and what to buy for it. Staples with
+   prices per chain (data/staples.json) fill a day template that is
+   scaled to the kcal and protein goal. Bargains you already have take
+   a slot first; bargains in the shop are suggested when they are
+   cheaper. Pure functions, shared by the page and the widget.
+   ============================================================ */
+const STAPLE_LIST = typeof STAPLES !== 'undefined' && STAPLES && Array.isArray(STAPLES.items) ? STAPLES.items : [];
+const STAPLE_BY_ID = Object.fromEntries(STAPLE_LIST.map(s => [s.id, s]));
+const SHOP_NL = { ah: 'AH', jumbo: 'Jumbo', lidl: 'Lidl', cheapest: 'Goedkoopst' };
+// Walking order through a typical shop: fresh produce, bread, dairy, meat, dry goods, freezer.
+const AISLE = ['banaan', 'wortel', 'broccoli', 'aardappelen', 'brood', 'melk', 'kwark', 'roomboter', 'eieren', 'kipfilet', 'rundergehakt', 'kippenlever', 'tofu', 'rijst', 'havermout', 'linzen', 'sardines', 'olijfolie', 'cacao', 'koolvis', 'spinazie'];
+const fmtDec = v => new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 2 }).format(v);
+function stapleById(id) { return STAPLE_BY_ID[id] || null; }
+function weekdayOf(iso) { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).getDay(); }
+function stapleGrams(st, amount) { return st.unit === 'st' ? amount * (st.per || 100) : amount; }
+function defaultShop(P) { return P && SHOP_NL[P.baseShop] ? P.baseShop : 'ah'; }
+function stapleOffers(st) { return Object.entries((st && st.offers) || {}).map(([chain, o]) => ({ chain, product: o.product, pack: o.pack, price: o.price, unit: o.price / o.pack })); }
+function offerFor(st, shop) {
+  const all = stapleOffers(st);
+  if (!all.length) return null;
+  const own = shop && shop !== 'cheapest' ? all.find(o => o.chain === shop) : null;
+  return own || all.sort((a, b) => a.unit - b.unit)[0];
+}
+function fmtAmt(st, a) {
+  if (!st) return fmtDec(a);
+  if (st.unit === 'st') return `${fmtDec(a)} ${a === 1 ? st.one : st.many}`;
+  if (st.portion && a > 0 && Math.abs(a / st.portion.g - Math.round(a / st.portion.g)) < 1e-9) { const n = Math.round(a / st.portion.g); return `${n} ${n === 1 ? st.portion.one : st.portion.many}`; }
+  const big = a >= 1000, u = st.unit === 'ml' ? (big ? 'L' : 'ml') : (big ? 'kg' : 'g');
+  return `${big ? fmtDec(a / 1000) : fmtDec(Math.round(a))} ${u}`;
+}
+// "havermout 80 g", "2 eieren", "4 sneetjes bruinbrood"
+function stapleLabel(st, a) {
+  const amt = fmtAmt(st, a);
+  if (st.unit === 'st') return amt;
+  const nm = st.name.charAt(0).toLowerCase() + st.name.slice(1);
+  return st.portion && !/ (g|kg|ml|L)$/.test(amt) ? `${amt} ${nm}` : `${nm} ${amt}`;
+}
+function expStateOn(it, iso) {
+  const d = it.expDate;
+  if (!d) return 'later';
+  if (d < iso) return 'verlopen';
+  if (d === iso) return 'vandaag';
+  if (d === addDays(iso, 1)) return 'morgen';
+  return 'later';
+}
+// The slot a bargain can take, and what "as much" means there: protein for meat and kwark, energy for starch and bread, weight for the rest.
+function roleMetric(role) { return role === 'eiwit' || role === 'zuivel' ? 'prot' : role === 'zetmeel' || role === 'brood' ? 'kcal' : 'g'; }
+function itemPer100(it, metric) {
+  if (metric === 'g') return 100;
+  const n = it.n || {};
+  const v = metric === 'prot' ? +n.protein : +n.kcal;
+  return v > 0 ? v : null;
+}
+function staplePer100(st, metric) { return metric === 'g' ? 100 : metric === 'prot' ? st.protein : st.kcal; }
+function bargainFits(it, role) {
+  const roles = rolesOf(it);
+  if (!roles.has(role)) return false;
+  const nm = norm(it.name);
+  if (role === 'brood') return /brood|volkoren|spelt|rogge|pistolet|bollen/.test(nm) && !/croissant|krenten|rozijn|suiker|koek|cake|gebak|brioche|choco/.test(nm);
+  if (role === 'eiwit') return !roles.has('maaltijd') && !roles.has('beleg');
+  return true;
+}
+// What you have that the plan may use: the basket and bought bargains that are still good on that day.
+// A freezable product past its date counts when you have a freezer: the app told you to freeze it.
+function planHave(session, P, iso) {
+  const out = [];
+  for (const it of [...((session && session.basket) || []), ...((session && session.pantry) || [])]) {
+    if (!it || it.example || !(it.grams > 0)) continue;
+    const st = expStateOn(it, iso);
+    const frozen = st === 'verlopen' && !!it.freezable && !!P.freezer;
+    if (st === 'verlopen' && !frozen) continue;
+    if (evaluate(it, P).verdict === 'nee') continue;
+    const left = it.grams * (it.qty || 1) - (it.usedG || 0);
+    if (left < 30) continue;
+    out.push({ it, left, frozen, rank: st === 'vandaag' ? 0 : st === 'morgen' ? 1 : frozen ? 3 : 2 });
+  }
+  return out.sort((a, b) => a.rank - b.rank);
+}
+function lineNut(l) {
+  let per, g;
+  if (l.item) {
+    const n = l.item.n && (+l.item.n.kcal > 0 || +l.item.n.protein > 0) ? l.item.n : null;
+    const st = stapleById(l.replaces);
+    per = n ? { kcal: +n.kcal || 0, prot: +n.protein || 0, carbs: +n.carbs || 0 } : st ? { kcal: st.kcal, prot: st.protein, carbs: st.carbs } : { kcal: 0, prot: 0, carbs: 0 };
+    g = l.grams;
+  } else {
+    const st = stapleById(l.id);
+    per = { kcal: st.kcal, prot: st.protein, carbs: st.carbs };
+    g = stapleGrams(st, l.amount);
+  }
+  return { kcal: per.kcal * g / 100, prot: per.prot * g / 100, carbs: per.carbs * g / 100 };
+}
+function sumNut(lines) { return lines.reduce((a, l) => { const n = lineNut(l); a.kcal += n.kcal; a.prot += n.prot; a.carbs += n.carbs; return a; }, { kcal: 0, prot: 0, carbs: 0 }); }
+
+function dayPlan(P, iso, ctx) {
+  ctx = ctx || {};
+  const persons = Math.max(1, Math.round(P.persons || 1));
+  const shop = ctx.shop || defaultShop(P);
+  const wd = weekdayOf(iso);
+  const G = GOALS[P.goal] || GOALS.balanced;
+  const kT = P.kcal > 0 ? P.kcal : G.kcal, pT = P.protein > 0 ? P.protein : G.protein;
+  const lim = P.carbsMax != null ? P.carbsMax : G.carbsMax;
+  const keto = P.goal === 'keto' || (lim != null && lim <= 40);
+  const lc = keto || P.goal === 'lowcarb' || (lim != null && lim <= 180);
+  const ex = exclusionsFor(P);
+  const skip = new Set(Array.isArray(P.skipStaples) ? P.skipStaples : []);
+  const meatDay = P.eat !== 'flexi' || [0, 2, 6].includes(wd);
+  const allowed = id => { const st = stapleById(id); return !!st && !skip.has(id) && !st.tags.some(t => ex.has(t)) && (meatDay || !st.tags.includes('meat')); };
+  const okAll = list => !!list && list.length > 0 && list.every(([id]) => allowed(id));
+  const used = new Set();
+  const meals = [];
+  const tpl = STAPLE_LIST.length && STAPLES.plan ? STAPLES.plan.meals : [];
+
+  /* 1. pick an item for every slot */
+  for (const meal of tpl) {
+    const lines = [];
+    meal.slots.forEach((slot, si) => {
+      let base = slot.items || (slot.rot ? slot.rot[String(wd)] || [] : []);
+      let variant = false;
+      if (keto && 'keto' in slot) { base = slot.keto; variant = true; }
+      else if (lc && 'lc' in slot) { base = slot.lc; variant = true; }
+      const alts = variant ? [] : (slot.alt || []).map(a => [a]);
+      // Dinner protein goes round the alternatives by weekday, so a diet without chicken still gets variety.
+      const off = slot.role === 'eiwit' && alts.length ? wd % alts.length : 0;
+      const ordered = alts.map((_, k) => alts[(k + off) % alts.length]);
+      const fresh = list => list.every(([id]) => !used.has(id));
+      const pick = okAll(base) && fresh(base) ? base : ordered.find(a => okAll(a) && fresh(a)) || (okAll(base) ? base : ordered.find(okAll));
+      if (!pick) return;
+      for (const [id, amount, mark] of pick) {
+        const sc = stapleById(id).scale || [amount, amount, 1];
+        const vast = mark === 'vast';
+        const a = clamp(amount, sc[0], sc[1]);
+        used.add(id);
+        lines.push({ meal: meal.id, slot: si, id, amount: a, base: a, min: Math.max(sc[0], slot.min || 0), optional: !!slot.optional, vast, flex: vast ? null : slot.flex || null, order: slot.order || 9, role: vast ? null : slot.role || null, needs: slot.needs || null, item: null, grams: null, replaces: null });
+      }
+    });
+    meals.push({ id: meal.id, name: meal.name, lines });
+  }
+  const live = () => meals.flatMap(m => m.lines);
+  const prune = () => {
+    for (const m of meals) {
+      m.lines = m.lines.filter(l => l.item ? l.grams > 0 : l.amount > 0);
+      m.lines = m.lines.filter(l => !l.needs || m.lines.some(o => o !== l && (o.id === l.needs || o.replaces === l.needs)));
+    }
+  };
+  prune();
+
+  /* 2. bargains you have take their slot, most urgent first */
+  const have = (ctx.have || []).map(x => Object.assign({}, x));
+  for (const l of live()) {
+    if (!l.role || l.vast) continue;
+    const st = stapleById(l.id), metric = roleMetric(l.role), sp = staplePer100(st, metric);
+    const sg = stapleGrams(st, l.amount) * persons;
+    for (const x of have) {
+      if (x.left <= 0 || !bargainFits(x.it, l.role)) continue;
+      const p = itemPer100(x.it, metric) || sp;
+      const needG = Math.min(sg * 2, sp * sg / p);
+      const useG = Math.round(Math.min(x.left, needG) / 5) * 5;
+      if (useG < 0.6 * needG) continue;
+      Object.assign(l, { item: x.it, grams: useG / persons, replaces: l.id, id: null, flex: null, frozen: x.frozen });
+      x.left -= useG;
+      break;
+    }
+  }
+
+  /* 3. scale to the goal: protein first, then energy; balanced over the flexible items */
+  const sc = l => stapleById(l.id).scale || [l.amount, l.amount, 1];
+  const flex = kind => live().filter(l => l.flex === kind && !l.item);
+  const step = l => lineNut(Object.assign({}, l, { amount: sc(l)[2] }));
+  const carbsOk = l => lim == null || sumNut(live()).carbs + step(l).carbs <= lim + 0.5;
+  // Which flexible item moves: 'balanced' keeps portions in proportion, 'lean' and 'fat' go by kcal per gram of protein.
+  const kpp = l => { const st = stapleById(l.id); return st.kcal / Math.max(0.5, st.protein); };
+  const eurPerProt = l => { const st = stapleById(l.id), off = offerFor(st, shop); return off ? off.unit / (stapleGrams(st, 1) * Math.max(0.5, st.protein) / 100) : Infinity; };
+  const pickUp = { balanced: (a, b) => a.amount / a.base - b.amount / b.base || a.order - b.order, fat: (a, b) => kpp(b) - kpp(a) };
+  const pickDown = { balanced: (a, b) => b.amount / b.base - a.amount / a.base || b.order - a.order, fat: (a, b) => kpp(b) - kpp(a) };
+  const inc = (list, guard, how) => {
+    let cs = list.filter(l => l.amount + sc(l)[2] <= sc(l)[1] + 1e-9 && carbsOk(l) && (!guard || guard(l)));
+    // 'lean': of the protein sources with few kcal per gram of protein, the cheapest.
+    if (how === 'lean' && cs.length) { const m = Math.min(...cs.map(kpp)); cs = cs.filter(l => kpp(l) <= m * 1.3).sort((a, b) => eurPerProt(a) - eurPerProt(b)); }
+    else cs.sort(pickUp[how || 'balanced']);
+    const c = cs[0];
+    if (!c) return false;
+    c.amount += sc(c)[2]; return true;
+  };
+  // One step down, or the whole item gone when the slot is optional and already at its smallest sensible amount.
+  const down = l => { const a = l.amount - sc(l)[2]; return a >= l.min - 1e-9 && a > 0 ? a : l.optional && l.amount > 0 ? 0 : null; };
+  const loss = (l, a) => { const now = lineNut(l), then = lineNut(Object.assign({}, l, { amount: a })); return { kcal: now.kcal - then.kcal, prot: now.prot - then.prot }; };
+  const dec = (list, guard, how) => {
+    const c = list.filter(l => { const a = down(l); return a != null && (!guard || guard(l, a)); }).sort(pickDown[how || 'balanced'])[0];
+    if (!c) return false;
+    c.amount = down(c);
+    if (c.amount <= 0) prune();
+    return true;
+  };
+  const protIfDec = (l, a) => sumNut(live()).prot - loss(l, a).prot;
+  // Steps never jump over the kcal band when a smaller step can land in it, so the loop settles.
+  for (let i = 0; i < 400; i++) {
+    const t = sumNut(live());
+    const fits = l => t.kcal + step(l).kcal <= kT * 1.03;
+    const stays = (l, a) => t.kcal - loss(l, a).kcal >= kT * 0.97;
+    // More protein: the leanest source when energy is tight, otherwise in proportion.
+    if (t.prot < pT * 0.98 && inc(flex('prot'), null, t.kcal >= kT * 0.97 ? 'lean' : 'balanced')) continue;
+    if (t.kcal < kT * 0.97) { if (inc(flex('kcal'), fits) || inc(flex('prot'), fits, 'fat')) continue; break; }
+    if (t.kcal > kT * 1.03) {
+      if (t.prot > pT * 1.15 && dec(flex('prot'), (l, a) => protIfDec(l, a) >= pT * 1.15)) continue;
+      if (dec(flex('kcal'), stays) || dec(flex('kcal'))) continue;
+      if (dec(flex('prot'), (l, a) => protIfDec(l, a) >= pT, 'fat')) continue;
+      // Still too much energy at the protein goal: take out some of a fatter protein, the next round adds a leaner one.
+      const lean = flex('prot').filter(l => l.amount + sc(l)[2] <= sc(l)[1] + 1e-9).map(kpp);
+      const leanest = lean.length ? Math.min(...lean) : Infinity;
+      if (dec(flex('prot'), (l, a) => kpp(l) > leanest * 1.3 && protIfDec(l, a) >= pT * 0.85, 'fat')) continue;
+      break;
+    }
+    break;
+  }
+  // A carb limit the template could not meet: take carbs away where it hurts least.
+  for (let i = 0; i < 60 && lim != null && sumNut(live()).carbs > lim + 0.5; i++) {
+    if (!dec(flex('kcal').filter(l => stapleById(l.id).carbs >= 10))) break;
+  }
+  prune();
+
+  /* 4. money: what today's food costs at the chosen shop, and cheaper bargains in the shop */
+  const lines = live();
+  for (const l of lines) {
+    if (l.item) {
+      const price = itemPriceNow(l.item);
+      l.cost = price != null && l.item.grams > 0 ? price / l.item.grams * l.grams * persons : 0;
+    } else {
+      l.offer = offerFor(stapleById(l.id), shop);
+      l.cost = l.offer ? l.offer.unit * l.amount * persons : 0;
+    }
+  }
+  const swaps = [];
+  const taken = new Set();
+  for (const l of lines) {
+    if (!l.role || l.vast || l.item || !l.offer) continue;
+    const st = stapleById(l.id), metric = roleMetric(l.role), sp = staplePer100(st, metric);
+    if (!(sp > 0)) continue;
+    const perStaple = l.offer.unit / (stapleGrams(st, 1) * sp / 100);
+    const needM = sp * stapleGrams(st, l.amount) * persons / 100;
+    let best = null;
+    for (const c of ctx.cands || []) {
+      if (!c || c.example || taken.has(c.id) || !(c.grams > 0) || !bargainFits(c, l.role)) continue;
+      const price = itemPriceNow(c), p = itemPer100(c, metric);
+      if (!(price > 0) || !p) continue;
+      const packM = p * c.grams / 100, per = price / packM;
+      if (per > perStaple * 0.95 || packM < needM * 0.75) continue;
+      if (!((c.freezable && P.freezer) || packM <= needM * 2.5 || expStateOn(c, iso) === 'later')) continue;
+      if (evaluate(c, P).verdict !== 'ja') continue;
+      if (!best || per < best.per) best = { it: c, per, packM };
+    }
+    if (best) {
+      taken.add(best.it.id);
+      swaps.push({ line: l, staple: st, it: best.it, metric, per: best.per, perStaple, save: (perStaple - best.per) * Math.min(needM, best.packM) });
+    }
+  }
+  swaps.sort((a, b) => b.save - a.save);
+
+  /* 5. what the day adds up to */
+  const t = sumNut(lines);
+  const notes = [];
+  if (t.kcal < kT * 0.93) {
+    const extra = [!ex.has('dairy') && 'kaas', !ex.has('nuts') && 'noten', !ex.has('nuts') && 'pindakaas', 'avocado'].filter(Boolean);
+    notes.push(`Dit menu haalt ${fmtNum(kT - t.kcal)} kcal te weinig. Vul aan met bijvoorbeeld ${extra.slice(0, -1).join(', ')} of ${extra[extra.length - 1]}.`);
+  }
+  if (t.prot < pT * 0.93) notes.push(`Dit menu haalt ${fmtNum(pT - t.prot)} g eiwit te weinig voor je doel.`);
+  if (lim != null && t.carbs > lim + 0.5) notes.push(`Dit menu heeft ${fmtNum(t.carbs)} g koolhydraten, meer dan je ${fmtNum(lim)} g.`);
+  for (const l of lines) { const st = stapleById(l.id); if (st && st.note && !notes.includes(st.note)) notes.push(st.note); }
+  if (P.excl && P.excl.halal && lines.some(l => l.id && stapleById(l.id).tags.includes('meat'))) notes.push('Vlees: koop het met een halal-keurmerk.');
+  if (lines.some(l => l.frozen)) notes.push('Koopjes uit de vriezer: laat ze ontdooien in de koelkast.');
+  return {
+    iso, wd, persons, shop, target: { kcal: kT, prot: pT, carbs: lim },
+    meals: meals.filter(m => m.lines.length), lines, totals: t, cost: round2(lines.reduce((a, l) => a + l.cost, 0)),
+    swaps: swaps.slice(0, 3), notes,
+  };
+}
+// The plan in the shape the day log keeps: staple amounts and bargain grams for the whole household.
+function compactPlan(plan) { return plan.lines.map(l => l.item ? { i: l.item.id, g: Math.round(l.grams * plan.persons) } : { s: l.id, a: round2(l.amount * plan.persons) }); }
+function planNeeds(plan) { const m = {}; for (const l of plan.lines) if (l.id && l.amount > 0) m[l.id] = (m[l.id] || 0) + l.amount * plan.persons; return m; }
+function buyList(plan, stock, shop) {
+  shop = shop || plan.shop;
+  const need = planNeeds(plan), out = [];
+  for (const id of Object.keys(need)) {
+    const st = stapleById(id), n = need[id], have = Math.max(0, +(stock && stock[id]) || 0);
+    if (have + 1e-6 >= n) continue;
+    const off = offerFor(st, shop);
+    if (!off) continue;
+    const short = n - have, packs = Math.max(1, Math.ceil(short / off.pack - 1e-9));
+    let alt = null;
+    for (const o of stapleOffers(st)) {
+      if (o.chain === off.chain || o.unit > off.unit * 0.8 || (off.unit - o.unit) * short < 0.3) continue;
+      if (!alt || o.unit < alt.unit) alt = o;
+    }
+    out.push({ id, st, need: n, have, short, offer: off, packs, cost: round2(packs * off.price), alt, rest: packs * off.pack - short });
+  }
+  const own = shop === 'cheapest' ? null : shop;
+  out.sort((a, b) => ((a.offer.chain === own ? 0 : 1) - (b.offer.chain === own ? 0 : 1)) || a.offer.chain.localeCompare(b.offer.chain) || AISLE.indexOf(a.id) - AISLE.indexOf(b.id));
+  return { lines: out, total: round2(out.reduce((a, l) => a + l.cost, 0)) };
+}
+// Take a day's food out of the stock: staples by amount, bargains by grams used.
+function consumeDay(s, lines) {
+  const items = [...(s.basket || []), ...(s.pantry || [])];
+  for (const x of lines || []) {
+    if (x && x.s) {
+      const v = (+s.stock[x.s] || 0) - (+x.a || 0);
+      if (v > 0.5) s.stock[x.s] = Math.round(v * 10) / 10; else delete s.stock[x.s];
+    } else if (x && x.i) {
+      const it = items.find(y => y.id === x.i);
+      if (it && it.grams > 0) it.usedG = Math.min(it.grams * (it.qty || 1), (it.usedG || 0) + (+x.g || 0));
+    }
+  }
+}
+// Move the stock to today: every day since the last visit is eaten as planned
+// (the logged plan of that day, or the plan the app would have made).
+function rollStock(s, iso, P) {
+  let changed = false;
+  if (!s.stock || typeof s.stock !== 'object' || Array.isArray(s.stock)) { s.stock = {}; changed = true; }
+  if (!s.dayLog || typeof s.dayLog !== 'object' || Array.isArray(s.dayLog)) { s.dayLog = {}; changed = true; }
+  const valid = typeof s.stockDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.stockDay);
+  if (!valid || s.stockDay > iso) {
+    if (s.stockDay !== iso) { s.stockDay = iso; changed = true; }
+  } else if (s.stockDay < iso) {
+    let d = s.stockDay < addDays(iso, -7) ? addDays(iso, -7) : s.stockDay;
+    while (d < iso) {
+      const log = Array.isArray(s.dayLog[d]) ? s.dayLog[d] : compactPlan(dayPlan(P, d, { have: planHave(s, P, d) }));
+      consumeDay(s, log);
+      d = addDays(d, 1);
+    }
+    s.stockDay = iso; changed = true;
+  }
+  for (const k of Object.keys(s.dayLog)) if (k < addDays(iso, -8)) { delete s.dayLog[k]; changed = true; }
+  return changed;
+}
+// Stock and bargains as they will be tomorrow, if today's list is bought and today's menu eaten.
+function projectAfter(s, lines, bought) {
+  const p = { stock: Object.assign({}, s.stock || {}), basket: clone(s.basket || []), pantry: clone(s.pantry || []) };
+  for (const b of bought || []) p.stock[b.id] = (+p.stock[b.id] || 0) + b.packs * b.offer.pack;
+  consumeDay(p, lines);
+  return p;
+}
