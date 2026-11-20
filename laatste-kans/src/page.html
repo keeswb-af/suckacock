@@ -199,39 +199,6 @@ body.host #addCard { order: 10; }
 .codebox { font-family: var(--font-num); font-size: 0.74rem; background: var(--surface-2); border-radius: var(--r-sm); padding: 10px 12px; overflow-x: auto; white-space: pre; max-height: 180px; }
 .steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 
-/* Vandaag halen: the day's shopping list, one row per product with price and actions */
-.today { border-color: color-mix(in srgb, var(--sticker) 40%, var(--line)); }
-.today-shop { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; }
-.today-sum { color: var(--muted); }
-.today-sum b { color: var(--ink); font-family: var(--font-num); font-weight: 600; white-space: nowrap; }
-.today-block { display: flex; flex-direction: column; gap: 2px; }
-.today-block > h3, .today-block > .section-head { margin-bottom: 4px; }
-.buy-row { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
-.buy-top, .buy-bottom { display: flex; gap: 12px; }
-.buy-top { align-items: baseline; }
-.buy-bottom { align-items: center; }
-.buy-name { flex: 1; min-width: 0; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
-.buy-cost { flex: none; font-family: var(--font-num); font-weight: 600; white-space: nowrap; }
-.buy-cost .pct { color: var(--sticker); font-size: 0.82rem; }
-.buy-sub { flex: 1; min-width: 0; font-size: 0.8rem; color: var(--muted); }
-.buy-act { flex: none; display: flex; gap: 6px; }
-.buy-row.deal { border-left: 4px solid var(--good); padding-left: 10px; }
-.today-ok { font-weight: 600; color: var(--good); }
-.today-more { border-top: 1px solid var(--line); padding-top: 4px; }
-.today-more[open] { padding-bottom: 4px; }
-.today-more > summary { font-size: 0.95rem; }
-.menu-meal { display: grid; grid-template-columns: 6.2em minmax(0, 1fr); gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); font-size: 0.88rem; align-items: baseline; }
-.menu-meal:first-of-type { border-top: 0; }
-.menu-name { font-weight: 600; color: var(--muted); }
-.menu-items { display: flex; flex-wrap: wrap; gap: 5px 6px; }
-.menu-item { display: inline-flex; align-items: center; background: var(--surface-2); border-radius: 999px; padding: 1px 2px 1px 10px; font-size: 0.82rem; }
-.menu-item.deal { background: var(--good-bg); color: var(--good); font-weight: 600; padding-right: 10px; }
-.menu-item button { border: 0; background: none; color: var(--muted); min-width: 30px; min-height: 30px; border-radius: 50%; cursor: pointer; font-size: 1rem; line-height: 1; }
-.menu-skip { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding-top: 6px; }
-.stock-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-top: 1px solid var(--line); font-size: 0.9rem; }
-.stock-row:first-of-type { border-top: 0; }
-.stock-row .nm { flex: 1; min-width: 0; }
-
 /* Meals and advice */
 .meal { display: flex; flex-direction: column; gap: 6px; }
 .meal .uses { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -300,7 +267,6 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
       <span>Stel eerst je dieet in, dan kloppen de adviezen.</span>
       <a class="btn btn-sm" href="#dieet">Dieet instellen</a>
     </div>
-    <section class="card today" id="todayCard" aria-labelledby="h-today" hidden></section>
     <div class="summary" id="summary" aria-live="polite"></div>
 
     <div class="card live" id="liveCard" hidden>

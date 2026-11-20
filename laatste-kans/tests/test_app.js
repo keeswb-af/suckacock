@@ -107,85 +107,6 @@ function ok(cond, msg) { if (cond) console.log('  ok  ' + msg); else { failures+
       ok(r.unknownN === 'twijfel', 'unknown nutrition = twijfel, not laten: ' + r.unknownN);
       ok(!/soja/i.test(r.soyRoerbak), 'soy-free roerbak text: ' + r.soyRoerbak);
 
-      // Day plan: menus hit the goal for every goal and weekday, diets are respected, stock and bargains work.
-      const dp = await page.evaluate(() => {
-        const { dayPlan, buyList, rollStock, planHave, compactPlan, projectAfter, defaultProfile, stapleById, itemFromFood } = window.LK;
-        const prof = o => Object.assign(defaultProfile(), o);
-        const week = ['2026-11-16', '2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20', '2026-11-21', '2026-11-22']; // Monday to Sunday
-        const out = {};
-        const goals = { balanced: [2000, 90], cut: [1800, 140], bulk: [2800, 160], lowcarb: [2000, 110], keto: [2000, 110], med: [2000, 90] };
-        out.miss = [];
-        for (const [g, [k, p]] of Object.entries(goals)) for (const d of week) {
-          const t = dayPlan(prof({ goal: g, kcal: k, protein: p }), d, {}).totals;
-          if (t.kcal < k * 0.95 || t.kcal > k * 1.05 || t.prot < p * 0.95) out.miss.push(`${g} ${d}: ${Math.round(t.kcal)} kcal ${Math.round(t.prot)} g`);
-        }
-        const tagsOf = p => p.lines.flatMap(l => l.id ? stapleById(l.id).tags : []);
-        const anyTag = (P, bad) => week.some(d => tagsOf(dayPlan(prof(P), d, {})).some(t => bad.includes(t)));
-        out.vegaMeat = anyTag({ eat: 'vega' }, ['meat', 'poultry', 'beef', 'pork', 'fish']);
-        out.veganAnimal = anyTag({ eat: 'vegan' }, ['meat', 'poultry', 'beef', 'fish', 'dairy', 'lactose', 'egg']);
-        out.pescoMeat = anyTag({ eat: 'pesco' }, ['meat', 'poultry', 'beef']);
-        out.glutenFree = anyTag({ excl: { gluten: true } }, ['gluten']);
-        out.lactoseFree = anyTag({ excl: { lactose: true } }, ['lactose']);
-        out.maxCarbs = g => Math.max(...week.map(d => dayPlan(prof({ goal: g, kcal: 2000, protein: 110 }), d, {}).totals.carbs));
-        out.lowcarbCarbs = out.maxCarbs('lowcarb'); out.ketoCarbs = out.maxCarbs('keto'); delete out.maxCarbs;
-        out.vegaVariety = new Set(week.map(d => dayPlan(prof({ eat: 'vega' }), d, {}).meals.find(m => m.id === 'diner').lines[0].id)).size;
-        out.thuFish = dayPlan(prof({}), week[3], {}).lines.some(l => l.id === 'koolvis');
-        out.liverWeek = week.reduce((a, d) => a + dayPlan(prof({}), d, {}).lines.filter(l => l.id === 'kippenlever').reduce((x, l) => x + l.amount, 0), 0);
-        out.liverNote = dayPlan(prof({}), week[5], {}).notes.some(n => /vitamine A/.test(n));
-        out.skipLiver = dayPlan(prof({ skipStaples: ['kippenlever'] }), week[5], {}).lines.some(l => l.id === 'kippenlever');
-        // Shopping list: everything on an empty shelf, nothing once bought, and the stock rolls to the next day.
-        const P = prof({ kcal: 2400, protein: 140 });
-        const plan = dayPlan(P, week[0], { shop: 'ah' });
-        const b0 = buyList(plan, {}, 'ah');
-        const full = {}; for (const l of b0.lines) full[l.id] = l.packs * l.offer.pack;
-        out.buyEmpty = b0.lines.length; out.buyFull = buyList(plan, full, 'ah').lines.length;
-        out.allAh = b0.lines.every(l => l.offer.chain === 'ah');
-        out.jumboNames = buyList(dayPlan(P, week[0], { shop: 'jumbo' }), {}, 'jumbo').lines.filter(l => l.offer.chain === 'jumbo').length;
-        const s = { stock: Object.assign({}, full), stockDay: week[0], dayLog: { [week[0]]: compactPlan(plan) }, basket: [], pantry: [] };
-        rollStock(s, week[1], P);
-        out.milk = [s.stock.melk, full.melk - plan.lines.filter(l => l.id === 'melk').reduce((a, l) => a + l.amount, 0)];
-        out.stockDay = s.stockDay;
-        // A missed day (no log) is eaten as the app would have planned it; a later visit the same day changes nothing.
-        const s2 = { stock: { melk: 4000 }, stockDay: week[0], dayLog: {}, basket: [], pantry: [] };
-        rollStock(s2, week[2], P);
-        const milkOn = d => dayPlan(P, d, {}).lines.filter(l => l.id === 'melk').reduce((x, l) => x + l.amount, 0);
-        out.twoDaysMilk = [s2.stock.melk, 4000 - milkOn(week[0]) - milkOn(week[1])];
-        out.rollAgain = rollStock(s2, week[2], P);
-        const two = dayPlan(prof({ kcal: 2400, protein: 140, persons: 2 }), week[0], {});
-        out.twoPersonsMilk = [buyList(two, {}, 'ah').lines.find(l => l.id === 'melk').need, 2 * milkOn(week[0])];
-        // Bargains: one you have takes the dinner slot and leaves the list; one in the shop is suggested only when cheaper.
-        const kd = { id: 'kd1', name: 'Kipdijfilet', cat: 'gevogelte', foodId: null, tags: ['meat', 'poultry'], n: { kcal: 147, protein: 19, carbs: 0 }, grams: 400, qty: 1, priceNormal: 4.99, priceNow: 2.99, expDate: week[0], freezable: true, source: 'ah' };
-        const ph = dayPlan(P, week[0], { have: planHave({ basket: [], pantry: [kd] }, P, week[0]) });
-        out.haveUsed = ph.lines.some(l => l.item && l.item.id === 'kd1' && l.replaces === 'kipfilet');
-        out.haveNotBought = !buyList(ph, {}, 'ah').lines.some(l => l.id === 'kipfilet');
-        const proj = projectAfter({ stock: {}, basket: [], pantry: [kd] }, compactPlan(ph), []);
-        out.kdUsed = proj.pantry[0].usedG;
-        const veg = prof({ eat: 'vega' });
-        out.vegaSkipsMeat = !dayPlan(veg, week[0], { have: planHave({ basket: [], pantry: [kd] }, veg, week[0]) }).lines.some(l => l.item);
-        const F = id => FOOD.find(f => f.id === id);
-        const cheap = itemFromFood(F('kipfilet'), { id: 'c1', discountPct: 50, expDate: null });
-        const dear = itemFromFood(F('kipfilet'), { id: 'c2', discountPct: 0, priceNormal: 12.99, expDate: null });
-        out.swapCheap = dayPlan(P, week[0], { cands: [cheap] }).swaps.map(x => x.it.id);
-        out.swapDear = dayPlan(P, week[0], { cands: [dear] }).swaps.length;
-        out.swapExample = dayPlan(P, week[0], { cands: [Object.assign({}, cheap, { example: true })] }).swaps.length;
-        return out;
-      });
-      ok(!dp.miss.length, 'day plans within 5% of kcal and protein for every goal and weekday' + (dp.miss.length ? ': ' + dp.miss.join('; ') : ''));
-      ok(!dp.vegaMeat && !dp.veganAnimal && !dp.pescoMeat, 'vega, vegan and pesco menus skip what they do not eat');
-      ok(!dp.glutenFree && !dp.lactoseFree, 'gluten-free and lactose-free menus skip gluten and lactose');
-      ok(dp.lowcarbCarbs <= 100 && dp.ketoCarbs <= 30, `low-carb ${Math.round(dp.lowcarbCarbs)} g and keto ${Math.round(dp.ketoCarbs)} g carbs at most`);
-      ok(dp.vegaVariety >= 2, 'vegetarian dinners vary over the week: ' + dp.vegaVariety);
-      ok(dp.thuFish && dp.liverWeek === 100 && dp.liverNote, 'fish on Thursday, 100 g liver a week with the vitamin A note');
-      ok(!dp.skipLiver, 'a skipped staple stays out of the menu');
-      ok(dp.buyEmpty >= 10 && dp.buyFull === 0 && dp.allAh, `empty shelf: ${dp.buyEmpty} things to buy at AH; none once bought`);
-      ok(dp.jumboNames >= 10, 'Jumbo prices when Jumbo is picked');
-      ok(dp.milk[0] === dp.milk[1] && dp.stockDay === '2026-11-17', `stock rolls a day: milk ${dp.milk[0]} ml left`);
-      ok(dp.twoDaysMilk[0] === dp.twoDaysMilk[1] && dp.twoDaysMilk[0] < 4000 && !dp.rollAgain, 'two missed days are eaten as planned, once: ' + dp.twoDaysMilk.join(' = '));
-      ok(dp.twoPersonsMilk[0] === dp.twoPersonsMilk[1] && dp.twoPersonsMilk[0] > 0, 'two persons need twice the milk: ' + dp.twoPersonsMilk.join(' = '));
-      ok(dp.haveUsed && dp.haveNotBought && dp.kdUsed > 0, `a bargain at home takes the dinner slot (${dp.kdUsed} g used), no chicken to buy`);
-      ok(dp.vegaSkipsMeat, 'a vegetarian plan does not use meat from the pantry');
-      ok(dp.swapCheap.join() === 'c1' && dp.swapDear === 0 && dp.swapExample === 0, 'cheaper bargain suggested; dearer one and examples not');
-
       const ms = await page.evaluate(() => ({
         old: window.LK.profileStores({ store: 'ah-1330', stores: [] }),
         both: window.LK.profileStores({ stores: ['ah-1330', 'ah-1829', 'nope'] }),
@@ -329,45 +250,6 @@ function ok(cond, msg) { if (cond) console.log('  ok  ' + msg); else { failures+
       await page.goto(FILE + '#koken');
       await page.waitForFunction(() => window.LK.Store.loaded);
       ok((await page.$$('#mealList .meal')).length >= 1, 'meal ideas from pantry + basket');
-
-      // Vandaag halen: today's shopping list, using what you bought.
-      await page.goto(FILE + '#winkel');
-      await page.waitForFunction(() => window.LK.Store.loaded);
-      const ids = () => page.$$eval('#todayBuy .buy-row', els => els.map(e => e.dataset.id));
-      ok(await page.isVisible('#todayCard') && /Vandaag halen/.test(await page.textContent('#todayCard')), 'Vandaag halen card shows');
-      const rows = await ids();
-      ok(rows.length >= 5 && !rows.includes('kipfilet'), 'list leaves out chicken: the kipfilet you bought is dinner: ' + rows.join(','));
-      ok(/Kipfilet/.test(await page.textContent('#todayMenu')), 'menu uses the kipfilet from the pantry');
-      const first = rows[0];
-      await page.click(`#todayBuy .buy-row[data-id="${first}"] button:has-text("Gekocht")`);
-      ok(!(await ids()).includes(first) && (await page.evaluate(id => window.LK.S.session.stock[id], first)) > 0, `Gekocht takes ${first} off the list and into the stock`);
-      const second = (await ids())[0];
-      await page.click(`#todayBuy .buy-row[data-id="${second}"] button:has-text("Heb ik")`);
-      ok(!(await ids()).includes(second), `Heb ik takes ${second} off the list`);
-      await page.click('#todayShop button[data-v="jumbo"]');
-      ok((await page.evaluate(() => window.LK.S.profile.baseShop)) === 'jumbo' && /Jumbo/.test(await page.textContent('#todayBuy')), 'switching to Jumbo shows Jumbo products');
-      await page.reload();
-      await page.waitForFunction(() => window.LK.Store.loaded);
-      const after = await ids();
-      ok(!after.includes(first) && !after.includes(second) && /Jumbo/.test(await page.textContent('#todayBuy')), 'stock and shop survive a reload');
-      await page.evaluate(() => { document.querySelector('#todayMenu').open = true; });
-      const chip = await page.$('#todayMenu .menu-item button');
-      const chipLabel = await chip.getAttribute('aria-label');
-      await chip.click();
-      ok((await page.evaluate(() => window.LK.S.profile.skipStaples.length)) === 1 && await page.isVisible('#todayMenu .menu-skip'), 'a staple can leave the menu: ' + chipLabel);
-      ok(await page.evaluate(() => document.querySelector('#todayMenu').open), 'the menu stays open after a change');
-      await page.goto(FILE + '#dieet');
-      await page.waitForFunction(() => window.LK.Store.loaded);
-      await page.click('#dietForm button[type="submit"]');
-      const kept = await page.evaluate(() => [window.LK.S.profile.baseShop, window.LK.S.profile.skipStaples.length]);
-      ok(kept[0] === 'jumbo' && kept[1] === 1, 'saving the diet keeps the shop and the skipped staple');
-      await page.goto(FILE + '#winkel');
-      await page.waitForFunction(() => window.LK.Store.loaded);
-      await page.evaluate(() => { document.querySelector('#todayMenu').open = true; });
-      await page.click('#todayMenu .menu-skip button');
-      ok((await page.evaluate(() => window.LK.S.profile.skipStaples.length)) === 0, 'and comes back');
-      const kw = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
-      ok(kw[0] <= kw[1], 'today card fits the phone width');
     }
 
     for (const tab of ['winkel', 'koken', 'logboek', 'dieet', 'info']) {
