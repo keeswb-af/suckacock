@@ -198,6 +198,13 @@ body.host #addCard { order: 10; }
 .chip.live-tag { background: var(--good-bg); color: var(--good); font-size: 0.7rem; padding: 1px 8px; vertical-align: 2px; margin-left: 6px; }
 .codebox { font-family: var(--font-num); font-size: 0.74rem; background: var(--surface-2); border-radius: var(--r-sm); padding: 10px 12px; overflow-x: auto; white-space: pre; max-height: 180px; }
 .steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.filter-list { display: flex; flex-direction: column; }
+.filter-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.filter-row:first-child { border-top: 0; }
+.filter-row input { width: 20px; height: 20px; accent-color: var(--brand); flex: none; margin-top: 2px; }
+.filter-row .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.filter-row .txt b { font-weight: 700; }
+.filter-row .txt span { font-size: 0.8rem; color: var(--muted); overflow-wrap: anywhere; }
 
 /* Meals and advice */
 .meal { display: flex; flex-direction: column; gap: 6px; }
@@ -439,6 +446,16 @@ details summary { cursor: pointer; font-weight: 600; min-height: 32px; display: 
           <label class="field" for="dBudget">Budget per week (€)<input id="dBudget" type="number" inputmode="decimal" min="0" step="1"></label>
         </div>
         <label class="check"><input type="checkbox" id="dFreezer"> Ik heb ruimte in de vriezer</label>
+      </div>
+      <div class="card" id="filterCard">
+        <h3>Wegfilter</h3>
+        <p class="small muted">Wat hier aanstaat, krijgt "Past niet" en verdwijnt met "Past bij mij". Live AH-producten worden op het etiket gecontroleerd, andere op naam en op wat dat soort product meestal bevat.</p>
+        <div id="filterList" class="filter-list"></div>
+        <div class="grid2">
+          <label class="field" for="wfName">Nieuw filter<input id="wfName" type="text" placeholder="bv. Suiker" autocomplete="off"></label>
+          <label class="field" for="wfTerms">Woorden, met komma's<input id="wfTerms" type="text" placeholder="suiker, glucosestroop, dextrose" autocomplete="off"></label>
+        </div>
+        <div class="btn-row"><button type="button" class="btn btn-sm" id="wfAdd">Filter toevoegen</button></div>
       </div>
       <div class="card">
         <h3>In je eigen woorden</h3>

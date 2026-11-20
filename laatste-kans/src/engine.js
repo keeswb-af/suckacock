@@ -29,7 +29,7 @@ function lerp(x, pts) {
   }
   return pts[pts.length - 1][1];
 }
-function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9% ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9% ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
 
 /* ============================================================
    Diet model
@@ -49,11 +49,112 @@ const EXCL = [
   ['nuts', 'Notenallergie'], ['soy', 'Geen soja'], ['halal', 'Halal'],
 ];
 const TAG_NL = { meat: 'vlees', poultry: 'gevogelte', pork: 'varkensvlees', beef: 'rundvlees', fish: 'vis', shellfish: 'schaaldieren', dairy: 'zuivel', egg: 'ei', gluten: 'gluten', lactose: 'lactose', nuts: 'noten', soy: 'soja' };
-const ALLOWED_TAGS = ['meat', 'poultry', 'pork', 'beef', 'fish', 'shellfish', 'dairy', 'egg', 'gluten', 'lactose', 'nuts', 'soy', 'vegetarian', 'vegan', 'halal_possible', 'processed', 'ultraprocessed', 'wholegrain', 'high_sugar', 'fresh_produce', 'ready_meal', 'bakery'];
+const ALLOWED_TAGS = ['meat', 'poultry', 'pork', 'beef', 'fish', 'shellfish', 'dairy', 'egg', 'gluten', 'lactose', 'nuts', 'soy', 'vegetarian', 'vegan', 'halal_possible', 'processed', 'ultraprocessed', 'wholegrain', 'high_sugar', 'fresh_produce', 'ready_meal', 'bakery', 'seed_oil'];
 const CATS = { vlees: 'Vlees', gevogelte: 'Gevogelte', vis: 'Vis', vega: 'Vega', zuivel: 'Zuivel', kaas: 'Kaas', ei: 'Eieren', beleg: 'Beleg', brood: 'Brood', groente: 'Groente', fruit: 'Fruit', maaltijd: 'Maaltijd', salade: 'Salade', zetmeel: 'Pasta en co', overig: 'Overig' };
 
 function defaultProfile() {
-  return { goal: 'balanced', eat: 'alles', kcal: 2000, protein: 90, carbsMax: null, excl: {}, avoidUltra: false, freezer: true, persons: 1, budget: 40, notes: '', weight: null, stores: [], setAt: null, savedAt: 0 };
+  return { goal: 'balanced', eat: 'alles', kcal: 2000, protein: 90, carbsMax: null, excl: {}, avoidUltra: false, freezer: true, persons: 1, budget: 40, notes: '', weight: null, stores: [], filters: defaultFilters(), setAt: null, savedAt: 0 };
+}
+
+/* ============================================================
+   Wegfilter: ingredients you never want. The seed-oil filter is built in
+   and on by default; people can add their own (a name and some words).
+   Live AH products are checked on their label; others on name and on what
+   that kind of product usually contains.
+   ============================================================ */
+// High-PUFA seed oils (the "hateful eight" plus sesame and linseed). Olive, palm, coconut,
+// avocado and butter are fine and are never matched.
+const SEED_OIL_WORDS = ['zonnebloem', 'raapzaad', 'koolzaad', 'canola', 'soja', 'sojabonen', 'mais', 'maiskiem', 'katoenzaad', 'druivenpit', 'saffloer', 'distel', 'rijst', 'rijstzemel', 'rijstzemelen', 'sesam', 'lijnzaad'];
+const SEED_OIL_TERMS = ['zonnebloemolie', 'zonnebloempitolie', 'raapzaadolie', 'koolzaadolie', 'canola olie', 'canolaolie', 'sojaolie', 'soja olie', 'sojabonenolie', 'maisolie', 'maiskiemolie', 'katoenzaadolie', 'druivenpitolie', 'saffloerolie', 'distelolie', 'rijstolie', 'rijstzemelolie', 'rijstzemelenolie', 'sesamolie', 'lijnzaadolie', 'sunflower oil', 'rapeseed oil', 'soybean oil', 'corn oil', 'cottonseed oil', 'grapeseed oil', 'safflower oil', 'rice bran oil'];
+const SEED_OIL_OK = ['olijf', 'palm', 'kokos', 'avocado', 'shea', 'cacao', 'boter', 'roomboter'];
+// Products that nearly always contain seed oil when no label is known.
+const SEED_OIL_NAME_RE = /mayonaise|\bmayo\b|fritessaus|frietsaus|halvarine|margarine|frituur|\bchips\b|tortillachips|dressing|saladesaus|hummus|pesto|satesaus|loempia|kroket|bitterbal|frikandel|nugget|falafel|\bwrap|tortilla|\b\w*salade\b(?!.*\bsla\b)/;
+const FILTER_PRESETS = {
+  pufa: { id: 'pufa', label: 'Zaadoliën (PUFA)', note: 'Zonnebloem, raapzaad (koolzaad), soja, maïs, katoenzaad, druivenpit, saffloer, rijstzemel, sesam en lijnzaad. Olijf, palm, kokos, avocado en boter mogen.' },
+};
+function defaultFilters() { return [{ id: 'pufa', on: true }]; }
+function normalizeFilters(list) {
+  const out = [];
+  for (const f of Array.isArray(list) ? list : []) {
+    if (!f || typeof f !== 'object') continue;
+    if (FILTER_PRESETS[f.id]) { if (!out.some(x => x.id === f.id)) out.push({ id: f.id, on: f.on !== false }); continue; }
+    const terms = (Array.isArray(f.terms) ? f.terms : String(f.terms || '').split(',')).map(t => norm(t)).filter(t => t.length >= 2).slice(0, 30);
+    if (!terms.length) continue;
+    out.push({ id: String(f.id || 'f' + uid()), label: String(f.label || terms[0]).slice(0, 40), terms, on: f.on !== false });
+  }
+  if (!out.some(x => x.id === 'pufa')) out.unshift({ id: 'pufa', on: true });
+  return out;
+}
+// Seed oil in an ingredient list: a named oil, an oil list "(zonnebloem, raapzaad)", or an unnamed
+// "plantaardige olie" (usually sunflower or rapeseed). Returns {level, term} or null.
+function seedOilHit(text) {
+  const t = norm(text);
+  if (!t) return null;
+  for (const term of SEED_OIL_TERMS) if (t.includes(norm(term))) return { level: 'zeker', term };
+  // "plantaardige olie (zonnebloem, raapzaad)", "plantaardige oliën en vetten (palm, zonnebloem)"
+  const raw = String(text).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const lists = [...raw.matchAll(/(olie|olien|vet|vetten)[^()]{0,30}\(([^)]*)\)/g)].map(m => m[2]);
+  for (const inner of lists) {
+    const words = inner.split(/[^a-z]+/).filter(Boolean);
+    const seed = words.find(w => SEED_OIL_WORDS.includes(w));
+    if (seed) return { level: 'zeker', term: `${seed}olie` };
+  }
+  if (/plantaardige oli(e|en)\b/.test(t)) {
+    const after = raw.slice(raw.search(/plantaardige oli/));
+    const m = after.match(/^plantaardige oli[a-z]*[^()]{0,30}\(([^)]*)\)/);
+    if (m && m[1].split(/[^a-z]+/).filter(Boolean).every(w => SEED_OIL_OK.includes(w) || ['en', 'in', 'wisselende', 'verhouding', 'olie', 'vet', 'gehard', 'deels'].includes(w))) return null;
+    return { level: 'waarschijnlijk', term: 'plantaardige olie (soort niet vermeld)' };
+  }
+  return null;
+}
+// Which active filters hit this product. level: 'zeker' (on the label or in the name),
+// 'waarschijnlijk' (this kind of product nearly always has it), 'onbekend' (processed, label unknown).
+function filterHits(it, P) {
+  const out = [];
+  const filters = normalizeFilters(P && P.filters);
+  const ingr = it.ingr ? String(it.ingr) : '';
+  const name = String(it.name || '');
+  const tags = new Set(it.tags || []);
+  for (const f of filters) {
+    if (!f.on) continue;
+    if (f.id === 'pufa') {
+      const label = FILTER_PRESETS.pufa.label;
+      if (ingr) { const hit = seedOilHit(ingr); if (hit) out.push({ id: f.id, label, level: hit.level, term: hit.term, from: 'etiket' }); continue; }
+      const byName = seedOilHit(name);
+      if (byName) { out.push({ id: f.id, label, level: 'zeker', term: byName.term, from: 'naam' }); continue; }
+      if (tags.has('seed_oil') || SEED_OIL_NAME_RE.test(norm(name))) { out.push({ id: f.id, label, level: 'waarschijnlijk', term: 'zaadolie', from: 'soort' }); continue; }
+      const processed = tags.has('processed') || tags.has('ultraprocessed') || tags.has('ready_meal') || tags.has('bakery') || ['maaltijd', 'beleg', 'vega', 'salade'].includes(it.cat);
+      if (processed && !tags.has('fresh_produce')) out.push({ id: f.id, label, level: 'onbekend', term: null, from: 'soort' });
+      continue;
+    }
+    const hay = norm(name + ' ' + ingr);
+    const term = f.terms.find(w => hay.includes(w));
+    if (term) out.push({ id: f.id, label: f.label, level: 'zeker', term, from: ingr && norm(ingr).includes(term) ? 'etiket' : 'naam' });
+  }
+  return out;
+}
+// Allergens and animal ingredients from an AH label.
+function tagsFromIngredients(stmt, contains) {
+  const tags = new Set();
+  const c = norm(contains), s = norm(stmt);
+  const has = (txt, re) => re.test(txt);
+  if (c) {
+    if (has(c, /\bmelk|lactose|zuivel/)) { tags.add('dairy'); tags.add('lactose'); }
+    if (has(c, /\bei\b|\beieren|\beiproduct/)) tags.add('egg');
+    if (has(c, /gluten|tarwe|rogge|gerst|spelt|haver|kamut/)) tags.add('gluten');
+    if (has(c, /\bsoja/)) tags.add('soy');
+    if (has(c, /noten|amandel|hazelno|walno|cashew|pistache|pecan|macadamia|paranoot|pinda|aardnoot/)) tags.add('nuts');
+    if (has(c, /\bvis\b/)) tags.add('fish');
+    if (has(c, /schaaldier|weekdier|kreeft|garnaal|mossel/)) { tags.add('fish'); tags.add('shellfish'); }
+  }
+  if (s) {
+    if (has(s, /varkensvlees|varkens|\bspek\b|\bham\b|reuzel/)) { tags.add('meat'); tags.add('pork'); }
+    if (has(s, /rundvlees|runder|\brund\b|kalfsvlees/)) { tags.add('meat'); tags.add('beef'); }
+    if (has(s, /kippenvlees|kipfilet|\bkip\b|kalkoen|gevogelte/)) { tags.add('meat'); tags.add('poultry'); }
+    if (has(s, /gelatine/)) tags.add('meat');
+    if (has(s, /\bvlees\b/)) tags.add('meat');
+  }
+  return [...tags];
 }
 // The stores a profile follows (older profiles had a single "store").
 const MAX_STORES = 99; // no practical limit: every AH in the list can be followed
@@ -210,6 +311,8 @@ function evaluate(it, P) {
   const tags = new Set(it.tags || []);
   const ex = exclusionsFor(P);
   const hits = [...ex].filter(t => tags.has(t));
+  const fhits = filterHits(it, P);
+  const fhard = fhits.filter(x => x.level !== 'onbekend');
   const R = [], pins = [];
   const add = (w, s) => R.push({ w, s });
   let capTwijfel = false;
@@ -334,12 +437,17 @@ function evaluate(it, P) {
     if (share > 1.2) { risk = 6; add(-6, 'Veel om binnen twee dagen op te eten'); }
   }
 
+  for (const x of fhits) if (x.level === 'onbekend') { pins.push(`Wegfilter ${x.label}: ingrediënten onbekend, check het etiket`); capTwijfel = true; }
   let score = clamp(Math.round(0.6 * fit + 0.4 * value - risk), 0, 100);
   let verdict;
-  if (hits.length) {
+  const fmsg = x => x.level === 'zeker'
+    ? `Wegfilter ${x.label}: bevat ${x.term}${x.from === 'etiket' ? ' (etiket)' : ''}`
+    : `Wegfilter ${x.label}: ${x.from === 'etiket' ? 'bevat ' + x.term : 'zit meestal in dit soort product; check het etiket'}`;
+  if (hits.length || fhard.length) {
     verdict = 'nee';
     score = Math.min(score, 10);
-    pins.unshift(`Bevat ${hits.map(t => TAG_NL[t] || t).join(', ')}: dat eet je niet`);
+    for (const x of fhard.slice().reverse()) pins.unshift(fmsg(x));
+    if (hits.length) pins.unshift(`Bevat ${hits.map(t => TAG_NL[t] || t).join(', ')}: dat eet je niet`);
   } else if (st === 'verlopen') {
     verdict = 'laten';
   } else if (!known) {
@@ -528,7 +636,12 @@ function itemFromAH(x) {
   const match = matchFood(core, 1)[0];
   const strong = match && match.s >= 70 ? match.f : null;
   const cat = strong ? strong.cat : catFromAH(x.category, title);
-  const tags = new Set([...(strong ? strong.tags : []), ...inferTags(raw)]);
+  const ing = x.ingredients && typeof x.ingredients === 'object' ? x.ingredients : null;
+  const tags = new Set([...(strong ? strong.tags : []), ...inferTags(raw), ...(ing ? tagsFromIngredients(ing.s, ing.c) : [])]);
+  // A known label decides about seed oil, not what this kind of product usually has.
+  if (ing && ing.s) tags.delete('seed_oil');
+  if (['meat', 'poultry', 'pork', 'beef', 'fish', 'shellfish'].some(t => tags.has(t))) { tags.delete('vegetarian'); tags.delete('vegan'); }
+  else if (['dairy', 'egg', 'lactose'].some(t => tags.has(t))) tags.delete('vegan');
   if (!strong && (cat === 'groente' || cat === 'fruit') && !/gesneden|salade|soep|maaltijd|smoothie|\bsap\b|flap|taart/.test(norm(title))) tags.add('fresh_produce');
   if (tags.has('vegan') && ANIMAL.some(t => tags.has(t))) tags.delete('vegan');
   const label = x.nutrition && (x.nutrition.kcal != null || x.nutrition.protein != null) ? x.nutrition : null;
@@ -545,6 +658,7 @@ function itemFromAH(x) {
     priceNormal: was, priceNow: now, discountPct: pct, expDate: exp,
     qty: 1, source: 'ah', productId: x.productId ?? null, stock: x.stock != null && isFinite(+x.stock) ? +x.stock : null,
     nutriSource: label ? 'etiket' : strong ? 'tabel' : null, addedAt: Date.now(),
+    ingr: ing && ing.s ? String(ing.s).slice(0, 1500) : null, allergens: ing && ing.c ? String(ing.c).slice(0, 300) : null,
   };
 }
 

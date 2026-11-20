@@ -27,7 +27,7 @@ CATS = {"vlees", "gevogelte", "vis", "vega", "zuivel", "kaas", "ei", "beleg", "b
         "groente", "fruit", "maaltijd", "salade", "zetmeel", "overig"}
 TAGS = {"meat", "poultry", "pork", "beef", "fish", "shellfish", "dairy", "egg", "gluten",
         "lactose", "nuts", "soy", "vegetarian", "vegan", "halal_possible", "processed",
-        "ultraprocessed", "wholegrain", "high_sugar", "fresh_produce", "ready_meal", "bakery"}
+        "ultraprocessed", "wholegrain", "high_sugar", "fresh_produce", "ready_meal", "bakery", "seed_oil"}
 NUM = ["kcal", "protein", "carbs", "sugar", "fat", "satfat", "fiber", "salt", "pack_g", "price_eur"]
 
 

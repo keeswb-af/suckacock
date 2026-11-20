@@ -35,7 +35,7 @@ const CACHE_FILE = FM.joinPath(DIR, 'voeding-cache.json');
 const HISTORY_FILE = FM.joinPath(DIR, 'afprijs-geschiedenis.json');
 // One copy of the nutrition cache and the markdown history per run, written once at the end,
 // so stores fetched side by side do not overwrite each other's additions.
-const RUN = { cache: null, hist: null, histOk: true, dirty: false, seen: new Set() };
+const RUN = { cache: null, hist: null, histOk: true, dirty: false, seen: new Set(), noIngredients: false };
 async function runCache() { if (!RUN.cache) RUN.cache = await readJSON(CACHE_FILE, {}); return RUN.cache; }
 async function runHistory() {
   if (!RUN.hist) {
@@ -51,7 +51,7 @@ async function flushRun() {
     if (RUN.cache) {
       const c = RUN.cache;
       const old = Object.keys(c).filter(id => !RUN.seen.has(id)).sort((a, b) => ((c[a] && c[a].t) || 0) - ((c[b] && c[b].t) || 0));
-      const extra = Object.keys(c).length - 3000;
+      const extra = Object.keys(c).length - 2000;
       if (extra > 0) for (const id of old.slice(0, extra)) delete c[id];
       writeJSON(CACHE_FILE, c);
     }
@@ -103,6 +103,10 @@ const BARGAINS_Q = `query BargainItems($storeId: String!) {
 }`;
 function nutritionQuery(ids) {
   return 'query FetchNutrition {\n' + ids.map((id, k) => `  p${k}: product(id: ${parseInt(id, 10)}) { id tradeItem { nutritions { nutrients { type name value } } } }`).join('\n') + '\n}';
+}
+// Ingredients and allergens come in their own query: if AH changes those fields, nutrition still works.
+function ingredientQuery(ids) {
+  return 'query FetchIngredients {\n' + ids.map((id, k) => `  p${k}: product(id: ${parseInt(id, 10)}) { id tradeItem { ingredients { statement allergens { contains mayContain } } } }`).join('\n') + '\n}';
 }
 const AUTH_RE = /unauthori|unauthenti|not authenticated|not authorized|forbidden|access denied|login|permission|expired|invalid token/i;
 
@@ -261,7 +265,30 @@ async function fetchLive(s, state) {
       });
     } catch (e) { if (e.code === 'network' || e.code === 'login') break; }
   }
-  for (const x of items) x.nutrition = cache[String(x.productId)] ? cache[String(x.productId)].n : null;
+  // Ingredients and allergens (for the wegfilter and allergies). Cached as cache[id].i = {s, c, m} or null.
+  const needI = RUN.noIngredients ? [] : [...new Set(items.map(x => String(x.productId)))].filter(id => cache[id] && cache[id].i === undefined).slice(0, 80);
+  for (let i = 0; i < needI.length; i += 20) {
+    const chunk = needI.slice(i, i + 20);
+    try {
+      const { data, errors } = await AH.gql(ingredientQuery(chunk), {});
+      const errPaths = new Set(errors.map(e => e && Array.isArray(e.path) ? e.path[0] : null).filter(Boolean));
+      chunk.forEach((id, k) => {
+        const p = data ? data['p' + k] : undefined;
+        if (p === undefined || (p === null && (errPaths.has('p' + k) || errors.length))) return;
+        const ing = p && p.tradeItem && p.tradeItem.ingredients;
+        const al = ing && ing.allergens && typeof ing.allergens === 'object' ? ing.allergens : {};
+        cache[id].i = ing && (ing.statement || al.contains) ? { s: ing.statement ? String(ing.statement).slice(0, 1500) : null, c: al.contains ? String(al.contains).slice(0, 300) : null, m: al.mayContain ? String(al.mayContain).slice(0, 300) : null } : null;
+      });
+    } catch (e) {
+      if (e.code === 'network' || e.code === 'login') break;
+      RUN.noIngredients = true; break; // the fields are not accepted (any more): skip them this run
+    }
+  }
+  for (const x of items) {
+    const c = cache[String(x.productId)];
+    x.nutrition = c ? c.n : null;
+    x.ingredients = c && c.i ? c.i : null;
+  }
 
   return { storeKey: s.key, storeName: s.name, storeId, fetchedAt: Date.now(), kind: res.kind, items };
 }

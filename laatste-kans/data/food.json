@@ -115,7 +115,8 @@
    "halal_possible",
    "meat",
    "poultry",
-   "processed"
+   "processed",
+   "seed_oil"
   ],
   "freezable": true
  },
@@ -441,7 +442,8 @@
   "tags": [
    "meat",
    "pork",
-   "processed"
+   "processed",
+   "seed_oil"
   ],
   "freezable": true
  },
@@ -645,7 +647,8 @@
    "halal_possible",
    "meat",
    "poultry",
-   "processed"
+   "processed",
+   "seed_oil"
   ],
   "freezable": true
  },
@@ -1065,6 +1068,7 @@
    "gluten",
    "halal_possible",
    "processed",
+   "seed_oil",
    "soy",
    "ultraprocessed",
    "vegan",
@@ -1096,6 +1100,7 @@
    "gluten",
    "halal_possible",
    "processed",
+   "seed_oil",
    "ultraprocessed",
    "vegan",
    "vegetarian"
@@ -1124,6 +1129,7 @@
    "gluten",
    "halal_possible",
    "processed",
+   "seed_oil",
    "vegan",
    "vegetarian"
   ],
@@ -1155,6 +1161,7 @@
    "gluten",
    "halal_possible",
    "processed",
+   "seed_oil",
    "soy",
    "ultraprocessed",
    "vegan",
@@ -1684,6 +1691,7 @@
   "tags": [
    "halal_possible",
    "processed",
+   "seed_oil",
    "vegan",
    "vegetarian"
   ],
@@ -1715,7 +1723,8 @@
    "halal_possible",
    "meat",
    "poultry",
-   "processed"
+   "processed",
+   "seed_oil"
   ],
   "freezable": false
  },
@@ -1743,7 +1752,8 @@
    "halal_possible",
    "meat",
    "poultry",
-   "processed"
+   "processed",
+   "seed_oil"
   ],
   "freezable": false
  },
@@ -1774,6 +1784,7 @@
    "nuts",
    "poultry",
    "processed",
+   "seed_oil",
    "soy"
   ],
   "freezable": false
@@ -1801,7 +1812,8 @@
    "egg",
    "fish",
    "halal_possible",
-   "processed"
+   "processed",
+   "seed_oil"
   ],
   "freezable": false
  },
@@ -1828,6 +1840,7 @@
    "egg",
    "halal_possible",
    "processed",
+   "seed_oil",
    "vegetarian"
   ],
   "freezable": false
@@ -2026,6 +2039,7 @@
   "tags": [
    "bakery",
    "gluten",
+   "seed_oil",
    "ultraprocessed",
    "vegetarian"
   ],
@@ -3316,7 +3330,8 @@
    "nuts",
    "poultry",
    "processed",
-   "ready_meal"
+   "ready_meal",
+   "seed_oil"
   ],
   "freezable": false
  },
@@ -3374,6 +3389,7 @@
    "gluten",
    "processed",
    "ready_meal",
+   "seed_oil",
    "soy"
   ],
   "freezable": false
@@ -3406,6 +3422,7 @@
    "meat",
    "poultry",
    "ready_meal",
+   "seed_oil",
    "ultraprocessed"
   ],
   "freezable": false
@@ -3434,6 +3451,7 @@
    "egg",
    "gluten",
    "ready_meal",
+   "seed_oil",
    "ultraprocessed",
    "vegetarian"
   ],
@@ -3465,6 +3483,7 @@
    "meat",
    "poultry",
    "ready_meal",
+   "seed_oil",
    "ultraprocessed"
   ],
   "freezable": false

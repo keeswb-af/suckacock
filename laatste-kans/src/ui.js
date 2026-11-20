@@ -180,6 +180,7 @@ function normalizeSession(d) {
 }
 function normalizeProfile(d) {
   const p = Object.assign(defaultProfile(), d || {});
+  p.filters = normalizeFilters(d && d.filters !== undefined ? d.filters : defaultFilters());
   p.stores = profileStores(p);
   delete p.store;
   return p;
@@ -342,7 +343,8 @@ function renderCandidates() {
   const hidden = onlyFit ? inStore.filter(x => x.it.source === 'ah' && (x.v === 'laten' || x.v === 'nee')) : [];
   const list = inStore.filter(x => !hidden.includes(x)).sort((a, b) => b.s - a.s).map(x => x.it);
   $('#candCount').textContent = list.length ? `${list.length} product${list.length === 1 ? '' : 'en'}` : '';
-  const hiddenNote = hidden.length ? h('div', { class: 'banner info' }, h('span', null, `${hidden.length} koopje${hidden.length === 1 ? '' : 's'} verborgen dat niet bij je dieet past.`), h('button', { class: 'btn btn-sm', type: 'button', onclick: () => setLiveFilter('all') }, 'Toon alles')) : null;
+  const byFilter = hidden.filter(x => filterHits(x.it, S.profile).some(f => f.level !== 'onbekend')).length;
+  const hiddenNote = hidden.length ? h('div', { class: 'banner info' }, h('span', null, `${hidden.length} koopje${hidden.length === 1 ? '' : 's'} verborgen dat niet bij je dieet past${byFilter ? `, waarvan ${byFilter} door je wegfilter` : ''}.`), h('button', { class: 'btn btn-sm', type: 'button', onclick: () => setLiveFilter('all') }, 'Toon alles')) : null;
   if (!list.length && HOST) {
     fill($('#candList'), hiddenNote, h('div', { class: 'empty' },
       h('strong', null, myStores().length ? 'Geen passende koopjes gevonden' : 'Kies je winkels'),
@@ -822,6 +824,28 @@ function renderDieet() {
   $('#dWeight').value = p.weight ?? ''; $('#dPersons').value = p.persons ?? 1; $('#dBudget').value = p.budget ?? '';
   $('#dFreezer').checked = !!p.freezer; $('#dNotes').value = p.notes || '';
   $('#dietSubmit').disabled = !Store.loaded;
+  p.filters = normalizeFilters(p.filters);
+  renderFilters();
+}
+function renderFilters() {
+  const list = S.draft.filters;
+  fill($('#filterList'), ...list.map(f => {
+    const preset = FILTER_PRESETS[f.id];
+    const sub = preset ? preset.note : f.terms.join(', ');
+    return h('div', { class: 'filter-row' },
+      h('input', { type: 'checkbox', id: 'wf-' + f.id, checked: f.on, 'aria-label': `${preset ? preset.label : f.label} aan`, onchange: e => { f.on = e.target.checked; } }),
+      h('label', { class: 'txt', for: 'wf-' + f.id }, h('b', null, preset ? preset.label : f.label), h('span', null, sub)),
+      preset ? null : h('button', { class: 'btn btn-sm btn-ghost', type: 'button', 'aria-label': `Verwijder filter ${f.label}`, onclick: () => { S.draft.filters = S.draft.filters.filter(x => x.id !== f.id); renderFilters(); } }, 'Weg'));
+  }));
+}
+function addFilter() {
+  const name = $('#wfName').value.trim(), terms = $('#wfTerms').value;
+  const words = terms.split(',').map(w => w.trim()).filter(w => w.length >= 2);
+  if (!words.length) { toast('Vul een of meer woorden in, met komma\'s ertussen'); $('#wfTerms').focus(); return; }
+  S.draft.filters = normalizeFilters([...S.draft.filters, { id: 'f' + uid(), label: name || words[0], terms: words, on: true }]);
+  $('#wfName').value = ''; $('#wfTerms').value = '';
+  renderFilters();
+  toast('Filter toegevoegd. Tik op Opslaan.');
 }
 function applyGoal(k) {
   const g = GOALS[k];
@@ -848,6 +872,7 @@ function submitDiet(e) {
   const b = num('#dBudget'); d.budget = b == null ? null : Math.max(0, b);
   d.avoidUltra = $('#dUltra').checked; d.freezer = $('#dFreezer').checked;
   d.notes = $('#dNotes').value.slice(0, 2000);
+  d.filters = normalizeFilters(d.filters);
   S.profile = Object.assign({}, d, { stores: profileStores(S.profile), setAt: Date.now() });
   delete S.profile.store;
   S.draft = clone(S.profile);
@@ -976,6 +1001,7 @@ function profileText() {
     `Eetwijze: ${EATS[p.eat]?.label || 'Alles'}${ex.length ? `; eet geen: ${ex.join(', ')}` : ''}${p.excl?.halal ? '; alleen halal vlees' : ''}`,
     `Per persoon per dag: ${p.kcal} kcal, ${p.protein} g eiwit${p.carbsMax != null ? `, max ${p.carbsMax} g koolhydraten` : ''}`,
     `Personen: ${p.persons}; budget per week: ${p.budget != null ? '€' + p.budget : 'onbekend'}; vriezer: ${p.freezer ? 'ja' : 'nee'}${p.avoidUltra ? '; vermijdt ultrabewerkt' : ''}`,
+    ...normalizeFilters(p.filters).filter(f => f.on).map(f => f.id === 'pufa' ? 'Vermijdt zaadoliën: zonnebloem, raapzaad (koolzaad), soja, maïs, katoenzaad, druivenpit, saffloer, rijstzemel, sesam en lijnzaad. Olijf, palm, kokos, avocado en boter mogen wel.' : `Vermijdt (${f.label}): ${f.terms.join(', ')}`),
     p.notes ? `Eigen woorden: ${p.notes}` : '',
   ].filter(Boolean).join('\n');
 }
@@ -1003,6 +1029,7 @@ Geef per product:
 - cat: precies een van ${Object.keys(CATS).join(', ')}
 - per100: geschatte voedingswaarde per 100 g: {"kcal","protein","carbs","sugar","fat","satfat","fiber","salt"} in getallen. Lees het etiket als dat zichtbaar is, anders schat je op basis van NEVO-waarden voor dit type product.
 - tags: alle van toepassing zijnde waarden uit ${ALLOWED_TAGS.join(', ')}. Wees volledig bij dierlijke producten en allergenen (meat, poultry, pork, beef, fish, shellfish, dairy, lactose, egg, gluten, nuts, soy).
+- ingredients: de ingrediëntenlijst als die op de foto leesbaar is (letterlijk overnemen), anders null
 - freezable: true als je dit product op de laatste dag kunt invriezen
 - confidence: "hoog", "middel" of "laag" voor hoe zeker je naam en prijs hebt gelezen
 
@@ -1030,6 +1057,7 @@ function itemFromClaude(x) {
     priceNormal: pn ?? (pnow != null && pct > 0 && pct < 100 ? round2(pnow / (1 - pct / 100)) : null),
     priceNow: pnow,
     discountPct: pct ?? (pn && pnow ? Math.round((1 - pnow / pn) * 100) : null),
+    ingr: typeof x.ingredients === 'string' && x.ingredients.trim() ? x.ingredients.slice(0, 1500) : null,
     expDate: d < todayISO() ? todayISO() : d, qty: 1, source: 'claude', confidence: x.confidence || null, addedAt: Date.now(),
   };
 }
@@ -1193,6 +1221,8 @@ function bind() {
   $('#storeSheetAll').addEventListener('click', () => { S.sheetSel = STORES.map(x => x.id); syncSheet(); });
   $('#storeSheetNone').addEventListener('click', () => { S.sheetSel = []; syncSheet(); });
   $('#dietForm').addEventListener('submit', submitDiet);
+  $('#wfAdd').addEventListener('click', addFilter);
+  $('#wfTerms').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addFilter(); } });
   $('#dUltra').addEventListener('change', e => { if (S.draft) S.draft.avoidUltra = e.target.checked; });
   $('#dFreezer').addEventListener('change', e => { if (S.draft) S.draft.freezer = e.target.checked; });
   $('#calcProt').addEventListener('click', () => {
@@ -1267,5 +1297,5 @@ async function boot() {
   }
 }
 
-window.LK = { timingAdvice, buildTimingStats, recordObservations, profileStores, setStores, evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, itemFromAH, nutritionFromAH, parseUnitSize, inferTags, exclusionsFor, defaultProfile, expState, GOALS, S, Store };
+window.LK = { filterHits, seedOilHit, normalizeFilters, timingAdvice, buildTimingStats, recordObservations, profileStores, setStores, evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, itemFromAH, nutritionFromAH, parseUnitSize, inferTags, exclusionsFor, defaultProfile, expState, GOALS, S, Store };
 boot();

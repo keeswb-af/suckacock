@@ -194,6 +194,56 @@ function ok(cond, msg) { if (cond) console.log('  ok  ' + msg); else { failures+
       ok(hr.cheap.kind === 'nu' && /scheelt maar/.test(hr.cheap.text), 'small saving: no contradictory gamble text: ' + hr.cheap.text);
       ok(hr.hint25 === 'info' && hr.hint35 === null && hr.hintNoStats === null, 'general hint only for live dynamic steps');
       ok(hr.stale && hr.stale.kind !== 'nu' || !/voorbij/.test((hr.stale || {}).text || ''), 'old price does not claim the moment passed: ' + JSON.stringify(hr.stale && hr.stale.text));
+      const wf = await page.evaluate(() => {
+        const { seedOilHit, filterHits, evaluate, itemFromFood, itemFromAH, defaultProfile } = window.LK;
+        const F = id => FOOD.find(f => f.id === id);
+        const lv = t => (seedOilHit(t) || {}).level || null;
+        const P = defaultProfile();
+        const off = Object.assign(defaultProfile(), { filters: [{ id: 'pufa', on: false }] });
+        const sugar = Object.assign(defaultProfile(), { filters: [{ id: 'pufa', on: true }, { id: 'f1', label: 'Suiker', terms: ['suiker', 'glucosestroop'], on: true }] });
+        const ah = ingr => itemFromAH({ productId: 9, title: 'AH Hummus naturel', pct: 35, expDate: '2026-11-20', priceWas: '1.49', priceNow: '0.97', ingredients: ingr });
+        const reasons = ev => ev.reasons.map(r => r.s).join(' | ');
+        return {
+          terms: ['Tarwebloem, zonnebloemolie', 'plantaardige olie (raapzaad, zonnebloem)', 'plantaardige olie, suiker', 'olijfolie, palmolie, kokosolie', 'plantaardige vetten (palm, kokos)', 'plantaardige olie (olijf)', 'Soja-olie', 'Maïsolie', 'maïszetmeel', 'sesamzaad', 'koolzaadolie', 'roomboter'].map(lv),
+          defaultOn: P.filters.some(f => f.id === 'pufa' && f.on),
+          hummus: evaluate(itemFromFood(F('hummus')), P),
+          chicken: evaluate(itemFromFood(F('kipfilet')), P).verdict,
+          bread: evaluate(itemFromFood(F('volkoren_brood')), P),
+          hummusOff: evaluate(itemFromFood(F('hummus')), off).verdict,
+          olive: filterHits(ah({ s: 'kikkererwten, sesampasta, olijfolie, citroensap', c: 'sesam' }), P).length,
+          sun: evaluate(ah({ s: 'kikkererwten, zonnebloemolie, citroensap', c: null }), P),
+          sugarHit: evaluate(ah({ s: 'kikkererwten, olijfolie, suiker', c: null }), sugar),
+          allergens: ah({ s: 'kikkererwten, kippenvlees, olijfolie', c: 'Bevat: melk, tarwe, ei' }).tags.sort().join(','),
+          vegaChicken: evaluate(ah({ s: 'kikkererwten, kippenvlees, olijfolie', c: null }), Object.assign(defaultProfile(), { eat: 'vega' })).verdict,
+        };
+      });
+      ok(JSON.stringify(wf.terms) === JSON.stringify(['zeker', 'zeker', 'waarschijnlijk', null, null, null, 'zeker', 'zeker', null, null, 'zeker', null]), 'seed oils on labels recognised, olive/palm/coconut/butter allowed: ' + JSON.stringify(wf.terms));
+      ok(wf.defaultOn, 'seed-oil filter is on by default');
+      ok(wf.hummus.verdict === 'nee' && /Wegfilter Zaadoliën/.test(JSON.stringify(wf.hummus.reasons)), 'hummus (usually seed oil): Past niet');
+      ok(wf.chicken === 'ja', 'plain chicken not affected');
+      ok(wf.bread.verdict === 'twijfel' && /ingrediënten onbekend/.test(JSON.stringify(wf.bread.reasons)), 'bread without label: twijfel, check the label');
+      ok(wf.hummusOff !== 'nee', 'filter off: hummus judged normally again');
+      ok(wf.olive === 0, 'AH label with olive oil overrides the product type');
+      ok(wf.sun.verdict === 'nee' && /zonnebloemolie \(etiket\)/.test(JSON.stringify(wf.sun.reasons)), 'AH label with sunflower oil: Past niet, says it is from the label');
+      ok(wf.sugarHit.verdict === 'nee' && /Suiker/.test(JSON.stringify(wf.sugarHit.reasons)), 'own filter (suiker) works on the label');
+      ok(wf.allergens.includes('dairy') && wf.allergens.includes('gluten') && wf.allergens.includes('egg') && wf.allergens.includes('poultry') && !wf.allergens.includes('vegetarian'), 'allergens and meat read from the AH label, no longer vegetarian: ' + wf.allergens);
+      ok(wf.vegaChicken === 'nee', 'vegetarian + chicken on the label: Past niet');
+      // Wegfilter card in Dieet: preset on, add own filter, switch the preset off.
+      await page.goto(FILE + '#dieet');
+      await page.waitForFunction(() => window.LK.Store.loaded);
+      ok(await page.isChecked('#wf-pufa'), 'Dieet shows the seed-oil filter switched on');
+      await page.fill('#wfName', 'Suiker');
+      await page.fill('#wfTerms', 'suiker, glucosestroop');
+      await page.click('#wfAdd');
+      await page.click('#wf-pufa');
+      await page.click('#dietSubmit');
+      const fl = await page.evaluate(() => window.LK.S.profile.filters);
+      ok(fl.length === 2 && fl.find(f => f.id === 'pufa').on === false && fl.some(f => f.label === 'Suiker' && f.terms.join() === 'suiker,glucosestroop'), 'own filter saved, preset switched off: ' + JSON.stringify(fl));
+      await page.click('#wf-pufa');
+      await page.click('#dietSubmit');
+      ok((await page.evaluate(() => window.LK.S.profile.filters.find(f => f.id === 'pufa').on)) === true, 'preset switched back on');
+      await page.goto(FILE + '#winkel');
+      await page.waitForFunction(() => window.LK.Store.loaded);
       // Full flow: set diet, add product via search, basket, finish, logboek.
       await page.goto(FILE + '#dieet');
       await page.fill('#dNotes', 'Ik lust geen champignons');

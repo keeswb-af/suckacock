@@ -21,7 +21,7 @@ async function until(fn, ms = 8000, label = 'condition') {
 const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
 
 /* ---------- fake AH API ---------- */
-const AH = { failStore: null, requireLogin: false, partialAuth: false, refresh503: false, nutriError: false, calls: [], badHeaders: 0, scriptText: null };
+const AH = { ingrBroken: false, failStore: null, requireLogin: false, partialAuth: false, refresh503: false, nutriError: false, calls: [], badHeaders: 0, scriptText: null };
 const BARGAINS_1093 = [
   { product: { id: 201, title: 'AH Broccoli', brand: 'AH', salesUnitSize: '500 g' }, categoryTitle: 'Groente, aardappelen', markdown: { markdownType: 'DYNAMIC', markdownExpirationDate: today, markdownPercentage: 40 }, stock: 4, bargainPrice: { priceWas: '1.79', priceNow: '1.07' } },
 ];
@@ -61,6 +61,14 @@ function ahRespond(req) {
       if (body.variables.storeId === '1093') return AH.failStore === '1093' ? { status: 500, body: 'oops' } : { status: 200, body: JSON.stringify({ data: { bargainItems: BARGAINS_1093 } }) };
       if (body.variables.storeId !== '1829') return { status: 200, body: JSON.stringify({ data: { bargainItems: [] } }) };
       return { status: 200, body: JSON.stringify({ data: { bargainItems: BARGAINS } }) };
+    }
+    if (/FetchIngredients/.test(q)) {
+      if (AH.ingrBroken) return { status: 400, body: JSON.stringify({ errors: [{ message: 'Cannot query field "ingredients" on type "ProductTradeItem".' }] }) };
+      const LABELS = { 101: ['Kipdijfilet (98%), zout', null], 102: ['Tarwebloem, roomboter (21%), water, suiker, gist, zonnebloemolie, zout', 'Bevat: tarwe, melk, ei'], 103: ['Volle melk, yoghurtcultuur', 'Bevat: melk'] };
+      const ids = [...q.matchAll(/p(\d+): product\(id: (\d+)\)/g)];
+      const data = {};
+      for (const [, k, id] of ids) data['p' + k] = { id: +id, tradeItem: LABELS[id] ? { ingredients: { statement: LABELS[id][0], allergens: { contains: LABELS[id][1], mayContain: null } } } : null };
+      return { status: 200, body: JSON.stringify({ data }) };
     }
     if (/FetchNutrition/.test(q) && AH.nutriError) {
       const ids = [...q.matchAll(/p(\d+): product\(id: (\d+)\)/g)];
@@ -169,6 +177,12 @@ function run(env) {
   const kd = live.find(x => x.name === 'Kipdijfilet');
   ok(kd && kd.ns === 'etiket' && kd.n.protein === 19 && kd.n.kcal === 147 && kd.grams === 400, 'Kipdijfilet uses label nutrition from AH');
   ok(AH.calls.some(c => c.query === 'StoresSearch') && AH.calls.some(c => c.query === 'BargainItems' && c.vars.storeId === '1829'), 'store id resolved by address (1829, not the first result)');
+  const cro = await page.evaluate(() => { const c = window.LK.S.session.candidates.find(x => /croissant/i.test(x.name)); const ev = c && window.LK.evaluate(c, window.LK.S.profile); return c && { ingr: c.ingr, tags: c.tags, verdict: ev.verdict, why: ev.reasons.map(r => r.s).join(' | ') }; });
+  ok(cro && /zonnebloemolie/.test(cro.ingr) && cro.verdict === 'nee' && /Wegfilter Zaadoliën \(PUFA\): bevat zonnebloemolie \(etiket\)/.test(cro.why), 'croissant with sunflower oil on the AH label: Past niet: ' + (cro && cro.why));
+  ok(cro && cro.tags.includes('egg') && cro.tags.includes('dairy'), 'allergens from the AH label become tags');
+  ok(AH.calls.some(c => c.query === 'FetchIngredients'), 'ingredients fetched in their own query');
+  const cacheNow = JSON.parse(fs.readFileSync(path.join(docs, 'Laatste Kans data', 'voeding-cache.json'), 'utf8'));
+  ok(cacheNow['102'] && cacheNow['102'].i && /zonnebloemolie/.test(cacheNow['102'].i.s), 'ingredients cached per product');
   ok(AH.badHeaders === 0, 'every AH call carries the app headers');
   ok(/Paddepoel.*koopje.*bijgewerkt/.test(await page.textContent('#liveLines')) && await page.evaluate(() => document.querySelector('#liveDot').classList.contains('on')), 'live card shows count and time');
   const shown = await page.$$eval('#candList .item .item-name', els => els.map(e => e.textContent));
@@ -388,6 +402,15 @@ function run(env) {
   await env.done;
   ok(kc2.has('laatste-kans.ah-tokens') && JSON.parse(kc2.get('laatste-kans.ah-tokens')).kind === 'member', 'refresh 503 does not log the member out');
   AH.refresh503 = false;
+
+  // AH rejecting the ingredient fields does not break nutrition.
+  AH.ingrBroken = true;
+  fs.writeFileSync(path.join(docs2, 'Laatste Kans data', 'voeding-cache.json'), '{}');
+  env = run(makeEnv(ctx, docs2, kc2, { widget: true }));
+  await env.done;
+  const cb = JSON.parse(fs.readFileSync(path.join(docs2, 'Laatste Kans data', 'voeding-cache.json'), 'utf8'));
+  ok(cb['101'] && cb['101'].n && cb['101'].n.protein === 19 && cb['101'].i === undefined, 'ingredient query refused: nutrition still cached, ingredients left for later');
+  AH.ingrBroken = false;
 
   // Nutrition errors are not cached as "no label".
   const cacheFile = path.join(docs2, 'Laatste Kans data', 'voeding-cache.json');
