@@ -270,7 +270,7 @@ function stickerFor(it) {
 }
 const EXP_NL = { vandaag: 'tot vandaag', morgen: 'tot morgen', verlopen: 'datum verstreken', later: null };
 const TIMING_NL = { nu: 'Nu kopen', wacht: 'Wachten loont', gok: 'Gok', info: 'Afprijzen' };
-function itemCard(it, where, alts) {
+function itemCard(it, where, alts, rank) {
   const ev = evaluate(it, S.profile);
   const price = itemPriceNow(it);
   const meta = [it.grams ? `${fmtNum(it.grams)} g` : (it.unitSize || null), EXP_NL[ev.exp], CATS[it.cat] || null,
@@ -310,7 +310,8 @@ function itemCard(it, where, alts) {
         h('b', null, price == null ? 'prijs?' : fmtEur(price)),
         stickerFor(it))),
     h('div', { class: 'verdict-row' },
-      h('span', { class: `chip ${ev.verdict}` }, VERDICT_NL[ev.verdict]),
+      rank ? h('span', { class: 'chip rank' }, `#${rank}`) : null,
+      h('span', { class: `chip ${ev.verdict}` }, verdictName(ev.verdict, S.profile)),
       h('div', { class: 'scorebar', role: 'img', 'aria-label': `Score ${ev.score} van 100` }, h('i', { style: `width:${ev.score}%` })),
       h('span', { class: 'score' }, `${ev.score}/100`)),
     metrics.length ? h('ul', { class: 'metrics' }, metrics) : null,
@@ -340,7 +341,9 @@ function renderCandidates() {
   const onlyFit = HOST && (S.session.liveFilter || 'fit') === 'fit';
   const sf = S.session.storeFilter && S.session.storeFilter !== 'all' && profileStores(S.profile).includes(S.session.storeFilter) ? S.session.storeFilter : null;
   const inStore = sf ? scored.filter(x => x.it.source !== 'ah' || x.it.storeKey === sf) : scored;
-  const hidden = onlyFit ? inStore.filter(x => x.it.source === 'ah' && (x.v === 'laten' || x.v === 'nee')) : [];
+  // A ranking diet (Ray Peat) hides nothing for scoring low; only explicit exclusions and the wegfilter.
+  const ranking = !!(GOALS[S.profile.goal] || {}).rank;
+  const hidden = onlyFit ? inStore.filter(x => x.it.source === 'ah' && (x.v === 'nee' || (!ranking && x.v === 'laten'))) : [];
   const list = inStore.filter(x => !hidden.includes(x)).sort((a, b) => b.s - a.s).map(x => x.it);
   $('#candCount').textContent = list.length ? `${list.length} product${list.length === 1 ? '' : 'en'}` : '';
   const byFilter = hidden.filter(x => filterHits(x.it, S.profile).some(f => f.level !== 'onbekend')).length;
@@ -375,7 +378,7 @@ function renderCandidates() {
   const cap = S.showMax || 60;
   const more = shown.length > cap ? h('div', { class: 'btn-row' }, h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { S.showMax = cap + 60; renderCandidates(); } }, `Toon meer (${shown.length - cap})`)) : null;
   $('#candCount').textContent = shown.length ? `${shown.length} product${shown.length === 1 ? '' : 'en'}` : '';
-  const kids = [hiddenNote, ...shown.slice(0, cap).map(it => itemCard(it, 'cand', altsOf.get(it))), more];
+  const kids = [hiddenNote, ...shown.slice(0, cap).map((it, i) => itemCard(it, 'cand', altsOf.get(it), ranking && !it.example ? i + 1 : null)), more];
   if (list.some(it => it.example)) kids.push(h('div', { class: 'btn-row' }, h('button', { class: 'btn btn-sm btn-ghost', type: 'button', onclick: clearExamples }, 'Wis voorbeelden')));
   fill($('#candList'), ...kids);
 }
@@ -635,7 +638,7 @@ function submitForm(e) {
   }
   if (!placed) { it.qty = 1; S.session.candidates.unshift(it); }
   saveSession(); closeForm(); renderWinkel();
-  toast(`${it.name}: ${VERDICT_NL[evaluate(it, S.profile).verdict]}`);
+  toast(`${it.name}: ${verdictName(evaluate(it, S.profile).verdict, S.profile)}`);
 }
 function editItem(id, where) {
   const arr = where === 'basket' ? S.session.basket : S.session.candidates;
@@ -857,7 +860,7 @@ function applyGoal(k) {
   $('#dProt').value = w ? proteinFor(k, w) : g.protein;
   $('#dCarb').value = g.carbsMax ?? '';
 }
-function proteinFor(goal, w) { const f = goal === 'cut' ? 2.0 : goal === 'bulk' ? 1.8 : goal === 'keto' || goal === 'lowcarb' ? 1.4 : 1.0; return Math.round(w * f); }
+function proteinFor(goal, w) { const f = goal === 'cut' ? 2.0 : goal === 'bulk' ? 1.8 : goal === 'keto' || goal === 'lowcarb' ? 1.4 : goal === 'peat' ? 1.3 : 1.0; return Math.round(w * f); }
 function submitDiet(e) {
   e.preventDefault();
   if (!Store.loaded) return;

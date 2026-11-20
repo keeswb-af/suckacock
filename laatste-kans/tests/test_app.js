@@ -244,6 +244,36 @@ function ok(cond, msg) { if (cond) console.log('  ok  ' + msg); else { failures+
       ok((await page.evaluate(() => window.LK.S.profile.filters.find(f => f.id === 'pufa').on)) === true, 'preset switched back on');
       await page.goto(FILE + '#winkel');
       await page.waitForFunction(() => window.LK.Store.loaded);
+      const peat = await page.evaluate(() => {
+        const { evaluate, itemFromFood, defaultProfile, nutritionFromAH } = window.LK;
+        const F = id => FOOD.find(f => f.id === id);
+        const P = Object.assign(defaultProfile(), { goal: 'peat', filters: [{ id: 'pufa', on: false }] });
+        const sc = id => evaluate(itemFromFood(F(id), { expDate: null }), P);
+        const all = FOOD.map(f => evaluate(itemFromFood(f, { expDate: null }), P).verdict);
+        return {
+          goal: !!GOALS.peat && GOALS.peat.rank === true,
+          milk: sc('volle_melk').score, tofu: sc('tofu_naturel').score, cod: sc('kabeljauwfilet').score, salmon: sc('zalmfilet').score,
+          beef: sc('biefstuk').score, chicken: sc('kipfilet').score, hummus: sc('hummus').score, oj: sc('jus_dorange').score, nuts: sc('kip_sate_salade').score,
+          noExclusion: !all.includes('nee'),
+          withFilter: evaluate(itemFromFood(F('hummus')), Object.assign(defaultProfile(), { goal: 'peat' })).verdict,
+          labelPufa: nutritionFromAH([{ type: 'ENERGY', value: '250 kcal' }, { type: 'FAT', name: 'Vet', value: '20 g' }, { name: 'waarvan meervoudig onverzadigd', value: '11 g' }, { name: 'waarvan verzadigd', value: '2 g' }, { type: 'PROTEIN', value: '5 g' }]),
+        };
+      });
+      ok(peat.goal, 'Ray Peat is a ranking diet');
+      ok(peat.milk > peat.tofu && peat.cod > peat.salmon && peat.beef > peat.chicken && peat.oj > peat.hummus && peat.milk > peat.nuts, 'Peat order: milk>tofu, cod>salmon, beef>chicken, juice>hummus: ' + JSON.stringify(peat));
+      ok(peat.noExclusion, 'Peat itself excludes nothing (no Past niet with the wegfilter off)');
+      ok(peat.withFilter === 'nee', 'the wegfilter still hides seed-oil products when it is on');
+      ok(peat.labelPufa && peat.labelPufa.pufa === 11 && peat.labelPufa.satfat === 2 && peat.labelPufa.fat === 20, 'PUFA read from the AH label: ' + JSON.stringify(peat.labelPufa));
+      await page.goto(FILE + '#dieet');
+      await page.waitForFunction(() => window.LK.Store.loaded);
+      await page.click('#dGoal button[data-v="peat"]');
+      await page.click('#dietSubmit');
+      await page.goto(FILE + '#winkel');
+      await page.waitForFunction(() => window.LK.Store.loaded);
+      for (const q of ['tofu', 'volle melk']) { await page.fill('#q', q); await page.click('#suggest li:first-child button'); await page.click('#addForm button[type="submit"]'); }
+      const cards = await page.$$eval('#candList .item', els => els.map(e => e.textContent));
+      ok(/Volle melk/.test(cards[0]) && /#1/.test(cards[0]) && /Top/.test(cards[0]) && /#2/.test(cards[1]) && /Tofu/.test(cards[1]) && !/Past niet/.test(cards[1]), 'Peat list: ranked top to bottom with #1, #2 and Top/Matig/Laag');
+      for (let i = 0; i < 2; i++) await page.click('#candList .item button:has-text("Weg")');
       // Full flow: set diet, add product via search, basket, finish, logboek.
       await page.goto(FILE + '#dieet');
       await page.fill('#dNotes', 'Ik lust geen champignons');

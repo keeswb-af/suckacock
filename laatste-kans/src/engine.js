@@ -41,7 +41,74 @@ const GOALS = {
   lowcarb: { label: 'Koolhydraatarm', desc: 'Rond de 100 g koolhydraten per dag of minder: brood, pasta en zoet worden kritisch bekeken.', kcal: 2000, protein: 110, pf: 0.6, carbsMax: 100 },
   keto: { label: 'Keto', desc: 'Onder de 30 g koolhydraten per dag. Vooral vlees, vis, eieren, kaas en groente boven de grond.', kcal: 2000, protein: 110, pf: 0.5, carbsMax: 30 },
   med: { label: 'Mediterraan', desc: 'Vis, groente, peulvruchten, volkoren en noten; weinig rood en bewerkt vlees.', kcal: 2000, protein: 90, pf: 0.4, carbsMax: null },
+  peat: { label: 'Ray Peat', rank: true, desc: 'Ray Peat: veel melk en kaas, rijp fruit en sinaasappelsap, eieren, schaaldieren en magere witvis, rund (stoofvlees voor gelatine), aardappel en rauwe wortel. Zo min mogelijk meervoudig onverzadigd vet (zaadoliën, noten en zaden, vette vis, kip- en varkensvet), soja, peulvruchten, graan en veel vezel. Suiker, verzadigd vet en zout zijn prima. Niets wordt uitgesloten: alles krijgt een Peat-score van hoog naar laag.', kcal: 2400, protein: 100, pf: 0.3, carbsMax: null },
 };
+// Ray Peat: share of the fat that is polyunsaturated, by kind of product (used when the label does not say).
+function pufaShare(it, tags) {
+  const nm = norm(it.name), c = it.cat;
+  if (tags.has('seed_oil')) return 0.45;
+  if (tags.has('soy') || /tofu|tempeh|soja/.test(nm)) return 0.55;
+  if (tags.has('nuts') || /noot|noten|pinda|zaden|pitten|sesam|tahin/.test(nm)) return 0.35;
+  if (/kokos/.test(nm)) return 0.02;
+  if (c === 'zuivel' || c === 'kaas' || /roomboter|\bboter\b/.test(nm)) return 0.04;
+  if (tags.has('beef') && !tags.has('pork') && !tags.has('poultry')) return 0.04;
+  if (c === 'vis' || tags.has('fish')) return 0.3;
+  if (tags.has('poultry')) return 0.22;
+  if (tags.has('pork')) return 0.12;
+  if (c === 'ei') return 0.15;
+  if (/avocado/.test(nm)) return 0.12;
+  if (/olijf/.test(nm)) return 0.1;
+  if (tags.has('dairy') && !tags.has('ready_meal')) return 0.05;
+  return 0.25;
+}
+// Ray Peat rating: never excludes, only moves a product up or down the list.
+function peatRules(it, n, tags) {
+  const R = [];
+  let d = 0;
+  const add = (w, txt) => { d += w; if (txt) R.push({ w, s: txt }); };
+  const nm = norm(it.name), c = it.cat;
+  const fat = n && n.fat != null && isFinite(+n.fat) ? +n.fat : null;
+  const labelPufa = n && n.pufa != null && isFinite(+n.pufa) ? +n.pufa : null;
+  const pufa = labelPufa != null ? labelPufa : fat != null ? fat * pufaShare(it, tags) : null;
+  if (pufa != null) {
+    const amount = `${labelPufa != null ? '' : '~'}${fmtNum(pufa, 1)} g per 100 g${labelPufa != null ? ', etiket' : ', geschat'}`;
+    if (pufa >= 5) add(-25, `Veel meervoudig onverzadigd vet (${amount})`);
+    else if (pufa >= 2) add(-12, `Vrij veel meervoudig onverzadigd vet (${amount})`);
+    else if (pufa >= 1) add(-4, null);
+    else if (fat != null && fat >= 3) add(4, 'Vet is vooral verzadigd, weinig PUFA');
+  }
+  // What Peat favoured.
+  if ((/jus d orange|sinaasappelsap|\bsap\b|vruchtensap/.test(nm)) && !/groente/.test(nm)) add(18, 'Vruchtensap: suiker en kalium (Peat-favoriet)');
+  else if (c === 'fruit' && !/avocado/.test(nm)) add(/aardbei|\bbes|bessen|framboz|druif|druiven/.test(nm) ? 6 : 12, 'Rijp fruit: suiker en kalium');
+  if (c === 'zuivel' || c === 'kaas') {
+    if (/melk/.test(nm) && !/chocolade/.test(nm)) add(18, 'Melk: calcium en eiwit (Peat-basis)');
+    else if (c === 'kaas') add(15, 'Kaas: calcium en eiwit (Peat-basis)');
+    else if (/vla|pudding|toetje/.test(nm)) add(4, 'Zuivel, maar vaak met bindmiddelen');
+    else add(10, 'Zuivel: calcium en eiwit');
+  }
+  if (c === 'ei') add(8, 'Eieren');
+  if (tags.has('shellfish')) add(14, 'Schaaldieren: mineralen, weinig PUFA');
+  else if ((c === 'vis' || tags.has('fish')) && c !== 'maaltijd') { if (fat != null && fat <= 3) add(10, 'Magere witvis'); else add(-6, 'Vette vis: omega-3 is ook meervoudig onverzadigd'); }
+  if (tags.has('beef') && !tags.has('pork') && (c === 'vlees' || c === 'beleg')) {
+    if (/stoof|riblap|sukade|schenkel|soepvlees/.test(nm)) add(10, 'Rund om te stoven: gelatine (Peat-tip)');
+    else add(6, 'Rundvlees: weinig PUFA');
+  }
+  if (tags.has('poultry') && c !== 'maaltijd') add(-5, 'Kip en kalkoen: het vet bevat meer PUFA');
+  if (tags.has('pork') && !tags.has('beef') && c !== 'maaltijd') add(-5, 'Varkensvlees: het vet bevat meer PUFA');
+  if (/\blever\b|kippenlever|runderlever/.test(nm)) add(10, 'Lever: vitamine A (een keer per week)');
+  if (/aardappel|krieltjes/.test(nm)) add(8, 'Aardappel: Peat-vriendelijk zetmeel');
+  if (/wortel|\bpeen\b|winterpeen/.test(nm)) add(8, 'Wortel, rauw gegeten (Peat-tip)');
+  if (/spinazie|boerenkool|snijbiet/.test(nm)) add(-4, 'Blad met veel oxaalzuur');
+  // What Peat advised against.
+  if (tags.has('soy') || /tofu|tempeh|soja/.test(nm)) add(-18, 'Soja: Peat raadde dit sterk af');
+  else if (/hummus|falafel|bonen|linzen|kikkererwt|peulvrucht/.test(nm)) add(-10, 'Peulvruchten: lastig verteerbaar');
+  if (tags.has('nuts') || /\bnoot|noten|pinda|zaden|pitten/.test(nm)) add(-12, 'Noten en zaden: veel PUFA');
+  if (c === 'brood' || c === 'zetmeel' || tags.has('bakery')) add(tags.has('wholegrain') ? -10 : -5, tags.has('wholegrain') ? 'Volkoren graan: fytaat en vezel' : 'Graanproduct: liever fruit of aardappel');
+  if (tags.has('ultraprocessed')) add(-8, 'Ultrabewerkt: vaak bindmiddelen en olie');
+  else if (tags.has('ready_meal')) add(-5, 'Kant-en-klaar: olie en toevoegingen onbekend');
+  if (n && n.fiber != null && +n.fiber >= 6) add(-4, 'Veel vezel');
+  return { d, R };
+}
 const EATS = { alles: { label: 'Alles' }, flexi: { label: 'Weinig vlees' }, pesco: { label: 'Pescotarisch' }, vega: { label: 'Vegetarisch' }, vegan: { label: 'Veganistisch' } };
 const EXCL = [
   ['pork', 'Geen varkensvlees'], ['beef', 'Geen rundvlees'], ['fish', 'Geen vis'], ['shellfish', 'Geen schaaldieren'],
@@ -365,6 +432,8 @@ function evaluate(it, P) {
       else if (carbs <= 10) { fit += 2; }
       else if (carbs <= 15) { fit -= 12; add(-12, `Lastig voor keto (${fmtNum(carbs, 0)} g koolh. per 100 g)`); capTwijfel = true; }
       else { fit -= 35; add(-35, `Te veel koolhydraten voor keto (${fmtNum(carbs, 0)} g per 100 g)`); }
+    } else if (goal === 'peat') {
+      // rated below, also when the nutrition is unknown
     } else if (goal === 'med') {
       if (tags.has('fish') || tags.has('shellfish')) { fit += 10; add(10, 'Vis past goed in mediterraan'); }
       if (fresh) { fit += 8; add(8, 'Verse groente of fruit'); }
@@ -384,6 +453,7 @@ function evaluate(it, P) {
       if (share > 1) { fit -= 15; add(-15, `${fmtNum(carbPack)} g koolh. in dit pak, meer dan je dagmax van ${fmtNum(lim)} g`); if (goal === 'keto' || goal === 'lowcarb') capTwijfel = true; }
       else if (share > 0.5) { fit -= 6; add(-6, `${fmtNum(carbPack)} g koolh. in dit pak, ruim de helft van je dagmax`); }
     }
+    if (goal !== 'peat') {
     if (fiber != null && fiber >= 6) { fit += 6; add(6, `Vezelrijk (${fmtNum(fiber, 0)} g per 100 g)`); }
     else if (fiber != null && fiber >= 3) fit += 3;
     if (tags.has('high_sugar') && !fresh) {
@@ -394,7 +464,9 @@ function evaluate(it, P) {
     if (satfat != null && satfat > 8) { const p = goal === 'bulk' || goal === 'keto' ? 3 : 6; fit -= p; add(-p, `Veel verzadigd vet (${fmtNum(satfat, 0)} g per 100 g)`); }
     if (salt != null && salt > 2.5) { fit -= 9; add(-9, `Erg zout (${fmtNum(salt, 1)} g per 100 g)`); }
     else if (salt != null && salt > 1.5) { fit -= 5; add(-5, `Vrij zout (${fmtNum(salt, 1)} g per 100 g)`); }
+    }
   }
+  if (goal === 'peat') { const pr = peatRules(it, n, tags); fit += pr.d; for (const r of pr.R) add(r.w, r.s); }
   if (tags.has('ultraprocessed')) { const p = P.avoidUltra ? 15 : 4; fit -= p; if (P.avoidUltra) add(-p, 'Ultrabewerkt'); }
   else if (tags.has('processed') && P.avoidUltra) fit -= 5;
   if (P.eat === 'vegan' && !tags.has('vegan') && !ANIMAL.some(t => tags.has(t)) && !fresh) { fit -= 10; pins.push('Check het etiket op dierlijke ingrediënten'); capTwijfel = true; }
@@ -438,7 +510,9 @@ function evaluate(it, P) {
   }
 
   for (const x of fhits) if (x.level === 'onbekend') { pins.push(`Wegfilter ${x.label}: ingrediënten onbekend, check het etiket`); capTwijfel = true; }
-  let score = clamp(Math.round(0.6 * fit + 0.4 * value - risk), 0, 100);
+  // A ranking diet (Ray Peat) is about the food first, the deal second.
+  const wFit = G.rank ? 0.75 : 0.6;
+  let score = clamp(Math.round(wFit * fit + (1 - wFit) * value - risk), 0, 100);
   let verdict;
   const fmsg = x => x.level === 'zeker'
     ? `Wegfilter ${x.label}: bevat ${x.term}${x.from === 'etiket' ? ' (etiket)' : ''}`
@@ -464,6 +538,9 @@ function evaluate(it, P) {
   return { score, verdict, fit: Math.round(fit), value: Math.round(value), risk, reasons, m, exp: st };
 }
 const VERDICT_NL = { ja: 'Kopen', twijfel: 'Twijfel', laten: 'Laten liggen', nee: 'Past niet' };
+// Diets that rank instead of exclude (Ray Peat) name the levels as a rating.
+const RANK_NL = { ja: 'Top', twijfel: 'Matig', laten: 'Laag', nee: 'Past niet' };
+function verdictName(v, P) { return (GOALS[P && P.goal] || {}).rank ? RANK_NL[v] : VERDICT_NL[v]; }
 
 function itemFromFood(f, over = {}) {
   return Object.assign({
@@ -589,6 +666,7 @@ function nutritionFromAH(list) {
     const first = val.match(/-?\d+(?:\.\d+)?/);
     if (!first) continue;
     const num = parseFloat(first[0]);
+    if (/meervoudig|polyunsat|polyonverzadig/.test(key)) { set('pufa', num); continue; }
     if (/onverzadig|unsatur|enkelvoudig|meervoudig|mono|poly|transvet|trans fat/.test(key)) continue;
     if (/energ/.test(key)) {
       const kc = val.match(/(\d+(?:\.\d+)?)\s*kcal/);
