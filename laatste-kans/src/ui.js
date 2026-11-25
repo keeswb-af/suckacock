@@ -270,6 +270,18 @@ function stickerFor(it) {
 }
 const EXP_NL = { vandaag: 'tot vandaag', morgen: 'tot morgen', verlopen: 'datum verstreken', later: null };
 const TIMING_NL = { nu: 'Nu kopen', wacht: 'Wachten loont', gok: 'Gok', info: 'Afprijzen' };
+function modeKey(m) { let best = null, c = 0; for (const k in m || {}) if (m[k] > c || (m[k] === c && +k > best)) { c = m[k]; best = +k; } return best; }
+function fmtDay(ts) { return new Date(ts).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }); }
+// What the app has seen of this one product (all your stores, up to 120 days).
+function productTrack(it) {
+  const P = it && it.source === 'ah' && it.productId != null && S.stats && S.stats.prod ? S.stats.prod[it.productId] : null;
+  if (!P || !(P.k >= 2)) return null;
+  const deep = modeKey(P.mx);
+  const parts = [`${P.k}× in de aanbieding gezien${P.ns > 1 ? ` in ${P.ns} winkels` : ''}${P.f ? ` sinds ${fmtDay(P.f)}` : ''}`];
+  if (deep != null) parts.push(`meestal tot ${deep}%`);
+  if (P.lo != null) parts.push(`laagste prijs ${fmtEur(P.lo)}`);
+  return `Gevolgd: ${parts.join(', ')}.`;
+}
 function itemCard(it, where, alts, rank) {
   const ev = evaluate(it, S.profile);
   const price = itemPriceNow(it);
@@ -317,6 +329,7 @@ function itemCard(it, where, alts, rank) {
     metrics.length ? h('ul', { class: 'metrics' }, metrics) : null,
     ev.reasons.length ? h('ul', { class: 'reasons' }, ev.reasons.map(r => h('li', { class: r.pos ? 'pos' : r.neg ? 'neg' : '' }, r.s))) : null,
     (() => { const m = it.storeKey && S.session.liveMeta ? S.session.liveMeta[it.storeKey] : null; const a = where === 'cand' && ev.verdict !== 'nee' ? timingAdvice(it, S.stats, Date.now(), m ? m.fetchedAt : null) : null; return a ? h('p', { class: 'timing t-' + a.kind }, h('span', { class: 'chip' }, TIMING_NL[a.kind] || ''), ' ', a.text) : null; })(),
+    where === 'cand' ? (() => { const t = productTrack(it); return t ? h('p', { class: 'timing-hist' }, t) : null; })() : null,
     alts && alts.length ? h('p', { class: 'alts' }, 'Ook bij: ', alts.slice(0, 6).map(a => `${a.storeName || '?'} ${fmtEur(itemPriceNow(a))}${a.discountPct ? ` (-${a.discountPct}%)` : ''}`).join(', '), alts.length > 6 ? ` en ${alts.length - 6} meer` : '') : null,
     h('div', { class: 'item-actions' }, actions));
 }
@@ -777,10 +790,40 @@ function renderPatterns() {
   const rows = [];
   for (const s of myStores()) { const l = steps(`s:${s.id}`); if (l.length) rows.push(h('div', null, h('b', null, storeShort(s)), h('ul', { class: 'tips small' }, l.map(x => h('li', null, x))))); }
   const cats = Object.keys(CATS).map(c => ({ c, l: steps(`c:${c}`) })).filter(x => x.l.length);
+  const nProd = Object.keys(st.prod || {}).length;
   fill(card, h('h3', null, 'Hoe AH afprijst bij jou'),
-    h('p', { class: 'small muted' }, st.offers ? `Gebaseerd op ${st.offers} koopjes die de app heeft gevolgd. Elke keer dat je de app of de widget opent, komt er meer bij; na een paar weken worden de adviezen per product betrouwbaar.` : 'Nog geen metingen. Elke keer dat je de app of de widget opent, volgt de app hoe de korting oploopt.'),
+    h('p', { class: 'small muted' }, st.offers || nProd ? `De app volgt elk product apart: hoe vaak het in de aanbieding ligt, hoe ver en hoe laat de korting zakt en hoe vaak het eerst op is. Het advies gaat uit van het product zelf; zolang dat weinig metingen heeft, telt het patroon van de soort product mee. ${nProd ? `${nProd} producten gevolgd.` : ''}` : 'Nog geen metingen. Elke keer dat je de app of de widget opent, volgt de app hoe de korting oploopt.'),
     rows.length ? rows : h('p', { class: 'small' }, 'Nog te weinig metingen per winkel.'),
-    cats.length ? h('details', null, h('summary', null, 'Per soort product'), ...cats.map(x => h('div', null, h('b', null, CATS[x.c]), h('ul', { class: 'tips small' }, x.l.map(t => h('li', null, t)))))) : null);
+    cats.length ? h('details', null, h('summary', null, 'Per soort product'), ...cats.map(x => h('div', null, h('b', null, CATS[x.c]), h('ul', { class: 'tips small' }, x.l.map(t => h('li', null, t)))))) : null,
+    nProd ? h('details', { id: 'prodTrack', open: !!S.prodOpen, ontoggle: e => { S.prodOpen = e.target.open; } },
+      h('summary', null, `Per product (${nProd})`),
+      h('input', { type: 'search', id: 'prodSearch', placeholder: 'Zoek een product', 'aria-label': 'Zoek een product', value: S.prodQuery || '', autocomplete: 'off', oninput: e => { S.prodQuery = e.target.value; renderProdList(); } }),
+      h('div', { id: 'prodList', class: 'prod-list' })) : null);
+  if (nProd) renderProdList();
+}
+// One row per product: how often, how deep, at what time, and how often it was gone first.
+function productSteps(id) {
+  const K = (S.stats && S.stats.keys && S.stats.keys['p:' + id]) || {};
+  return Object.keys(K).map(Number).sort((a, b) => a - b).filter(b => b < 70).map(b => {
+    const B = K[b], gone = B.n - B.up;
+    return `${b}%: ${B.up} van ${B.n}× verder${B.up && B.to ? ` naar ${B.to}%${B.h != null ? ` rond ${fmtHour(B.h)}` : ''}` : ''}${gone ? `, ${gone}× eerst op` : ''}`;
+  });
+}
+function renderProdList() {
+  const box = $('#prodList');
+  if (!box) return;
+  const prod = (S.stats && S.stats.prod) || {};
+  const q = norm(S.prodQuery || '');
+  const all = Object.keys(prod).map(id => Object.assign({ id }, prod[id])).filter(P => !q || norm(P.n).includes(q));
+  all.sort((a, b) => (b.k || 0) - (a.k || 0) || (b.t || 0) - (a.t || 0));
+  const shown = all.slice(0, 40);
+  fill(box, shown.length ? shown.map(P => {
+    const deep = modeKey(P.mx);
+    const meta = [`${P.k}×`, P.ns > 1 ? `${P.ns} winkels` : null, deep != null ? `meestal tot ${deep}%` : null, P.lo != null ? `laagste ${fmtEur(P.lo)}` : null, P.t ? `laatst ${fmtDay(P.t)}` : null].filter(Boolean).join(' · ');
+    const steps = productSteps(P.id);
+    return h('div', { class: 'prod-row' }, h('b', null, P.n), h('span', { class: 'small muted' }, meta), steps.length ? h('span', { class: 'small' }, steps.join('; ')) : null);
+  }) : h('p', { class: 'small muted' }, q ? 'Geen product gevonden.' : 'Nog geen producten gevolgd.'),
+  all.length > shown.length ? h('p', { class: 'small muted' }, `En nog ${all.length - shown.length}. Zoek om ze te vinden.`) : null);
 }
 function renderLogboek() {
   renderPatterns();
@@ -1300,5 +1343,5 @@ async function boot() {
   }
 }
 
-window.LK = { filterHits, seedOilHit, normalizeFilters, timingAdvice, buildTimingStats, recordObservations, profileStores, setStores, evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, itemFromAH, nutritionFromAH, parseUnitSize, inferTags, exclusionsFor, defaultProfile, expState, GOALS, S, Store };
+window.LK = { productTrack, pruneHistory, mergeHistory, filterHits, seedOilHit, normalizeFilters, timingAdvice, buildTimingStats, recordObservations, profileStores, setStores, evaluate, matchFood, parseQuick, basketTotals, mealIdeas, itemFromFood, itemFromClaude, itemFromAH, nutritionFromAH, parseUnitSize, inferTags, exclusionsFor, defaultProfile, expState, GOALS, S, Store };
 boot();

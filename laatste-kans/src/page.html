@@ -84,6 +84,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .live-lines details summary { min-height: 28px; font-weight: 500; }
 .timing { margin: 0; font-size: 0.86rem; }
 .timing .chip { margin-right: 4px; }
+.timing-hist { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.prod-list { display: flex; flex-direction: column; margin-top: 8px; }
+.prod-row { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-top: 1px solid var(--line); min-width: 0; overflow-wrap: anywhere; }
+.prod-row:first-child { border-top: 0; }
+#prodSearch { width: 100%; margin-top: 6px; }
 .t-nu .chip { background: var(--good-bg); color: var(--good); }
 .t-wacht .chip { background: var(--warn-bg); color: var(--warn); }
 .t-gok .chip, .t-info .chip { background: var(--surface-2); color: var(--muted); }

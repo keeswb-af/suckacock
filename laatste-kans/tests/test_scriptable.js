@@ -368,10 +368,17 @@ function run(env) {
   page = wv.page;
   await page.click('#liveFilter button[data-v="all"]');
   const kdCard = await page.textContent('#candList .item:has-text("Spekreepjes")');
-  ok(/Nu kopen/.test(kdCard) && /op voordat de korting verder zakte/.test(kdCard), 'card advises to buy now from history: ' + (kdCard.match(/Nu kopen[^(]*/) || [''])[0]);
+  ok(/Nu kopen/.test(kdCard) && /Dit product in deze winkel: 6 van de 20 keer verder gezakt/.test(kdCard) && /14× eerst op/.test(kdCard), 'card advises to buy now from the product history: ' + (kdCard.match(/Nu kopen.*?eerst op/) || [''])[0]);
+  ok(/Gevolgd: 2\d× in de aanbieding gezien/.test(kdCard) && /meestal tot 40%/.test(kdCard), 'card shows the product track record: ' + (kdCard.match(/Gevolgd:[^.]*\./) || [''])[0]);
   ok(await page.evaluate(() => window.LK.S.stats && (window.LK.S.stats.offers + (window.LK.S.stats.folded || 0)) > 20), 'stats sent to the page after a refresh, old offers folded into counters');
   await page.click('a[href="#logboek"]');
   ok(/Hoe AH afprijst bij jou/.test(await page.textContent('#patternCard')) && /Paddepoel/.test(await page.textContent('#patternCard')), 'Logboek shows the markdown pattern per store');
+  await page.click('#prodTrack summary');
+  await page.fill('#prodSearch', 'spek');
+  const prow = await page.textContent('#prodList');
+  ok(/Spekreepjes/.test(prow) && /40%: 6 van 20× verder naar 70%/.test(prow) && /14× eerst op/.test(prow) && !/Kipdijfilet/.test(prow), 'Logboek per product: search finds the product with its own record: ' + prow.slice(0, 160));
+  await page.fill('#prodSearch', '');
+  ok((await page.$$('#prodList .prod-row')).length >= 3, 'per product list shows all followed products');
   // All stores at once: no limit, summary line instead of one line per store.
   await page.click('a[href="#winkel"]');
   await page.click('#storeBtn');

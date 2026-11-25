@@ -753,6 +753,9 @@ function itemFromAH(x) {
    agg     = outcomes of offers older than a week, folded into counters so
              the history can cover many weeks without growing:
              { key: { bucket: { up, gone, lv: { toPct: { n, hh: { quarterHour: n }, ds, dn } } } } }
+             keys: sp:store|product, p:product (all stores), sc:store|category, c:category, s:store, all
+   prod    = per product, also folded: { productId: { n: name, c, f, t: last seen, lo: lowest price,
+               w: normal price, s: [stores], k: offers seen, mx: { deepest discount: offers } } }
    ============================================================ */
 const HISTORY_DAYS = 120, HISTORY_RAW_DAYS = 7, HISTORY_MAX = 8000;
 const GONE_GAP_MS = 2 * 3600000; // a disappearance only counts if the last sighting was at most this long before
@@ -823,7 +826,40 @@ function offerOutcomes(o) {
   });
   return out;
 }
-function offerAggKeys(o) { return [`sp:${o.s}|${o.p}`, `sc:${o.s}|${o.c}`, `c:${o.c}`, `s:${o.s}`, 'all']; }
+function offerAggKeys(o) { return [`sp:${o.s}|${o.p}`, `p:${o.p}`, `sc:${o.s}|${o.c}`, `c:${o.c}`, `s:${o.s}`, 'all']; }
+function offerMaxPct(o) { let m = null; for (const r of o.o || []) { const b = pctBucket(r[1]); if (b != null && (m == null || b > m)) m = b; } return m; }
+function offerLowPrice(o) { let m = null; for (const r of o.o || []) if (r[2] != null && isFinite(r[2]) && r[2] > 0 && (m == null || r[2] < m)) m = r[2]; return m; }
+// Add one offer to a per-product summary (deepest discount it reached, lowest price, stores).
+function addProductOffer(P, o) {
+  const mx = offerMaxPct(o), lo = offerLowPrice(o);
+  if (!P.n || (o.l || 0) >= (P.t || 0)) { if (o.n) P.n = o.n; if (o.c) P.c = o.c; if (o.w > 0) P.w = o.w; }
+  P.t = Math.max(P.t || 0, o.l || 0);
+  P.f = Math.min(P.f || Infinity, o.f || o.l || Infinity);
+  if (lo != null && (P.lo == null || lo < P.lo)) P.lo = lo;
+  P.s = P.s || [];
+  if (o.s && !P.s.includes(o.s)) { P.s.push(o.s); if (P.s.length > 40) P.s.shift(); }
+  P.k = (P.k || 0) + 1;
+  P.mx = P.mx || {};
+  if (mx != null) P.mx[mx] = (P.mx[mx] || 0) + 1;
+  return P;
+}
+function mergeOutcomeBucket(dst, src) {
+  dst.up += src.up || 0; dst.gone += src.gone || 0;
+  for (const to in src.lv || {}) {
+    const a = src.lv[to], L = dst.lv[to] = dst.lv[to] || { n: 0, hh: {}, ds: 0, dn: 0 };
+    L.n += a.n || 0; L.ds += a.ds || 0; L.dn += a.dn || 0;
+    for (const q in a.hh || {}) L.hh[q] = (L.hh[q] || 0) + a.hh[q];
+  }
+}
+// Histories from before the per-product key: add up the per-store product counters once.
+function productKeysFromStores(agg, seen) {
+  for (const key of Object.keys(agg)) {
+    if (!key.startsWith('sp:')) continue;
+    const pk = 'p:' + key.slice(key.indexOf('|') + 1);
+    for (const b in agg[key]) { const K = agg[pk] = agg[pk] || {}; mergeOutcomeBucket(K[b] = K[b] || { up: 0, gone: 0, lv: {} }, agg[key][b]); }
+    if (seen) seen[pk] = Math.max(seen[pk] || 0, seen[key] || 0);
+  }
+}
 function addOutcome(acc, key, r) {
   const K = acc[key] = acc[key] || {};
   const B = K[r.b] = K[r.b] || { up: 0, gone: 0, lv: {} };
@@ -840,13 +876,19 @@ function pruneHistory(hist, now) {
   const t = now || Date.now();
   hist.agg = hist.agg || {};
   hist.aggSeen = hist.aggSeen || {};
-  const fold = o => { for (const r of offerOutcomes(o)) for (const key of offerAggKeys(o)) { addOutcome(hist.agg, key, r); hist.aggSeen[key] = t; } };
+  hist.prod = hist.prod || {};
+  if (!hist.pv) { productKeysFromStores(hist.agg, hist.aggSeen); hist.pv = 1; }
+  const fold = o => {
+    for (const r of offerOutcomes(o)) for (const key of offerAggKeys(o)) { addOutcome(hist.agg, key, r); hist.aggSeen[key] = t; }
+    if (o.p != null) addProductOffer(hist.prod[o.p] = hist.prod[o.p] || {}, o);
+  };
   const rawCut = t - HISTORY_RAW_DAYS * 86400000;
   for (const k in hist.offers) { const o = hist.offers[k]; if (o.l < rawCut) { fold(o); delete hist.offers[k]; } }
   const keys = Object.keys(hist.offers);
   if (keys.length > HISTORY_MAX) keys.sort((a, b) => hist.offers[a].l - hist.offers[b].l).slice(0, keys.length - HISTORY_MAX).forEach(k => { fold(hist.offers[k]); delete hist.offers[k]; });
   const aggCut = t - HISTORY_DAYS * 86400000;
   for (const key in hist.aggSeen) if (hist.aggSeen[key] < aggCut) { delete hist.agg[key]; delete hist.aggSeen[key]; }
+  for (const pid in hist.prod) if (!(hist.prod[pid].t >= aggCut)) delete hist.prod[pid];
   for (const sk in hist.fetches) hist.fetches[sk] = hist.fetches[sk].filter(x => x >= rawCut);
   return hist;
 }
@@ -854,7 +896,7 @@ function pruneHistory(hist, now) {
 function mergeHistory(disk, mem) {
   if (!disk || !disk.offers) return mem;
   if (!mem || !mem.offers) return disk;
-  const out = { v: 2, offers: {}, fetches: {}, agg: disk.agg || {}, aggSeen: disk.aggSeen || {} };
+  const out = { v: 2, offers: {}, fetches: {}, agg: disk.agg || {}, aggSeen: disk.aggSeen || {}, prod: disk.prod || {}, pv: disk.pv };
   const cut = Date.now() - HISTORY_RAW_DAYS * 86400000;
   for (const k of new Set([...Object.keys(disk.offers), ...Object.keys(mem.offers)])) {
     const a = disk.offers[k], b = mem.offers[k];
@@ -873,22 +915,28 @@ function mergeHistory(disk, mem) {
   return out;
 }
 function buildTimingStats(hist) {
-  const out = { v: 2, offers: 0, stores: {}, keys: {} };
+  const out = { v: 3, offers: 0, stores: {}, keys: {}, prod: {} };
   if (!hist || !hist.offers) return out;
   const acc = JSON.parse(JSON.stringify(hist.agg || {}));
+  if (!hist.pv) productKeysFromStores(acc, null);
+  const prod = JSON.parse(JSON.stringify(hist.prod || {}));
   for (const k in hist.offers) {
     const o = hist.offers[k];
     if (!o.o || !o.o.length) continue;
     out.offers++;
     out.stores[o.s] = (out.stores[o.s] || 0) + 1;
     for (const r of offerOutcomes(o)) for (const key of offerAggKeys(o)) addOutcome(acc, key, r);
+    if (o.p != null) addProductOffer(prod[o.p] = prod[o.p] || {}, o);
   }
+  // Per-product summary for the cards and the Logboek; the most followed products first.
+  const plist = Object.keys(prod).filter(id => prod[id].n).sort((a, b) => (prod[b].k || 0) - (prod[a].k || 0) || (prod[b].t || 0) - (prod[a].t || 0)).slice(0, 1200);
+  for (const id of plist) { const P = prod[id]; out.prod[id] = { n: P.n, c: P.c || null, f: isFinite(P.f) ? P.f : null, t: P.t || null, lo: P.lo ?? null, w: P.w ?? null, ns: (P.s || []).length, k: P.k || 0, mx: P.mx || {} }; }
   for (const key in hist.agg || {}) if (key === 'all') for (const b in hist.agg.all) out.folded = (out.folded || 0) + hist.agg.all[b].up + hist.agg.all[b].gone;
   const r1 = v => v == null ? null : Math.round(v * 10) / 10;
   for (const key in acc) {
     for (const b in acc[key]) {
       const B = acc[key][b], n = B.up + B.gone;
-      if (key.startsWith('sp:') && n < 2) continue; // keep the file small: single sightings say little
+      if (key.startsWith('sp:') && n < 2) continue; // single sightings per store: the p: key holds them
       // The next level is the most common one (a median of 40 and 70 would be a 55% that never happens);
       // its time of day and wait come from the cases that went to that level.
       let to = null, best = 0;
@@ -906,8 +954,11 @@ function buildTimingStats(hist) {
   return out;
 }
 function fmtHour(h) { let H = Math.floor(h), M = Math.round((h - H) * 4) * 15; if (M === 60) { H += 1; M = 0; } return `${String(H % 24).padStart(2, '0')}:${String(M).padStart(2, '0')}`; }
-// Buy now or wait? Uses the most specific history that has enough cases.
+// Buy now or wait? Starts from this product's own history (in this store, else in all your stores).
+// While the product has few cases (under 6), the pattern of other products of its kind weighs in,
+// like 3 extra cases at first and less with every case of its own.
 // seenAt: when this price was seen (old data cannot prove a drop "did not happen").
+const PRIOR_WEIGHT = 3;
 function timingAdvice(it, stats, now, seenAt) {
   if (!it || it.discountPct == null || !(it.priceNormal > 0)) return null;
   const st = expState(it);
@@ -915,39 +966,68 @@ function timingAdvice(it, stats, now, seenAt) {
   const p = pctBucket(it.discountPct);
   if (p >= 70) return { kind: 'nu', text: 'Dit is al de hoogste korting die AH meestal geeft; wachten levert weinig op.' };
   const catName = it.cat && CATS[it.cat] ? CATS[it.cat].toLowerCase() : 'dit soort product';
+  const K = (stats && stats.keys) || {};
+  const at = key => (key && K[key] && K[key][p]) || null;
+  const hasPid = it.productId != null && it.productId !== '';
+  const sp = it.storeKey && hasPid ? at(`sp:${it.storeKey}|${it.productId}`) : null;
+  const pa = hasPid ? at(`p:${it.productId}`) : null;
+  let prod = null, prodLabel = '';
+  if (sp && (sp.n >= 3 || !pa || sp.n >= pa.n)) { prod = sp; prodLabel = 'dit product in deze winkel'; }
+  else if (pa) { prod = pa; prodLabel = pa.n > (sp ? sp.n : 0) && it.storeKey ? 'dit product in je winkels' : 'dit product'; }
   const chain = [
-    [it.storeKey && it.productId != null ? `sp:${it.storeKey}|${it.productId}` : null, 'dit product in deze winkel', 3],
     [it.storeKey ? `sc:${it.storeKey}|${it.cat}` : null, `${catName} in deze winkel`, 5],
     [`c:${it.cat}`, `${catName} in je winkels`, 8],
-    [it.storeKey ? `s:${it.storeKey}` : null, 'een koopje in deze winkel', 8],
-    ['all', 'een koopje in je winkels', 10],
+    [it.storeKey ? `s:${it.storeKey}` : null, 'koopjes in deze winkel', 8],
+    ['all', 'koopjes in je winkels', 10],
   ];
-  const K = (stats && stats.keys) || {};
-  let pick = null;
-  for (const [key, label, min] of chain) { const B = key && K[key] && K[key][p]; if (B && B.n >= min) { pick = { B, label }; break; } }
+  let prior = null, priorLabel = '';
+  for (const [key, label, min] of chain) {
+    const B = at(key);
+    if (!B || B.n < min) continue;
+    // Leave this product's own cases out of the general pattern (they are counted already).
+    const own = key.startsWith('sc:') || key.startsWith('s:') ? sp : (pa || sp);
+    const up = B.up - (own ? own.up : 0), n = B.n - (own ? own.n : 0);
+    if (n >= 3) { prior = { up, n, to: B.to, h: B.h, dt: B.dt }; priorLabel = own ? label.replace(/ in (deze|je) winkel(s?)$/, ' (andere producten) in $1 winkel$2') : label; }
+    break;
+  }
   const tNow = now || Date.now();
   const dNow = new Date(tNow), hourNow = dNow.getHours() + dNow.getMinutes() / 60;
   const fresh = seenAt == null || tNow - seenAt <= 3600000;
-  if (!pick) {
+  if (!prod && !prior) {
     // Only for live AH bargains on a dynamic step; the fixed 35% sticker does not move.
-    if (stats && it.source === 'ah' && it.storeKey && p !== 35 && st === 'vandaag' && p <= 40 && hourNow < 18) return { kind: 'info', weak: true, text: 'AH verhoogt de korting door de dag heen (25%, 40%, tot 70%). Er zijn nog te weinig eigen metingen om te zeggen of dit product het haalt.' };
+    if (stats && it.source === 'ah' && it.storeKey && p !== 35 && st === 'vandaag' && p <= 40 && hourNow < 18) return { kind: 'info', weak: true, text: 'AH verhoogt de korting door de dag heen (25%, 40%, tot 70%). Dit product is nog te weinig gevolgd om te zeggen of het die haalt.' };
     return null;
   }
-  const { B, label } = pick;
-  const raw = B.up / B.n;
+  // Chance it drops further: the product's own count, pulled towards the general pattern while it is small.
+  const base = prior ? prior.up / prior.n : 0.5;
+  const w = prod ? Math.max(0, PRIOR_WEIGHT - prod.n / 2) : 0;
+  const raw = prod ? (prod.up + w * base) / (prod.n + w) : base;
+  // Where and when it goes: the product's own next step when it has one.
+  const src = prod && prod.up > 0 && prod.to != null ? prod : prior || prod;
+  const nextTo = src && src.to, nextH = src ? src.h : null, nextDt = src ? src.dt : null;
   const lastOne = it.stock != null && it.stock <= 1;
-  const late = fresh && B.h != null && st === 'vandaag' && hourNow > B.h + 1.5;
+  const late = fresh && nextH != null && st === 'vandaag' && hourNow > nextH + 1.5;
   let pUp = raw;
   if (lastOne) pUp *= 0.75;
   if (late) pUp *= 0.4;
-  const nextPct = B.to || Math.min(70, p + 15);
+  const nextPct = nextTo || Math.min(70, p + 15);
   const save = round2((itemPriceNow(it) || 0) - round2(it.priceNormal * (1 - nextPct / 100)));
-  const when = B.h != null ? ` rond ${fmtHour(B.h)}` : B.dt != null ? ` na zo'n ${Math.max(1, Math.round(B.dt))} uur` : '';
-  const upTxt = Math.round(raw * 100), one = lastOne ? ' Er ligt er nog maar één.' : '';
-  const basis = ` (${B.n}× gezien${!fresh && seenAt ? `; prijs van ${fmtHour(new Date(seenAt).getHours() + new Date(seenAt).getMinutes() / 60)}` : ''})`;
-  if (late && pUp < 0.6) return { kind: 'nu', p: pUp, text: `${label[0].toUpperCase() + label.slice(1)} zakt meestal${when} verder, en dat moment is al voorbij zonder dat het gebeurde.${one}${basis}` };
-  if (pUp >= 0.6 && save >= 0.3) return { kind: 'wacht', p: pUp, save, text: `In ${upTxt}% van de gevallen zakte ${label} verder naar ${nextPct}%${when}, ${fmtEur(save)} goedkoper.${one}${basis}` };
-  if (pUp >= 0.6) return { kind: 'nu', p: pUp, save, text: `Hij zakt meestal nog naar ${nextPct}%${when}, maar dat scheelt maar ${fmtEur(Math.max(0, save))}.${one}${basis}` };
-  if (pUp <= 0.4) return { kind: 'nu', p: pUp, text: `In ${100 - upTxt}% van de gevallen was ${label} op voordat de korting verder zakte.${one}${basis}` };
-  return { kind: 'gok', p: pUp, save, text: `In ${upTxt}% van de gevallen zakte ${label} verder naar ${nextPct}%${when} (${fmtEur(Math.max(0, save))} goedkoper), maar regelmatig was hij ook eerder op.${one}${basis}` };
+  const when = nextH != null ? ` rond ${fmtHour(nextH)}` : nextDt != null ? ` na zo'n ${Math.max(1, Math.round(nextDt))} uur` : '';
+  const kans = Math.round(pUp * 100), one = lastOne ? ' Er ligt er nog maar één.' : '';
+  const Up = x => x[0].toUpperCase() + x.slice(1);
+  // The evidence: this product first, then the general pattern when it still counts.
+  const ev = [];
+  if (prod) {
+    const gone = prod.n - prod.up;
+    ev.push(`${Up(prodLabel)}: ${prod.up} van de ${prod.n} keer verder gezakt${prod.up && prod.to ? ` (meestal naar ${prod.to}%${prod.h != null ? ` rond ${fmtHour(prod.h)}` : ''})` : ''}${gone ? `, ${gone}× eerst op` : ''}.`);
+  } else ev.push('Dit product is op deze korting nog niet gevolgd.');
+  if (prior && (!prod || w > 0)) ev.push(`${Up(priorLabel)}: ${Math.round(prior.up / prior.n * 100)}% zakte verder (${prior.n}×).`);
+  const stale = !fresh && seenAt ? ` Prijs van ${fmtHour(new Date(seenAt).getHours() + new Date(seenAt).getMinutes() / 60)}.` : '';
+  const tail = `${one} ${ev.join(' ')}${stale}`;
+  const out = (kind, head) => ({ kind, p: pUp, save, own: prod ? prod.n : 0, text: head + tail });
+  if (late && pUp < 0.6) return out('nu', `Meestal zakt hij${when} verder, en dat moment is al voorbij zonder dat het gebeurde.`);
+  if (pUp >= 0.6 && save >= 0.3) return out('wacht', `${kans}% kans dat hij${when} naar ${nextPct}% zakt: ${fmtEur(save)} goedkoper.`);
+  if (pUp >= 0.6) return out('nu', `Hij zakt waarschijnlijk nog naar ${nextPct}%${when}, maar dat scheelt maar ${fmtEur(Math.max(0, save))}.`);
+  if (pUp <= 0.4) return out('nu', `Kleine kans (${kans}%) dat hij eerst nog verder zakt.`);
+  return out('gok', `${kans}% kans dat hij${when} naar ${nextPct}% zakt (${fmtEur(Math.max(0, save))} goedkoper), maar hij kan ook eerder op zijn.`);
 }
