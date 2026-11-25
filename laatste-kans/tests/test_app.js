@@ -110,11 +110,12 @@ function ok(cond, msg) { if (cond) console.log('  ok  ' + msg); else { failures+
       const ms = await page.evaluate(() => ({
         old: window.LK.profileStores({ store: 'ah-1330', stores: [] }),
         both: window.LK.profileStores({ stores: ['ah-1330', 'ah-1829', 'nope'] }),
-        cap: window.LK.profileStores({ stores: STORES.map(s => s.id) }).length,
+        cap: window.LK.profileStores({ stores: STORES.map(s => s.id) }).length, total: STORES.length, borch: STORES.some(s => s.id === 'ah-4191' && s.city === 'Eelderwolde'),
       }));
       ok(ms.old.join() === 'ah-1330', 'old single-store profile migrates: ' + ms.old);
       ok(ms.both.join() === 'ah-1330,ah-1829', 'unknown store ids dropped');
-      ok(ms.cap === 23, 'all 23 stores can be followed: ' + ms.cap);
+      ok(ms.cap === ms.total && ms.total >= 24, `all ${ms.total} stores can be followed: ` + ms.cap);
+      ok(ms.borch, 'AH Ter Borch (Borchsingel, Eelderwolde) is in the list');
       await page.click('#storeBtn');
       await page.click('#storeSheetList input[data-id="ah-1330"]');
       await page.click('#storeSheetList input[data-id="ah-1829"]');

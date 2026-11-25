@@ -41,7 +41,7 @@ Het live ophalen gebruikt dezelfde, niet-officiële koppeling als de AH-app (`ap
 | `src/ui.js` | Schermlogica, opslag, Claude-functies en de koppeling met Scriptable |
 | `src/scriptable.js` | Het Scriptable-script: AH-login, winkel opzoeken, koopjes en voeding ophalen, app tonen, widget |
 | `data/food.json` | 130 producten die vaak worden afgeprijsd, met richtwaarden voor voeding, verpakking, richtprijs en tags |
-| `data/stores.json` | 23 AH-winkels in de gemeente Groningen, inclusief Haren en AH to go |
+| `data/stores.json` | 24 AH-winkels in en rond Groningen, inclusief Haren, Ter Borch (Eelderwolde) en AH to go |
 | `data/tips.json`, `data/safety.json` | Hoe AH afprijst en de TGT/THT- en invriesregels van Voedingscentrum en NVWA |
 | `build.py` | Bouwt `dist/artifact.html` (claude.ai), `dist/index.html` (los te hosten), `dist/LaatsteKans.js` (Scriptable) en `dist/installer.js` |
 | `tests/` | Tests voor de beoordeling, de schermen, de claude.ai-opslag en het Scriptable-script tegen een nagebootste AH |

@@ -234,6 +234,19 @@
   "note": "AH heroverweegt deze locatie (2026)."
  },
  {
+  "id": "ah-4191",
+  "name": "AH Borchsingel Ter Borch",
+  "short": "Ter Borch (Borchsingel)",
+  "street": "Borchsingel 25",
+  "postcode": "9766 PP",
+  "city": "Eelderwolde",
+  "area": "Ter Borch",
+  "format": "AH",
+  "hours": "",
+  "url": "https://www.ah.nl/winkels/nederland/eelderwolde/borchsingel-25/4191",
+  "note": "Net buiten de stad, gemeente Tynaarlo."
+ },
+ {
   "id": "ah-5826",
   "name": "AH to go Stationsplein 3",
   "short": "Station (to go, Stationsplein 3)",

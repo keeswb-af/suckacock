@@ -372,14 +372,15 @@ function run(env) {
   ok(await page.evaluate(() => window.LK.S.stats && (window.LK.S.stats.offers + (window.LK.S.stats.folded || 0)) > 20), 'stats sent to the page after a refresh, old offers folded into counters');
   await page.click('a[href="#logboek"]');
   ok(/Hoe AH afprijst bij jou/.test(await page.textContent('#patternCard')) && /Paddepoel/.test(await page.textContent('#patternCard')), 'Logboek shows the markdown pattern per store');
-  // All stores at once: no limit, summary line instead of 23 lines.
+  // All stores at once: no limit, summary line instead of one line per store.
   await page.click('a[href="#winkel"]');
   await page.click('#storeBtn');
   await page.click('#storeSheetAll');
   await page.click('#storeSheetDone');
-  ok(/23 winkels/.test(await page.textContent('#storeBtn')), 'all 23 stores followed');
+  const NST = await page.evaluate(() => STORES.length);
+  ok(new RegExp(NST + ' winkels').test(await page.textContent('#storeBtn')), `all ${NST} stores followed`);
   await until(() => page.evaluate(() => Object.values(window.LK.S.live.per).filter(x => x.status === 'loading').length === 0), 20000, 'all fetched');
-  ok(/23 winkels: \d+ koopjes/.test(await page.textContent('#liveLines')), 'summary line for many stores: ' + (await page.textContent('#liveLines')).slice(0, 80));
+  ok(new RegExp(NST + ' winkels: \\d+ koopjes').test(await page.textContent('#liveLines')), 'summary line for many stores: ' + (await page.textContent('#liveLines')).slice(0, 80));
   await pickStores(page, ['ah-1829']);
   wv.dismiss();
   await until(() => Promise.race([env.done.then(() => true), wait(50).then(() => false)]), 8000, 'end');
